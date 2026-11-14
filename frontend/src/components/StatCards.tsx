@@ -70,7 +70,7 @@ export function MiniStats({ stats, grid, loading }: Omit<Props, 'scope'>) {
       {items.map(({ label, value }) => (
         <div key={label} className="px-2 first:pl-0 last:pr-0">
           <dt className="text-[10px] font-medium tracking-wider text-slate-400 uppercase">{label}</dt>
-          <dd className="mt-0.5 truncate font-mono text-base font-bold text-white">{value}</dd>
+          <dd className="mt-0.5 truncate font-mono text-base font-bold text-white" data-testid={label === 'Hotspots' ? 'stat-total' : undefined}>{value}</dd>
         </div>
       ))}
     </dl>
