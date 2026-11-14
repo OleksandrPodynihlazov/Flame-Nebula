@@ -1,0 +1,7 @@
+AI-LOG.md
+CLAUDE.md
+*.md
+# raw FIRMS downloads and secrets (FIRMS_MAP_KEY must never be committed)
+data/raw/
+.env
+__pycache__/
