@@ -34,6 +34,12 @@ export APP_VERSION="$SHA"
 
 echo "==> docker compose up (APP_VERSION=$APP_VERSION)"
 docker compose up -d --build --remove-orphans
+bash infra/sync-gateway.sh
+
+# The gateway API cache outlives deploys that keep gateway.conf: drop answers from the old API
+# so the new frontend and the post-deploy e2e never see old response shapes. Empty dir is fine.
+docker compose exec -T gateway sh -c 'rm -rf /var/cache/nginx/api/*'
+echo "==> gateway API cache cleared"
 
 echo "==> waiting for $HEALTH_URL to report version $SHA"
 deadline=$((SECONDS + 90))

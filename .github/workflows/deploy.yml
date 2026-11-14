@@ -80,9 +80,8 @@ jobs:
           test "$code" = "401"
 
   e2e:
-    needs: smoke
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 12
     defaults:
       run:
         working-directory: e2e
@@ -98,8 +97,42 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Read Playwright version
+        id: pw
+        run: |
+          v="$(node -p "require('./package-lock.json').packages['node_modules/playwright-core']?.version ?? ''")"
+          test -n "$v" || { echo "playwright-core version not found in package-lock.json" >&2; exit 1; }
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps --only-shell chromium
+
+      - name: Install Chromium system deps (browser restored from cache)
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium-headless-shell
+
+      - name: Wait for this commit to be live
+        env:
+          SHA: ${{ github.sha }}
+        run: |
+          for _ in $(seq 1 72); do
+            if body="$(curl -fsS --max-time 10 "$APP_URL/api/health" 2>/dev/null)" \
+               && echo "$body" | grep -q "\"version\":\"$SHA\""; then
+              echo "ok: $body"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "timed out after 6 min waiting for $APP_URL/api/health to report version $SHA (last body: ${body:-none})" >&2
+          exit 1
 
       - name: Run Playwright against production
         env:

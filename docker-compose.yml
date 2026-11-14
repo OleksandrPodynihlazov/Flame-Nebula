@@ -18,8 +18,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
     volumes:
       - pgdata:/var/lib/postgresql/data
-      # db teammate: mount schema/load scripts here, they run on first start of an empty volume:
-      # - ./db/init:/docker-entrypoint-initdb.d:ro
+      # Runs only on first start of an EMPTY volume (CI, new laptops). An existing DB needs the change applied by hand.
+      - ./db/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
@@ -39,6 +39,8 @@ services:
       APP_VERSION: ${APP_VERSION:-dev}
       PORT: "3000"
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      # Row cap per /api/hotspots(.csv) response; a Europe year with MODIS+VIIRS is up to ~437k rows.
+      HOTSPOTS_MAX_ROWS: ${HOTSPOTS_MAX_ROWS:-500000}
     depends_on:
       db:
         condition: service_healthy
@@ -53,6 +55,9 @@ services:
     build:
       # Real frontend (frontend/Dockerfile). Stub kept at ./infra/stubs/web as a fallback.
       context: ./frontend
+      args:
+        # false = real API (VPS, laptops). PR CI sets true: its DB is empty and the map e2e tests need demo data.
+        VITE_USE_MOCKS: ${VITE_USE_MOCKS:-false}
     restart: unless-stopped
     logging: *logging
 

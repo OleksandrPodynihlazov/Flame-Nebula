@@ -11,7 +11,10 @@ export type Area =
 export interface Filters {
   year: number
   month: Month | null
+  date: string | null
   area: Area | null
+  /** At least one. Sensors with no data in `year` are dropped from requests. */
+  sensors: Sensor[]
   types: FireType[]
   hideNoise: boolean
   daynight: DayNight | null
@@ -26,6 +29,12 @@ export interface ApiQuery {
   polygon?: string
   daynight?: DayNight
   type?: string
+  /** Comma list, e.g. `MODIS,VIIRS`. */
+  sensor?: string
+  /** Visible map area `west,south,east,north`; map requests only (never stats, calendar, CSV). */
+  bbox?: string
+  /** Grid cell in degrees; `/hotspots/grid` only. */
+  cell?: number
 }
 
 export interface HotspotProperties {
@@ -53,6 +62,21 @@ export interface HotspotCollection {
   features: HotspotFeature[]
 }
 
+/** One non-empty cell of `GET /api/hotspots/grid`. */
+export interface GridCell {
+  /** Average position of the cell's hotspots. */
+  lat: number
+  lon: number
+  count: number
+  /** Most common type; null when no hotspot in the cell has one (FIRMS API rows). */
+  type: FireType | null
+}
+
+export interface GridResponse {
+  cell: number
+  cells: GridCell[]
+}
+
 export interface StatsResponse {
   total: number
   by_type: Partial<Record<`${FireType}`, number>>
@@ -70,11 +94,4 @@ export interface CalendarResponse {
 
 export interface ApiError {
   error: string
-}
-
-export interface MonthlyCalendar {
-  year: number
-  months: number[]
-  total: number
-  peakMonth: { month: Month; count: number } | null
 }

@@ -11,12 +11,14 @@
 Every merge to `main` runs the **Deploy** workflow (`.github/workflows/deploy.yml`):
 
 ```
-merge to main ─▶ Deploy workflow ─▶ ssh VPS ─▶ infra/deploy.sh <sha> ─▶ /api/health reports <sha> ─▶ smoke job ─▶ e2e job
+merge to main ─▶ Deploy workflow ─▶ ssh VPS ─▶ infra/deploy.sh <sha> ─▶ /api/health reports <sha> ─▶ smoke job   (e2e job runs in parallel)
 ```
 
-`infra/deploy.sh` checks out the commit, runs `docker compose up -d --build`, and waits up to 90 s for `/api/health` to return that commit's sha as `version`. If it never does, the job fails and saves container logs to `deploy-failure.log` in the repo dir on the VPS (CI output is public, so logs are not printed). The smoke job then checks the public URL.
+`infra/deploy.sh` checks out the commit, runs `docker compose up -d --build`, then `infra/sync-gateway.sh`, and waits up to 90 s for `/api/health` to return that commit's sha as `version`. If it never does, the job fails and saves container logs to `deploy-failure.log` in the repo dir on the VPS (CI output is public, so logs are not printed). The smoke job then checks the public URL.
 
-The e2e job then runs the Playwright suite in `e2e/` against the public URL. Its HTML report is a downloadable artifact on the Actions run.
+`gateway.conf` and `htpasswd` are bind-mounted as single files. A checkout or edit replaces the file, but the running container keeps the old copy and `compose up` does not recreate it. `infra/sync-gateway.sh` compares checksums on the host and in the container, and force-recreates `gateway` if they differ. After changing `htpasswd` on the VPS by hand, run `bash infra/sync-gateway.sh`.
+
+The e2e job starts alongside deploy: it installs Chromium, polls `/api/health` (up to 6 min) until it reports this commit's sha, then runs the Playwright suite in `e2e/` against the public URL. Its HTML report is a downloadable artifact on the Actions run.
 
 PRs into `main` run **CI** (`.github/workflows/ci.yml`): build the whole stack, wait for health, then run the e2e suite without `@prod` tests.
 
@@ -49,7 +51,19 @@ CI must be green before merge.
 
 `web` now builds from `frontend/` (`frontend/Dockerfile`: Node build stage, then nginx on port 80 with SPA fallback). The **Frontend** workflow (`.github/workflows/frontend.yml`) runs `npm ci`, `npm run lint`, `npm run build` in `frontend/`.
 
+Demo vs real data is the `web` build arg `VITE_USE_MOCKS`: default `false` = real API (VPS, laptops); PR CI sets `true` because its DB is empty. The API row cap is `HOTSPOTS_MAX_ROWS` (compose default 500000). Override either in `.env`.
+
 The stub stays in `infra/stubs/web`. To fall back to it, change the `web` `build:` `context:` in `docker-compose.yml` from `./frontend` back to `./infra/stubs/web`.
+
+## API cache (gateway)
+
+The gateway caches `200` answers of `GET /api/...` (not `/api/health`, not `/logs/`) for 10 minutes in `/var/cache/nginx/api` inside the container (max 500 MB). Responses carry `X-Cache-Status` (`MISS`, `HIT`, `EXPIRED`, `UPDATING`); the access log has `cache=`. Data changes only when someone loads it, so **after a data load clear the cache**, from the repo dir:
+
+```sh
+docker compose exec gateway sh -c 'rm -rf /var/cache/nginx/api/*'
+```
+
+Every deploy empties it (`infra/deploy.sh`, after `sync-gateway.sh`), so a new API never serves cached answers from the old one. The command above is still needed after a data load without a deploy. Recreating the gateway also empties it. The `/api/hotspots` connection limit is checked before the cache lookup, so a cache hit also holds a slot while it is sent; `/api/hotspots/grid` has no limit.
 
 ## Run locally
 

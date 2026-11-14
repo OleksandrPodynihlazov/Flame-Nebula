@@ -27,11 +27,54 @@ jobs:
       - name: Validate compose file
         run: docker compose config -q
 
-      - name: Build images
-        run: docker compose build
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
 
-      - name: Start stack
-        run: APP_VERSION=ci docker compose up -d
+      - name: Read Playwright version
+        id: pw
+        run: |
+          v="$(node -p "require('./e2e/package-lock.json').packages['node_modules/playwright-core']?.version ?? ''")"
+          test -n "$v" || { echo "playwright-core version not found in e2e/package-lock.json" >&2; exit 1; }
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+
+      - name: Build and start stack (e2e deps and Chromium install in background)
+        env:
+          PW_CACHE_HIT: ${{ steps.pw-cache.outputs.cache-hit }}
+          # The CI DB is empty, so the web build uses demo mocks for the map e2e tests.
+          VITE_USE_MOCKS: "true"
+        run: |
+          (
+            set -e
+            start=$SECONDS
+            cd e2e
+            npm ci
+            if [ "$PW_CACHE_HIT" = "true" ]; then
+              npx playwright install-deps chromium-headless-shell
+            else
+              npx playwright install --with-deps --only-shell chromium
+            fi
+            echo "e2e install took $((SECONDS - start))s (browser cache hit: ${PW_CACHE_HIT:-false})"
+          ) > /tmp/e2e-install.log 2>&1 &
+          pw=$!
+          docker compose build
+          APP_VERSION=ci docker compose up -d
+          if ! wait "$pw"; then
+            echo "e2e install failed:" >&2
+            cat /tmp/e2e-install.log
+            exit 1
+          fi
+          echo "e2e install ok:"
+          tail -5 /tmp/e2e-install.log
 
       - name: Wait for health (version ci)
         run: |
@@ -45,20 +88,6 @@ jobs:
           done
           echo "stack did not become healthy in 90s" >&2
           exit 1
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: e2e/package-lock.json
-
-      - name: Install e2e dependencies
-        working-directory: e2e
-        run: npm ci
-
-      - name: Install Chromium
-        working-directory: e2e
-        run: npx playwright install --with-deps chromium
 
       - name: Run Playwright against the stack
         working-directory: e2e
@@ -81,7 +110,3 @@ jobs:
         run: |
           docker compose ps
           docker compose logs --tail=100
-
-      - name: Tear down
-        if: always()
-        run: docker compose down -v

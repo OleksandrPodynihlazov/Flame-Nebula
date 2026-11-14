@@ -9,8 +9,17 @@ const CSV_COLUMNS = [
   'id', 'latitude', 'longitude', 'acq_date', 'acq_time', 'sensor',
   'satellite', 'daynight', 'frp', 'confidence', 'type',
 ];
-const ITALY_BBOX = { lonMin: 6, lonMax: 19, latMin: 35, latMax: 48 };
 const YEAR_2008 = { from: '2008-01-01', to: '2008-12-31' };
+const ROME_CIRCLE = { lat: 41.9, lon: 12.5, radius_km: 300 };
+// Same Earth radius as the API's haversine filter (api/lib/query.js).
+const EARTH_RADIUS_KM = 6371;
+
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const rad = (deg) => (deg * Math.PI) / 180;
+  const a = Math.sin(rad(lat2 - lat1) / 2) ** 2
+    + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(rad(lon2 - lon1) / 2) ** 2;
+  return 2 * EARTH_RADIUS_KM * Math.asin(Math.sqrt(a));
+}
 
 async function getJson(request, path, params) {
   const res = await request.get(path, { params });
@@ -28,7 +37,7 @@ async function expectBadRequest(request, path, params) {
 }
 
 test.describe('GET /api/stats', () => {
-  test.fixme('total, by_type and by_daynight are consistent', async ({ request }) => {
+  test('total, by_type and by_daynight are consistent', async ({ request }) => {
     const body = await getJson(request, '/api/stats');
     expect(Number.isInteger(body.total)).toBe(true);
     expect(body.total).toBeGreaterThanOrEqual(0);
@@ -42,7 +51,7 @@ test.describe('GET /api/stats', () => {
 });
 
 test.describe('GET /api/calendar', () => {
-  test.fixme('days are sorted, in range, and sum to stats total', async ({ request }) => {
+  test('days are sorted, in range, and sum to stats total', async ({ request }) => {
     const { days } = await getJson(request, '/api/calendar', YEAR_2008);
     expect(Array.isArray(days)).toBe(true);
     const dates = days.map((d) => d.date);
@@ -60,22 +69,21 @@ test.describe('GET /api/calendar', () => {
 });
 
 test.describe('GET /api/hotspots', () => {
-  test.fixme('returns a GeoJSON FeatureCollection of points in Italy', async ({ request }) => {
-    const body = await getJson(request, '/api/hotspots', YEAR_2008);
+  test('returns a GeoJSON FeatureCollection of points inside the requested circle', async ({ request }) => {
+    const body = await getJson(request, '/api/hotspots', { ...YEAR_2008, ...ROME_CIRCLE });
     expect(body.type).toBe('FeatureCollection');
     expect(Array.isArray(body.features)).toBe(true);
     for (const feature of body.features) {
       expect(feature.type).toBe('Feature');
       expect(feature.geometry.type).toBe('Point');
       const [lon, lat] = feature.geometry.coordinates;
-      expect(lon).toBeGreaterThanOrEqual(ITALY_BBOX.lonMin);
-      expect(lon).toBeLessThanOrEqual(ITALY_BBOX.lonMax);
-      expect(lat).toBeGreaterThanOrEqual(ITALY_BBOX.latMin);
-      expect(lat).toBeLessThanOrEqual(ITALY_BBOX.latMax);
+      // Small tolerance for float rounding of the returned coordinates.
+      expect(haversineKm(ROME_CIRCLE.lat, ROME_CIRCLE.lon, lat, lon))
+        .toBeLessThanOrEqual(ROME_CIRCLE.radius_km * 1.001);
     }
   });
 
-  test.fixme('hotspots.csv is text/csv with the contract [1] header', async ({ request }) => {
+  test('hotspots.csv is text/csv with the contract [1] header', async ({ request }) => {
     const res = await request.get('/api/hotspots.csv', { params: YEAR_2008 });
     expect(res.status()).toBe(200);
     expect(res.headers()['content-type']).toContain('text/csv');
@@ -95,25 +103,47 @@ test.describe('query validation', () => {
     ['from=not-a-date', { from: 'not-a-date', to: '2008-12-31' }],
     ['malformed polygon JSON', { polygon: '[[12.1,41.8],[12.9,41.8' }],
     ['polygon with < 3 points', { polygon: '[[12.1,41.8],[12.9,41.8]]' }],
+    ['type=7', { type: '7' }],
+    ['sensor=GOES', { sensor: 'GOES' }],
+    ['polygon with 201 points', {
+      // 5 decimals, as the frontend sends them: full-precision floats would hit nginx's 8 KB URL limit (HTML 414)
+      polygon: JSON.stringify(Array.from({ length: 201 }, (_, i) => [
+        Math.round((12 + Math.cos(i) / 10) * 1e5) / 1e5, Math.round((41 + Math.sin(i) / 10) * 1e5) / 1e5,
+      ])),
+    }],
+    ['region and polygon together', { region: 1, polygon: '[[12.1,41.8],[12.9,41.8],[12.5,42.2]]' }],
+    ['region and circle together', { region: 1, lat: 41.9, lon: 12.5, radius_km: 50 }],
+    ['unknown region', { region: 2147483647 }],
+    ['region not an id', { region: 'sicily' }],
   ];
 
   for (const [name, params] of badParams) {
-    test.fixme(`${name} -> 400 JSON error`, async ({ request }) => {
+    test(`${name} -> 400 JSON error`, async ({ request }) => {
       await expectBadRequest(request, '/api/stats', params);
     });
   }
 
-  test.fixme('area far outside Italy -> 200 with total 0', async ({ request }) => {
+  test('area far outside Italy -> 200 with total 0', async ({ request }) => {
     const body = await getJson(request, '/api/stats', { lat: 0, lon: 0, radius_km: 10 });
     expect(body.total).toBe(0);
   });
 
-  test.fixme('date range outside data -> 200 with total 0', async ({ request }) => {
+  test('region filter count is within the unfiltered total', async ({ request }) => {
+    const { regions } = await getJson(request, '/api/regions', { q: 'sicil' });
+    const sicilia = regions.find((r) => r.name === 'Sicilia' && r.country === 'ITA');
+    test.skip(!sicilia, 'regions not loaded in this DB');
+    const all = await getJson(request, '/api/stats');
+    const one = await getJson(request, '/api/stats', { region: sicilia.id });
+    expect(one.total).toBeGreaterThan(0);
+    expect(one.total).toBeLessThanOrEqual(all.total);
+  });
+
+  test('date range outside data -> 200 with total 0', async ({ request }) => {
     const body = await getJson(request, '/api/stats', { from: '1990-01-01', to: '1990-12-31' });
     expect(body.total).toBe(0);
   });
 
-  test.fixme('SQL-injection-looking type -> 400, stats still works', async ({ request }) => {
+  test('SQL-injection-looking type -> 400, stats still works', async ({ request }) => {
     await expectBadRequest(request, '/api/stats', { type: '0;DROP TABLE hotspots' });
     await getJson(request, '/api/stats');
   });
