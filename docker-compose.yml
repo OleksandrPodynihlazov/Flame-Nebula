@@ -30,7 +30,7 @@ services:
   api:
     build:
       # Swap to ./api when the real api/Dockerfile exists.
-      context: ./infra/stubs/api
+      context: ./api
       args:
         APP_VERSION: ${APP_VERSION:-dev}
     restart: unless-stopped
