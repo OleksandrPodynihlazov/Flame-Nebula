@@ -106,6 +106,8 @@ No area given → whole dataset (Italy).
 | `GET /api/calendar` | `{ "days": [ { "date": "2008-08-14", "count": 42 }, ... ] }` |
 | `GET /api/hotspots.csv` | CSV download, same columns as [1] |
 
+Row cap: `GET /api/hotspots` and `GET /api/hotspots.csv` return at most `HOTSPOTS_MAX_ROWS` rows (env, default 200000). More matching rows → 400 `{ "error": "Too many hotspots (more than 200000). Narrow the date range or area." }`; never a truncated result.
+
 Owner may change these; update this table first.
 
 ### Frontend requirements for [3]
