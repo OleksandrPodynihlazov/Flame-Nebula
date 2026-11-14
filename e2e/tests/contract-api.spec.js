@@ -98,6 +98,86 @@ test.describe('GET /api/hotspots', () => {
   });
 });
 
+// The selection card's numbers as the browser used to compute them from every dot of the area
+// (frontend/src/utils/selectionSummary.ts before /api/selection-summary), in the endpoint's shape.
+function summaryFromDots(features) {
+  const out = {
+    total: features.length, frp: null, peak_month: null, peak_day: null, first: null, last: null,
+    by_type: {}, by_daynight: {},
+  };
+  const days = new Map();
+  let sum = 0;
+  let n = 0;
+  let max = -Infinity;
+  for (const { properties: p } of features) {
+    if (p.type !== null) out.by_type[p.type] = (out.by_type[p.type] ?? 0) + 1;
+    out.by_daynight[p.daynight] = (out.by_daynight[p.daynight] ?? 0) + 1;
+    if (p.frp !== null) {
+      sum += p.frp;
+      n += 1;
+      max = Math.max(max, p.frp);
+    }
+    days.set(p.acq_date, (days.get(p.acq_date) ?? 0) + 1);
+  }
+  if (n) out.frp = { sum, mean: sum / n, max };
+  const months = new Map();
+  const sorted = [...days.keys()].sort();
+  for (const date of sorted) {
+    const count = days.get(date);
+    months.set(date.slice(0, 7), (months.get(date.slice(0, 7)) ?? 0) + count);
+    if (!out.peak_day || count > out.peak_day.count) out.peak_day = { date, count };
+  }
+  for (const [month, count] of months) {
+    if (!out.peak_month || count > out.peak_month.count) out.peak_month = { month, count };
+  }
+  out.first = sorted[0] ?? null;
+  out.last = sorted[sorted.length - 1] ?? null;
+  return out;
+}
+
+test.describe('GET /api/selection-summary', () => {
+  const SICILY_2020 = {
+    from: '2020-01-01', to: '2020-12-31', sensor: 'MODIS,VIIRS',
+    polygon: '[[12.3,36.6],[15.7,36.6],[15.7,38.3],[12.3,38.3]]',
+  };
+
+  for (const [name, params] of [['Rome circle 2008', { ...YEAR_2008, ...ROME_CIRCLE }], ['Sicily box 2020', SICILY_2020]]) {
+    test(`${name}: equals the summary of the same area's /api/hotspots dots`, async ({ request }) => {
+      const [summary, dots] = await Promise.all([
+        getJson(request, '/api/selection-summary', params),
+        getJson(request, '/api/hotspots', params),
+      ]);
+      const expected = summaryFromDots(dots.features);
+      const { frp, ...rest } = summary;
+      const { frp: expectedFrp, ...expectedRest } = expected;
+      expect(rest).toEqual(expectedRest);
+      if (expectedFrp === null) {
+        expect(frp).toBeNull();
+      } else {
+        // SQL and JS add the FRP values in a different order: last-bit differences only.
+        expect(Math.abs(frp.sum - expectedFrp.sum)).toBeLessThan(1e-6 * Math.max(1, expectedFrp.sum));
+        expect(Math.abs(frp.mean - expectedFrp.mean)).toBeLessThan(1e-9 * Math.max(1, expectedFrp.mean));
+        expect(frp.max).toBe(expectedFrp.max);
+      }
+      const stats = await getJson(request, '/api/stats', params);
+      expect(summary.total).toBe(stats.total);
+      expect(summary.by_type).toEqual(stats.by_type);
+    });
+  }
+
+  test('no match -> 200 with zeros and nulls', async ({ request }) => {
+    const body = await getJson(request, '/api/selection-summary', { from: '1990-01-01', to: '1990-12-31' });
+    expect(body).toEqual({
+      total: 0, frp: null, peak_month: null, peak_day: null, first: null, last: null, by_type: {}, by_daynight: {},
+    });
+  });
+
+  test('shared params are validated like /api/stats', async ({ request }) => {
+    await expectBadRequest(request, '/api/selection-summary', { polygon: '[[12.1,41.8],[12.9,41.8]]' });
+    await expectBadRequest(request, '/api/selection-summary', { region: 1, lat: 41.9, lon: 12.5, radius_km: 50 });
+  });
+});
+
 test.describe('query validation', () => {
   const badParams = [
     ['radius_km=0', { lat: 41.9, lon: 12.5, radius_km: 0 }],
