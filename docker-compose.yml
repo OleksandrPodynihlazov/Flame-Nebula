@@ -30,7 +30,7 @@ services:
   api:
     build:
       # Swap to ./api when the real api/Dockerfile exists.
-      context: ./infra/stubs/api
+      context: ./api
       args:
         APP_VERSION: ${APP_VERSION:-dev}
     restart: unless-stopped
@@ -51,8 +51,8 @@ services:
 
   web:
     build:
-      # Swap to ./web when the real web/Dockerfile exists.
-      context: ./infra/stubs/web
+      # Real frontend (frontend/Dockerfile). Stub kept at ./infra/stubs/web as a fallback.
+      context: ./frontend
     restart: unless-stopped
     logging: *logging
 

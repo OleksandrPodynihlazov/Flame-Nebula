@@ -20,9 +20,6 @@ test('home page loads without errors', async ({ page }) => {
   expect(res.status()).toBe(200);
   await expect(page).toHaveTitle(/\S/);
 
-  // stub-only: update when real web lands (the stub prints /api/health into #summary).
-  await expect(page.locator('#summary')).toContainText('status: ok');
-
   await page.waitForLoadState('networkidle');
   expect(errors).toEqual([]);
 });
