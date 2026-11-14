@@ -4,6 +4,8 @@ data/
 # env
 .env
 
+*.md
+
 # python
 .venv/
 venv/
