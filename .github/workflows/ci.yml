@@ -50,6 +50,8 @@ jobs:
       - name: Build and start stack (e2e deps and Chromium install in background)
         env:
           PW_CACHE_HIT: ${{ steps.pw-cache.outputs.cache-hit }}
+          # The CI DB is empty, so the web build uses demo mocks for the map e2e tests.
+          VITE_USE_MOCKS: "true"
         run: |
           (
             set -e
