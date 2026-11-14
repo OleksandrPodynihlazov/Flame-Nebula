@@ -256,5 +256,49 @@ class Fetching(unittest.TestCase):
             self.assertIn("header changed", str(ctx.exception))
 
 
+class MergeLineEndings(unittest.TestCase):
+    """FIRMS chunks may end without a newline or use CRLF; the merge must not glue rows."""
+
+    def merge(self, responder):
+        logs: list[str] = []
+        with FakeFirms(responder) as fake, tempfile.TemporaryDirectory() as out:
+            merged = fx.fetch_range(
+                key=KEY, source="MODIS_SP", bbox=fx.ITALY_BBOX,
+                start=dt.date(2025, 6, 1), end=dt.date(2025, 6, 12),
+                out_dir=Path(out), base_url=fake.base_url, sleep=lambda s: None, log=logs.append,
+            )
+            return merged.read_bytes(), logs
+
+    def assert_clean(self, data, logs, rows):
+        self.assertTrue(data.endswith(b"\n"))
+        self.assertNotIn(b"\r", data)
+        lines = data.decode().splitlines()
+        self.assertEqual(lines[0] + "\n", HEADER)
+        self.assertEqual(len(lines), 1 + rows)
+        width = HEADER.count(",") + 1
+        self.assertEqual({len(r) for r in csv.reader(lines)}, {width})
+        self.assertEqual(logs[-1].split()[1], str(rows))
+
+    def test_chunks_without_final_newline_do_not_glue_rows(self):
+        data, logs = self.merge(lambda path, i: (200, csv_for(path).rstrip("\n")))
+        self.assert_clean(data, logs, 24)
+
+    def test_header_only_chunk_without_newline_adds_no_rows(self):
+        data, logs = self.merge(lambda path, i: (200, HEADER.rstrip("\n") if i == 2 else csv_for(path)))
+        self.assert_clean(data, logs, 24 - 10)
+
+    def test_crlf_chunk_mixed_with_lf_chunks(self):
+        data, logs = self.merge(lambda path, i: (200, csv_for(path).replace("\n", "\r\n") if i == 2 else csv_for(path)))
+        self.assert_clean(data, logs, 24)
+
+    def test_different_header_without_newline_is_still_refused(self):
+        def responder(path, i):
+            return 200, HEADER.replace("brightness", "bright_ti4").rstrip("\n") if i == 2 else csv_for(path)
+
+        with self.assertRaises(fx.FirmsError) as ctx:
+            self.merge(responder)
+        self.assertIn("header changed", str(ctx.exception))
+
+
 if __name__ == "__main__":
     unittest.main()
