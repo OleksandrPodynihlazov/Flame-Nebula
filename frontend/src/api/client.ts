@@ -1,7 +1,7 @@
 import type { ApiError, ApiQuery, CalendarResponse, HotspotCollection, StatsResponse } from '../types/api'
 import { mockCalendar, mockHotspots, mockStats } from './mocks'
 
-export const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'false'
+export const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true'
 
 export function toSearchParams(q: ApiQuery): URLSearchParams {
   const p = new URLSearchParams()
