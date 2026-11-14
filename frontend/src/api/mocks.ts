@@ -1,4 +1,8 @@
 import type {
+  PatternCell,
+  PatternQuery,
+  PatternsResponse,
+  PatternSummaryResponse,
   ApiQuery,
   CalendarResponse,
   DayNight,
@@ -201,4 +205,66 @@ export function mockCalendar(q: ApiQuery): Promise<CalendarResponse> {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, d]) => ({ date, count: d.count, frp: Math.round(d.frp * 10) / 10 }))
   return delay({ days })
+}
+
+const PATTERN_YEARS = 14
+
+function patternInArea(c: PatternCell, q: PatternQuery) {
+  if (q.polygon) return inPolygon([c.lon, c.lat], JSON.parse(q.polygon))
+  if (q.lat !== undefined && q.lon !== undefined && q.radius_km !== undefined) return haversineKm(q.lat, q.lon, c.lat, c.lon) <= q.radius_km
+  return true
+}
+
+const patternCache = new Map<number, PatternCell[]>()
+
+function patternCells(month: number): PatternCell[] {
+  const cached = patternCache.get(month)
+  if (cached) return cached
+  const rand = rng(9000 + month)
+  const season = MONTH_WEIGHTS[month - 1] / Math.max(...MONTH_WEIGHTS)
+  const cells = new Map<string, PatternCell>()
+  for (const c of CLUSTERS) {
+    const reach = Math.ceil(c.spread * 25)
+    for (let i = -reach; i <= reach; i++) {
+      for (let j = -reach; j <= reach; j++) {
+        const lat = Math.floor((c.lat + i / 10) * 10)
+        const lon = Math.floor((c.lon + j / 10) * 10)
+        const d = Math.hypot(i / 10, j / 10) / c.spread
+        const p = Math.min(1, season * Math.exp(-d * d) * (0.6 + 0.6 * rand()) * (c.weight / 16))
+        const burned = Math.round(p * PATTERN_YEARS)
+        if (burned < 1 || rand() > 0.85) continue
+        const key = `${lat},${lon}`
+        if (cells.has(key)) continue
+        cells.set(key, {
+          lat: +((lat + 0.5) / 10).toFixed(2),
+          lon: +((lon + 0.5) / 10).toFixed(2),
+          years_burned: burned,
+          years_observed: PATTERN_YEARS,
+          probability: +(burned / PATTERN_YEARS).toFixed(3),
+          median_count: Math.max(1, Math.round(1 + p * 12 * rand())),
+        })
+      }
+    }
+  }
+  const out = [...cells.values()].sort((a, b) => b.probability - a.probability || b.median_count - a.median_count)
+  patternCache.set(month, out)
+  return out
+}
+
+export function mockPatterns(q: PatternQuery): Promise<PatternsResponse> {
+  const month = q.month ?? 8
+  return delay({ month, cells: patternCells(month).filter((c) => patternInArea(c, q)) })
+}
+
+export function mockPatternSummary(q: PatternQuery): Promise<PatternSummaryResponse> {
+  const months = Array.from({ length: 12 }, (_, i) => {
+    const cells = patternCells(i + 1).filter((c) => patternInArea(c, q))
+    return {
+      month: i + 1,
+      cells: cells.length,
+      likely: cells.filter((c) => c.probability >= 0.5).length,
+      max_probability: cells.reduce((m, c) => Math.max(m, c.probability), 0),
+    }
+  })
+  return delay({ months })
 }

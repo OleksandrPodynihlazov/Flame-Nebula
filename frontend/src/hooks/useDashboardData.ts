@@ -3,7 +3,7 @@ import { USE_MOCKS, fetchCalendar, fetchHotspots, fetchStats } from '../api/clie
 import type { ApiQuery, CalendarResponse, Filters, HotspotCollection, StatsResponse } from '../types/api'
 import { selectionQuery, yearQuery } from '../utils/filters'
 
-interface State<T> {
+export interface State<T> {
   data: T | null
   loading: boolean
   error: string | null
@@ -16,14 +16,14 @@ interface Settled<T> {
 }
 
 /** `query` null = nothing to load: no request, no data. */
-function useEndpoint<T>(fetcher: (q: ApiQuery, s: AbortSignal) => Promise<T>, query: ApiQuery | null): State<T> {
+export function useEndpoint<T, Q = ApiQuery>(fetcher: (q: Q, s: AbortSignal) => Promise<T>, query: Q | null): State<T> {
   const [settled, setSettled] = useState<Settled<T>>({ key: null, data: null, error: null })
   const key = query === null ? null : JSON.stringify(query)
 
   useEffect(() => {
     if (key === null) return
     const ctrl = new AbortController()
-    fetcher(JSON.parse(key) as ApiQuery, ctrl.signal)
+    fetcher(JSON.parse(key) as Q, ctrl.signal)
       .then((data) => {
         // Mocks ignore the signal: a superseded response must never overwrite a newer query.
         if (!ctrl.signal.aborted) setSettled({ key, data, error: null })

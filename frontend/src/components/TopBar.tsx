@@ -1,5 +1,5 @@
 import { COMPARE_COLORS, type CompareSide, type CompareYears } from '../constants/compare'
-import { ALL_SENSORS, ALL_TYPES, FIRE_TYPES, SENSORS, YEARS } from '../constants/fire'
+import { ALL_SENSORS, ALL_TYPES, FIRE_TYPES, MONTHS_FULL, SENSORS, YEARS } from '../constants/fire'
 
 import type { Area, DayNight, FireType, Filters, Sensor } from '../types/api'
 import { RegionSearch } from './RegionSearch'
@@ -16,6 +16,73 @@ interface Props {
   isDemo: boolean
   compare: CompareYears | null
   onCompareChange: (compare: CompareYears | null) => void
+  /** Set in the pattern view: only compare (two months) applies there. */
+  patternMode?: PatternMode | null
+}
+
+export interface PatternMode {
+  compare: CompareYears | null
+  onCompareChange: (compare: CompareYears | null) => void
+}
+
+function CompareToggle({ on, onClick, title }: { on: boolean; onClick: () => void; title: string }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      onClick={onClick}
+      title={title}
+      data-testid="compare-toggle"
+      className={`flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+        on ? 'border-orange-500/60 bg-orange-500/15 text-orange-200' : 'border-slate-700 bg-slate-800/80 text-slate-200 hover:bg-slate-800'
+      }`}
+    >
+      <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v18M5 7l-3 5 3 5M19 7l3 5-3 5" />
+      </svg>
+      Compare
+    </button>
+  )
+}
+
+function PatternControls({ mode, month, stacked }: { mode: PatternMode; month: number; stacked: boolean }) {
+  const { compare, onCompareChange } = mode
+  return (
+    <div className={stacked ? 'flex flex-col items-stretch gap-2.5' : 'flex flex-nowrap items-center gap-2 xl:gap-3'}>
+      <CompareToggle
+        on={compare !== null}
+        onClick={() => onCompareChange(compare ? null : { a: month === 1 ? 1 : month - 1, b: month === 1 ? 2 : month })}
+        title="Compare two months side by side"
+      />
+      {compare &&
+        (['a', 'b'] as CompareSide[]).map((side) => (
+          <label key={side} className={`flex items-center gap-1.5 text-xs ${stacked ? '[&>select]:flex-1' : ''}`}>
+            <span className={stacked ? 'flex w-16 items-center gap-1.5 text-slate-400' : 'flex items-center'}>
+              <span className="h-2 w-2 rounded-full" style={{ background: COMPARE_COLORS[side] }} />
+              {stacked && `Month ${side.toUpperCase()}`}
+            </span>
+            <select
+              value={compare[side]}
+              onChange={(e) => onCompareChange({ ...compare, [side]: Number(e.target.value) })}
+              aria-label={`Compare month ${side.toUpperCase()}`}
+              data-testid={`compare-month-${side}`}
+              className="rounded-lg border bg-slate-800/90 px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-orange-500"
+              style={{ borderColor: COMPARE_COLORS[side] }}
+            >
+              {MONTHS_FULL.map((name, i) => (
+                <option key={name} value={i + 1}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ))}
+      <span className="whitespace-nowrap rounded-lg border border-slate-800 bg-slate-950/60 px-2.5 py-1.5 text-[11px] text-slate-400">
+        Patterns · S-NPP 2012–2025 · area filter only
+      </span>
+    </div>
+  )
 }
 
 export function Brand({
@@ -23,11 +90,14 @@ export function Brand({
   sensors,
   isDemo,
   compare = null,
+  scope,
 }: {
   year: number
   sensors: Sensor[]
   isDemo: boolean
   compare?: CompareYears | null
+  /** Overrides the year · sensors badge (pattern view). */
+  scope?: string
 }) {
   return (
     <div className="flex min-w-0 items-center gap-2.5">
@@ -38,7 +108,7 @@ export function Brand({
         </div>
         <h1 className="whitespace-nowrap text-sm font-bold tracking-tight text-white">Flame Nebula</h1>
         <span className="hidden whitespace-nowrap rounded-full border border-orange-500/30 2xl:inline bg-orange-500/15 px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wider text-orange-300">
-          Italy · {compare ? `${compare.a} vs ${compare.b}` : year} · {sensors.join(' + ')}
+          Italy · {scope ?? `${compare ? `${compare.a} vs ${compare.b}` : year} · ${sensors.join(' + ')}`}
         </span>
         {isDemo && (
           <span
@@ -66,8 +136,11 @@ export function FilterControls({
   onCompareChange,
   stacked = false,
   hideYear = false,
-}: Omit<Props, 'isDemo'> & { stacked?: boolean; hideYear?: boolean }) {
+  patternMode = null,
+  patternMonth = 8,
+}: Omit<Props, 'isDemo'> & { stacked?: boolean; hideYear?: boolean; patternMonth?: number }) {
   const typeValue = filters.types.length === ALL_TYPES.length ? 'all' : String(filters.types[0])
+  if (patternMode) return <PatternControls mode={patternMode} month={patternMonth} stacked={stacked} />
 
   const setType = (v: string) => {
     if (v === 'all') return onChange({ types: ALL_TYPES })
@@ -92,22 +165,11 @@ export function FilterControls({
 
   return (
     <div className={stacked ? 'flex flex-col items-stretch gap-2.5' : 'flex flex-nowrap items-center gap-2 xl:gap-3'}>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={compare !== null}
+        <CompareToggle
+          on={compare !== null}
           onClick={() => onCompareChange(compare ? null : defaultCompareYears(filters.year))}
           title="Compare two years side by side"
-          data-testid="compare-toggle"
-          className={`flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
-            compare ? 'border-orange-500/60 bg-orange-500/15 text-orange-200' : 'border-slate-700 bg-slate-800/80 text-slate-200 hover:bg-slate-800'
-          }`}
-        >
-          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v18M5 7l-3 5 3 5M19 7l3 5-3 5" />
-          </svg>
-          Compare
-        </button>
+        />
 
         {compare ? (
           (['a', 'b'] as CompareSide[]).map((side) => (
@@ -246,16 +308,16 @@ export function FilterControls({
   )
 }
 
-export function TopBar({ isDemo, ...rest }: Props) {
+export function TopBar({ isDemo, scope, patternMonth, ...rest }: Props & { scope?: string; patternMonth?: number }) {
   return (
     <header className="z-30 flex h-14 shrink-0 items-center justify-between gap-3 border-b border-slate-800 bg-slate-900/95 px-4">
       <div className="flex min-w-0 items-center gap-4">
-<Brand year={rest.filters.year} sensors={activeSensors(rest.filters)} isDemo={isDemo} compare={rest.compare} />
-          <div className={rest.compare ? 'hidden 2xl:block' : 'contents'}>
-            <SearchField area={rest.filters.area} onAreaChange={(area) => rest.onChange({ area })} />
-          </div>
+        <Brand year={rest.filters.year} sensors={activeSensors(rest.filters)} isDemo={isDemo} compare={rest.compare} scope={scope} />
+        <div className={rest.compare || rest.patternMode?.compare ? 'hidden 2xl:block' : 'contents'}>
+          <SearchField area={rest.filters.area} onAreaChange={(area) => rest.onChange({ area })} />
+        </div>
       </div>
-      <FilterControls {...rest} />
+      <FilterControls {...rest} patternMonth={patternMonth} />
     </header>
   )
 }
