@@ -50,7 +50,7 @@ Frontend cell size: about 64 px on screen → `cell = 90 / 2^zoom` degrees, roun
 - **Cache** GET `/api/` responses with `proxy_cache` (key = full request URI, 200 for 10 min, `proxy_cache_lock on` so
   one request builds an answer while identical ones wait). Data changes only on a manual load; after a load, clear the
   cache (`docs/deploy.md` gets the command). Add `X-Cache-Status` header.
-- Concurrency limit stays on `/api/hotspots` (points). `/api/hotspots/grid` is light and cached: no limit beyond the
+- Concurrency limit stays on `/api/hotspots` (points), split in two classes: heavy (no bbox) 2 per IP / 3 total, light (bbox) 6 per IP / 20 total. `/api/hotspots/grid` is light and cached: no limit beyond the
   global ones.
 - Bbox requests rounded by the frontend to 0.01° so similar views share cache entries.
 

@@ -161,7 +161,7 @@ Row cap: `GET /api/hotspots` and `GET /api/hotspots.csv` return at most `HOTSPOT
 - `type` = most common `type` in the cell (`mode()`), lowest on a tie. Rows with `type` NULL (FIRMS API files) are skipped by `mode()`; `type` is `null` only when no point in the cell has one.
 - Missing / invalid `bbox` or `cell` → 400. More than 20,000 cells → 400 `{ "error": "Too many cells, zoom in or use a bigger cell" }`. Nothing in the box → 200 `{ "cell": …, "cells": [] }`.
 
-Concurrency: the gateway allows at most 2 parallel hotspots requests per client IP and 3 in total. Over the limit → 503 `{ "error": "Server busy, try again in a moment" }` with `Retry-After`. `/api/hotspots/grid` has no such limit.
+Concurrency (`/api/hotspots` and `/api/hotspots.csv`), two separate classes: without `bbox` (heavy) at most 2 parallel requests per client IP and 3 in total; with `bbox` (light, map viewport) at most 6 per client IP and 20 in total. One class never uses up the other. Over the limit → 503 `{ "error": "Server busy, try again in a moment" }` with `Retry-After`. `/api/hotspots/grid` has no such limit.
 
 Cache: the gateway caches `200` answers of every `GET /api/...` except `/api/health` for 10 minutes, keyed by path + query string (`X-Cache-Status: MISS` / `HIT` / …). After loading new data, clear it (`docs/deploy.md`). Clients should send identical query strings for identical views (the frontend rounds `bbox` to 0.01° and picks `cell` from a fixed set).
 
