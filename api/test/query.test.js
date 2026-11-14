@@ -51,7 +51,23 @@ test("buildWhere without a region never mentions the regions tables", () => {
 
 test("buildWhere: polygon keeps the exact form that uses the GiST index", () => {
   const { where } = buildWhere(parseFilters({ polygon: "[[1,1],[2,1],[2,2]]" }));
-  assert.match(where, /point\(longitude, latitude\) <@ \$1::polygon/);
+  assert.match(where, /point\(longitude, latitude\) <@ \$5::polygon/);
+});
+
+test("buildWhere: polygon is prefiltered by its vertices' bounding box, inclusive, before the <@ test", () => {
+  const polygon = "[[12.1,41.8],[12.9,41.75],[12.5,42.2],[11.95,42.05]]";
+  const { where, params } = buildWhere(parseFilters({ from: "2020-01-01", polygon }));
+  assert.equal(
+    where,
+    "WHERE acq_date >= $1 AND latitude BETWEEN $2 AND $3 AND longitude BETWEEN $4 AND $5" +
+      " AND point(longitude, latitude) <@ $6::polygon"
+  );
+  assert.deepEqual(params, ["2020-01-01", 41.75, 42.2, 11.95, 12.9, "((12.1,41.8),(12.9,41.75),(12.5,42.2),(11.95,42.05))"]);
+});
+
+test("buildWhere: polygon box uses the parsed numbers, so a vertex lies exactly on the box", () => {
+  const { params } = buildWhere(parseFilters({ polygon: "[[-10,35],[30,35],[30,60],[-10,60],[-10,35]]" }));
+  assert.deepEqual(params.slice(0, 4), [35, 60, -10, 30]);
 });
 
 test("sensor: a comma list of MODIS and VIIRS, bound as instrument = ANY($n)", () => {
