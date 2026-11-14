@@ -14,7 +14,7 @@ Every merge to `main` runs the **Deploy** workflow (`.github/workflows/deploy.ym
 merge to main ─▶ Deploy workflow ─▶ ssh VPS ─▶ infra/deploy.sh <sha> ─▶ /api/health reports <sha> ─▶ smoke job
 ```
 
-`infra/deploy.sh` checks out the commit, runs `docker compose up -d --build`, and waits up to 90 s for `/api/health` to return that commit's sha as `version`. If it never does, the job fails and prints container logs. The smoke job then checks the public URL.
+`infra/deploy.sh` checks out the commit, runs `docker compose up -d --build`, and waits up to 90 s for `/api/health` to return that commit's sha as `version`. If it never does, the job fails and saves container logs to `deploy-failure.log` in the repo dir on the VPS (CI output is public, so logs are not printed). The smoke job then checks the public URL.
 
 PRs into `main` run **CI** (`.github/workflows/ci.yml`): build the whole stack and wait for health.
 
@@ -22,7 +22,7 @@ Do not edit files on the VPS: its checkout is reset on every deploy.
 
 ## Logs
 
-- Browser: Dozzle at `/logs/` (only this project's containers).
+- Browser: Dozzle at `/logs/` (only this project's containers; it reads Docker through a read-only socket proxy, never the raw socket).
 - On the VPS, from the repo dir: `docker compose logs -f api`.
 
 Log to stdout, one line per event. Docker keeps 3 × 10 MB per container.

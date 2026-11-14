@@ -22,3 +22,6 @@ build/
 
 # infra — team logs password, created per machine
 infra/nginx/htpasswd
+
+# deploy failure logs, kept on the VPS only
+deploy-failure.log

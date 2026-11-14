@@ -56,6 +56,23 @@ services:
     restart: unless-stopped
     logging: *logging
 
+  # SECURITY: ":ro" on docker.sock does not limit the Docker API, so Dozzle talks to a read-only proxy on an isolated network.
+  socket-proxy:
+    image: tecnativa/docker-socket-proxy:v0.5.0
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      CONTAINERS: "1"
+      EVENTS: "1"
+      INFO: "1"
+      VERSION: "1"
+      PING: "1"
+      POST: "0"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - docker-api
+
   dozzle:
     image: amir20/dozzle:v8.14.12
     restart: unless-stopped
@@ -64,8 +81,12 @@ services:
       DOZZLE_BASE: /logs
       # SECURITY: the VPS runs other private containers; show only this project's.
       DOZZLE_FILTER: label=com.docker.compose.project=flame-nebula
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      DOCKER_HOST: tcp://socket-proxy:2375
+    depends_on:
+      - socket-proxy
+    networks:
+      - default
+      - docker-api
 
   gateway:
     image: nginx:1.27-alpine
@@ -87,3 +108,8 @@ services:
 
 volumes:
   pgdata:
+
+networks:
+  # Only socket-proxy and dozzle join this; no internet, gateway/api/web cannot reach the proxy.
+  docker-api:
+    internal: true

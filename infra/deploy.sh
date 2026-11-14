@@ -48,7 +48,9 @@ while (( SECONDS < deadline )); do
   sleep 2
 done
 
-echo "error: health check failed after 90s (last body: ${body:-<none>})" >&2
+echo "error: health check failed after 90s" >&2
 docker compose ps
-docker compose logs --tail=80
+# CI output is public: keep container logs on the VPS only.
+docker compose logs --tail=200 > "deploy-failure.log" 2>&1 || true
+echo "logs saved to $(pwd)/deploy-failure.log on the VPS; also at https://nebula.excl.sh/logs/" >&2
 exit 1
