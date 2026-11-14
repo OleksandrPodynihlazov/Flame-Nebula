@@ -59,7 +59,13 @@ jobs:
             cd e2e
             npm ci
             if [ "$PW_CACHE_HIT" = "true" ]; then
-              npx playwright install-deps chromium-headless-shell
+              # Runner image already has Chromium's libraries (install-deps only added fonts); apt only if launch fails.
+              if node -e "require('@playwright/test').chromium.launch().then(b => b.close())"; then
+                echo "cached Chromium launches -> skipped install-deps"
+              else
+                echo "missing system libs -> installed deps"
+                npx playwright install-deps chromium-headless-shell
+              fi
             else
               npx playwright install --with-deps --only-shell chromium
             fi
