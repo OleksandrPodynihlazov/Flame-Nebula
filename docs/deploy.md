@@ -41,6 +41,12 @@ Log to stdout, one line per event. Docker keeps 3 × 10 MB per container.
 
 CI must be green before merge.
 
+### web: built from `frontend/`
+
+`web` now builds from `frontend/` (`frontend/Dockerfile`: Node build stage, then nginx on port 80 with SPA fallback). CI also runs a separate `frontend` job: `npm ci`, `npm run lint`, `npm run build` in `frontend/`.
+
+The stub stays in `infra/stubs/web`. To fall back to it, change the `web` `build:` `context:` in `docker-compose.yml` from `./frontend` back to `./infra/stubs/web`.
+
 ## Run locally
 
 ```sh
