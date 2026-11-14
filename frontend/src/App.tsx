@@ -83,7 +83,7 @@ export default function App() {
       <div className="flex h-dvh flex-col overflow-hidden bg-slate-950 font-sans text-slate-100 antialiased">
         <header className="z-30 flex h-14 shrink-0 items-center gap-3 border-b border-slate-800 bg-slate-900/95 px-3">
           <Brand year={filters.year} sensors={sensors} isDemo={isDemo} />
-          <SearchField />
+          <SearchField area={filters.area} onAreaChange={setArea} />
         </header>
 
         <main className="relative flex min-h-0 flex-1 flex-col">

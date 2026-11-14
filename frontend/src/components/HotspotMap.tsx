@@ -8,6 +8,7 @@ import { useHotspotLayer } from "../hooks/useHotspotLayer";
 import { useViewportData } from "../hooks/useViewportData";
 import type { ApiQuery, Area, HotspotFeature, Sensor } from "../types/api";
 import { MapLegend, SideLegend } from "./MapLegend";
+import { RegionOutline } from "./RegionOutline";
 import { SelectionPanel } from "./SelectionPanel";
 
 function DrawTools({
@@ -172,6 +173,8 @@ export function HotspotMap({
           onAreaChange={onAreaChange}
           position={mobile ? "topright" : "topleft"}
         />
+
+        <RegionOutline area={area} fitOptions={fitOptions} />
       </MapContainer>
 
       {mobile ? (

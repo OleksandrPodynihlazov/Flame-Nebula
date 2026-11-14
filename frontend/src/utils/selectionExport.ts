@@ -1,12 +1,12 @@
-import type { Area, HotspotFeature, LonLat } from '../types/api'
+import type { Area, HotspotFeature, LonLat, RegionGeometry } from '../types/api'
 import { areaKm2 } from './selectionSummary'
 
 const EARTH_RADIUS_KM = 6371.0088
 
 export interface SelectionShapeFeature {
   type: 'Feature'
-  geometry: { type: 'Polygon'; coordinates: LonLat[][] }
-  properties: { selection: true; area_km2: number; radius_km?: number }
+  geometry: { type: 'Polygon'; coordinates: LonLat[][] } | RegionGeometry
+  properties: { selection: true; area_km2: number; radius_km?: number; region_id?: number; name?: string }
 }
 
 export interface SelectionExport {
@@ -39,6 +39,13 @@ export function selectionShapeFeature(area: Area): SelectionShapeFeature {
       type: 'Feature',
       geometry: { type: 'Polygon', coordinates: [circleRing(area.lat, area.lon, area.radiusKm)] },
       properties: { selection: true, area_km2, radius_km: area.radiusKm },
+    }
+  }
+  if (area.kind === 'region') {
+    return {
+      type: 'Feature',
+      geometry: area.geometry,
+      properties: { selection: true, area_km2, region_id: area.id, name: area.name },
     }
   }
   return {

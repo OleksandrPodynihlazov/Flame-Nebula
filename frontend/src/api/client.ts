@@ -1,4 +1,14 @@
-import type { ApiError, ApiQuery, CalendarResponse, GridResponse, HotspotCollection, StatsResponse } from '../types/api'
+import type {
+  ApiError,
+  ApiQuery,
+  CalendarResponse,
+  GridResponse,
+  HotspotCollection,
+  Region,
+  RegionFeature,
+  RegionsResponse,
+  StatsResponse,
+} from '../types/api'
 import { mockCalendar, mockGrid, mockHotspots, mockStats } from './mocks'
 
 export const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true'
@@ -41,6 +51,24 @@ export const fetchStats = (q: ApiQuery, signal?: AbortSignal) => getJson<StatsRe
 
 export const fetchCalendar = (q: ApiQuery, signal?: AbortSignal) =>
   getJson<CalendarResponse>('calendar', q, mockCalendar, signal)
+
+/**
+ * `GET /api/regions?q=` — name search, 2–100 chars, prefix matches first, max 20.
+ * Mock mode has no regions, so it returns none.
+ */
+export async function searchRegions(q: string, signal?: AbortSignal): Promise<Region[]> {
+  if (USE_MOCKS) return []
+  const res = await fetch(`/api/regions?${new URLSearchParams({ q })}`, { signal })
+  if (!res.ok) throw new Error(await errorMessage(res))
+  return ((await res.json()) as RegionsResponse).regions
+}
+
+/** `GET /api/regions/:id` — the region with its simplified outline. */
+export async function fetchRegion(id: number, signal?: AbortSignal): Promise<RegionFeature> {
+  const res = await fetch(`/api/regions/${id}`, { signal })
+  if (!res.ok) throw new Error(await errorMessage(res))
+  return (await res.json()) as RegionFeature
+}
 
 export const csvUrl = (q: ApiQuery) => `/api/hotspots.csv?${toSearchParams(q)}`
 

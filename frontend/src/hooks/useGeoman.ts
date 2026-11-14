@@ -38,7 +38,8 @@ export function areaFromLayer(layer: L.Layer): Area | null {
   return null
 }
 
-function layerFromArea(area: Area): Shape {
+/** Editable shape for a drawn area. Regions are not editable: `RegionOutline` draws them. */
+function layerFromArea(area: Exclude<Area, { kind: 'region' }>): Shape {
   return area.kind === 'circle'
     ? L.circle([area.lat, area.lon], { ...SHAPE_STYLE, radius: area.radiusKm * 1000 })
     : L.polygon(area.points.map(([lon, lat]) => [lat, lon] as L.LatLngTuple), SHAPE_STYLE)
@@ -127,11 +128,13 @@ export function useGeoman(area: Area | null, onAreaChange: (area: Area | null) =
       map.off('pm:create', onCreate)
       map.off('pm:remove', onRemove)
       map.off(MODE_EVENTS, onModeToggle)
-      map.pm.disableDraw()
-      map.pm.disableGlobalEditMode()
-      map.pm.disableGlobalDragMode()
-      map.pm.disableGlobalRemovalMode()
-      map.pm.removeControls()
+      // Turn modes off only if on: disabling an inactive mode makes Leaflet log "wrong listener type".
+      const pm = map.pm
+      if (pm.globalDrawModeEnabled()) pm.disableDraw()
+      if (pm.globalEditModeEnabled()) pm.disableGlobalEditMode()
+      if (pm.globalDragModeEnabled()) pm.disableGlobalDragMode()
+      if (pm.globalRemovalModeEnabled()) pm.disableGlobalRemovalMode()
+      pm.removeControls()
       drop(shapeRef)
       onModeToggle()
     }
@@ -141,6 +144,6 @@ export function useGeoman(area: Area | null, onAreaChange: (area: Area | null) =
   useEffect(() => {
     if (shapeRef.current && sameArea(areaFromLayer(shapeRef.current), area)) return
     drop(shapeRef)
-    if (area) adopt(shapeRef, layerFromArea(area).addTo(map), onChangeRef)
+    if (area && area.kind !== 'region') adopt(shapeRef, layerFromArea(area).addTo(map), onChangeRef)
   }, [map, area])
 }
