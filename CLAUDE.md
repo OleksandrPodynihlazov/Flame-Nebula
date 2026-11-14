@@ -21,8 +21,9 @@ FIRMS CSV ─▶ harmonize/ ─▶ data/processed/*.csv ─▶ db/ (Postgres + a
 | `web/` | React, plain JavaScript | Map, area picker, calendar, stats, CSV download |
 | `data/` | — | `raw/` and `processed/`, both gitignored |
 | `docs/` | Markdown | Specs everyone follows |
+| `infra/`, `.github/` | Docker Compose, nginx, bash, GitHub Actions | DevOps: compose stubs, nginx, deploy script, CI/deploy workflows |
 
-Run everything with `docker compose up` from the repo root. Secrets and ports go in `.env` (copy `.env.example`); `.env` is never committed.
+Run everything with `docker compose up --build` from the repo root, then open http://localhost:8090 (setup in `docs/deploy.md`). Secrets and ports go in `.env` (copy `.env.example`); `.env` is never committed.
 
 ## Docs — read before you touch the matching area
 
@@ -30,6 +31,7 @@ Run everything with `docker compose up` from the repo root. Secrets and ports go
 - `docs/data-sources.md` — before reading FIRMS data: download links, column meanings, `type` codes, Terra/Aqua and day/night.
 - `docs/challenge.md` — before adding a feature: challenge asks and our Must/Should/Could list. Build Must first.
 - `docs/workflow.md` — before branching, committing, or opening a PR.
+- `docs/deploy.md` — before changing `docker-compose.yml`, a Dockerfile, ports, or anything under `infra/` or `.github/`.
 
 ## Conventions
 
