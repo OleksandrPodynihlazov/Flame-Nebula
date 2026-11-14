@@ -1,4 +1,4 @@
-import type { Area, HotspotFeature, LonLat } from '../types/api'
+import type { Area, HotspotFeature, LonLat, RegionGeometry } from '../types/api'
 
 /** Great-circle distance in km (mean Earth radius 6371 km). */
 export function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -20,9 +20,19 @@ export function inPolygon([lon, lat]: LonLat, poly: readonly LonLat[]): boolean 
   return inside
 }
 
-/** Same rules as the mock API: polygon by ray casting, circle by haversine (edge included). */
+/** Inside a GeoJSON Polygon / MultiPolygon: inside an outer ring and outside its holes. */
+export function inGeometry(point: LonLat, geometry: RegionGeometry): boolean {
+  const polygons = geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates
+  return polygons.some(([outer, ...holes]) => inPolygon(point, outer) && !holes.some((h) => inPolygon(point, h)))
+}
+
+/**
+ * Same rules as the mock API: polygon by ray casting, circle by haversine (edge included),
+ * region by its outline (the real API also counts coastal points within 25 km).
+ */
 export function inArea(f: HotspotFeature, area: Area): boolean {
   if (area.kind === 'polygon') return inPolygon(f.geometry.coordinates, area.points)
+  if (area.kind === 'region') return inGeometry(f.geometry.coordinates, area.geometry)
   return haversineKm(area.lat, area.lon, f.properties.latitude, f.properties.longitude) <= area.radiusKm
 }
 

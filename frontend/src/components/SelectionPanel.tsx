@@ -152,6 +152,7 @@ export function SelectionPanel({ area, features: loaded, loading, error, fileTag
           <span className="flex min-w-0 items-center gap-2">
             <span className="h-2 w-2 shrink-0 rounded-full bg-orange-500" />
             <span className="truncate font-medium">
+              {area.kind === 'region' && <>{area.name} · </>}
               <span className="font-mono">{countText}</span> hotspots · <span className="font-mono">{areaText}</span>
             </span>
           </span>
@@ -169,8 +170,15 @@ export function SelectionPanel({ area, features: loaded, loading, error, fileTag
       </div>
 
       <h2 className="hidden items-center gap-2 px-3 pt-2.5 text-xs font-semibold text-slate-200 lg:flex">
-        <span className="h-2 w-2 rounded-full bg-orange-500" />
-        Selected area
+        <span className="h-2 w-2 shrink-0 rounded-full bg-orange-500" />
+        {area.kind === 'region' ? (
+          <span className="min-w-0" data-testid="selection-region">
+            <span className="block truncate">{area.name}</span>
+            {area.path && <span className="block truncate text-[10px] font-normal text-slate-400">{area.path}</span>}
+          </span>
+        ) : (
+          'Selected area'
+        )}
       </h2>
 
       <div
