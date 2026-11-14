@@ -19,6 +19,45 @@ curl -fL -o data/raw/modis_2008_Italy.csv \
   https://firms.modaps.eosdis.nasa.gov/data/country/modis/2008/modis_2008_Italy.csv
 ```
 
+## Load into Postgres
+
+Raw archive CSV → `hotspots` table (schema: `db/init/hotspots-init.sql`). Script: `ingest/load_hotspots.py`, stdlib only.
+Run from the repo root. Same commands on a laptop and on the VPS.
+
+```sh
+docker compose up -d db
+python3 ingest/firms_archive_fetch.py --years 2000-2025          # → data/raw/firms_archive/, ~1 min, no key
+python3 ingest/load_hotspots.py --create-table data/raw/firms_archive/*.csv
+```
+
+Expect `total: 131700 inserted …; 0 file(s) failed` (all MODIS Italy, ~9 s). A second run prints `0 inserted … 131700 unchanged`.
+
+| Question | Answer |
+|---|---|
+| How does it reach the DB without a port? | It runs `psql` **inside** the `db` container (`docker compose exec -T db psql …`), with the container's own credentials. Contract [0]: only `gateway` publishes a host port. Another DB: `HOTSPOTS_PSQL='psql postgresql://u:p@host:5432/db'`. |
+| Is it safe to run again? | Yes. One detection = `(satellite, acq_date, acq_time, latitude, longitude)` (unique index `hotspots_natural_key`, created by the loader). Same row → `unchanged`. Same detection with new values (FIRMS reprocessing) → `updated`. Nothing is duplicated. |
+| Can it recreate or wipe the table? | No. `--create-table` creates the table **only if it is missing**. An existing table, its rows and any later `ALTER`s are never touched (tested). The loader never runs `DROP`/`TRUNCATE`. |
+| What if a file fails? | That file writes nothing (one transaction per file), the others still load, and the exit code is 1. |
+| NRT / API files? | Not yet. They have no `type`, and `hotspots.type` is `NOT NULL` for now. |
+
+**On the VPS.** `data/` is gitignored, so the CSVs are not deployed: run the fetch command there once. `data/` survives deploys
+(`git checkout` leaves ignored files alone), and so does the `pgdata` volume. Loading is a one-time manual step, not part of
+`infra/deploy.sh`. Because it is idempotent, adding it to the deploy would also be safe.
+
+**When the schema changes** (e.g. `type` becomes nullable, a column is added):
+- Editing `db/init/hotspots-init.sql` does **not** change an existing database. Postgres runs init scripts only on an empty
+  volume, and `--create-table` skips an existing table. Apply the change explicitly, once per DB (laptop, VPS), as an
+  idempotent statement, e.g. `ALTER TABLE hotspots ALTER COLUMN type DROP NOT NULL;` or `ADD COLUMN IF NOT EXISTS …`.
+- Or rebuild, since the data is fully reproducible from `data/raw` in seconds:
+  `docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "DROP TABLE hotspots"'`
+  then the load command above. This is destructive, so on the VPS do it only on purpose.
+- The loader writes an explicit column list. New nullable columns don't affect it. A renamed or removed column makes the load
+  fail with the psql error, and nothing is written.
+
+Troubleshooting: `table "hotspots" does not exist` → add `--create-table`. `could not create unique index
+"hotspots_natural_key"` → the table already has duplicates from an older load: `TRUNCATE hotspots`, then re-run.
+`service "db" is not running` → `docker compose up -d db`.
+
 Other sources:
 
 - FIRMS archive download (custom area/dates, needs Earthdata login): <https://firms.modaps.eosdis.nasa.gov/download/>
