@@ -16,8 +16,10 @@ limit answers "Server busy", or the API runs out of memory. The map only needs w
 - A new move cancels the previous request (AbortController).
 - On a failed request the map clears and shows the error. It never keeps old dots under a new label (the "stale map").
 - Stat cards and calendar are unchanged: they follow filters + selected area, never the viewport.
-- **Selection card:** requests `/api/hotspots` with the selected area (no bbox) and computes the summary as today. Over the
-  row cap → card shows the API error.
+- **Selection card:** requests `/api/selection-summary` with the selected area (no bbox): a few hundred bytes, aggregated in
+  SQL. The area's dots (`/api/hotspots`, no bbox) are loaded only when the user clicks GeoJSON; over the row cap → the card
+  shows the API error under the buttons.
+- Filter changes (sensor, type, day/night, year, area) wait 300 ms like map moves before any request.
 - CSV export unchanged (filters + area, server side).
 
 ## API (contracts.md [3])
