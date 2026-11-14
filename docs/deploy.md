@@ -51,6 +51,8 @@ CI must be green before merge.
 
 `web` now builds from `frontend/` (`frontend/Dockerfile`: Node build stage, then nginx on port 80 with SPA fallback). The **Frontend** workflow (`.github/workflows/frontend.yml`) runs `npm ci`, `npm run lint`, `npm run build` in `frontend/`.
 
+Demo vs real data is the `web` build arg `VITE_USE_MOCKS`: default `false` = real API (VPS, laptops); PR CI sets `true` because its DB is empty. The API row cap is `HOTSPOTS_MAX_ROWS` (compose default 500000). Override either in `.env`.
+
 The stub stays in `infra/stubs/web`. To fall back to it, change the `web` `build:` `context:` in `docker-compose.yml` from `./frontend` back to `./infra/stubs/web`.
 
 ## Run locally
