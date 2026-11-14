@@ -11,6 +11,17 @@ class SourceDown(Exception):
     pass
 
 
+def with_retries(fn, *, retries=5, delay=2.0, retry_on=(Exception,)):
+    """Call fn(); on an exception in retry_on, wait delay * 2**attempt and try again. Re-raises the last error."""
+    for attempt in range(retries):
+        try:
+            return fn()
+        except retry_on:
+            if attempt == retries - 1:
+                raise
+            time.sleep(delay * 2 ** attempt)
+
+
 def get(url, *, headers=None, data=None, retries=4, timeout=60, backoff=1.0):
     hdrs = {"User-Agent": USER_AGENT, **(headers or {})}
     last = None

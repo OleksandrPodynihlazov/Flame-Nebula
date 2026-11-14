@@ -41,11 +41,19 @@ class PcTest(unittest.TestCase):
     def test_sign_caches_token(self):
         token = json.dumps({"token": "sv=1&sig=abc", "msft:expiry": "2099-01-01T00:00:00Z"}).encode()
         with mock.patch.object(http, "get", return_value=token) as g:
-            a = pc.sign("https://acct.blob.core.windows.net/c/a.tif", "esa-cci-lc")
-            b = pc.sign("https://acct.blob.core.windows.net/c/b.tif", "esa-cci-lc")
-        self.assertEqual(a, "https://acct.blob.core.windows.net/c/a.tif?sv=1&sig=abc")
+            a = pc.sign("https://acct.blob.core.windows.net/c/x/a.tif")
+            b = pc.sign("https://acct.blob.core.windows.net/c/y/b.tif")
+        self.assertEqual(a, "https://acct.blob.core.windows.net/c/x/a.tif?sv=1&sig=abc")
         self.assertTrue(b.endswith("b.tif?sv=1&sig=abc"))
         self.assertEqual(g.call_count, 1)
+        self.assertEqual(g.call_args[0][0], "https://planetarycomputer.microsoft.com/api/sas/v1/token/acct/c")
+
+    def test_sign_token_per_container(self):
+        token = json.dumps({"token": "t", "msft:expiry": "2099-01-01T00:00:00Z"}).encode()
+        with mock.patch.object(http, "get", return_value=token) as g:
+            pc.sign("https://acct.blob.core.windows.net/modis-061/a.hdf")
+            pc.sign("https://acct.blob.core.windows.net/modis-061-cogs/a.tif")
+        self.assertEqual(g.call_count, 2)
 
     def test_search_follows_next_page(self):
         p1 = {"features": [{"id": "a"}], "links": [{"rel": "next", "body": {"token": "t2"}}]}
@@ -94,6 +102,23 @@ class L4Test(unittest.TestCase):
         ctx = make_ctx([p])
         ctx.cache_dir = self.dir
         self.assertEqual(l4_landcover.run(ctx)[p.key], (1, "veg:60"))
+
+    def test_fetch_year_retries_read_errors(self):
+        from rasterio.errors import RasterioIOError
+        item = {"assets": {"lccs_class": {"href": "https://x/a.tif"}}}
+        results = [RasterioIOError("reset"), (np.ones((1, 1), np.uint8), (0, 1, 0, 1, 0, -1))]
+
+        def flaky(hrefs, bbox):
+            r = results.pop(0)
+            if isinstance(r, Exception):
+                raise r
+            return r
+
+        with mock.patch.object(pc, "search", return_value=[item]), \
+                mock.patch.object(pc, "sign", side_effect=lambda h: h), \
+                mock.patch.object(l4_landcover, "mosaic", flaky), mock.patch.object(l4_landcover, "RETRY_DELAY", 0):
+            cls, gt = l4_landcover.fetch_year(2008, self.dir / "L4" / "lc_2008.npz")
+        self.assertEqual(int(cls[0, 0]), 1)
 
     def test_l4_service_down_is_na(self):
         p = hs(40.0, 9.0)

@@ -16,6 +16,8 @@ NAME = "L4"
 COLLECTION = "esa-cci-lc"
 FIRST_YEAR, LAST_YEAR = 1992, 2020
 REFUTE = {190: "urban", 200: "bare", 201: "bare", 202: "bare", 210: "water", 220: "snow"}
+RETRIES = 5
+RETRY_DELAY = 2.0   # seconds, doubled per attempt
 
 
 def save_cache(path, cls, geotransform):
@@ -62,8 +64,10 @@ def fetch_year(year, cache_path):
     items = pc.search(COLLECTION, config.ITALY_BBOX, f"{year}-01-01/{year}-12-31")
     if not items:
         raise LookupError(f"no {COLLECTION} items for {year}")
-    hrefs = [pc.sign(i["assets"]["lccs_class"]["href"], COLLECTION) for i in items]
-    cls, gt = mosaic(hrefs, config.ITALY_BBOX)
+    from rasterio.errors import RasterioIOError
+    hrefs = [pc.sign(i["assets"]["lccs_class"]["href"]) for i in items]
+    cls, gt = http.with_retries(lambda: mosaic(hrefs, config.ITALY_BBOX), retries=RETRIES, delay=RETRY_DELAY,
+                                retry_on=(RasterioIOError,))
     save_cache(cache_path, cls, gt)
     return cls, gt
 
