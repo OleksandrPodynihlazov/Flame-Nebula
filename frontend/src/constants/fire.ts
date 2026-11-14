@@ -7,6 +7,10 @@ export const FIRE_TYPES: Record<FireType, { label: string; color: string; noise:
   3: { label: 'Offshore Source', color: '#5ED1B8', noise: true },
 }
 
+export const UNCLASSIFIED = { label: 'Unclassified', color: '#94A3B8', noise: false }
+
+export const typeMeta = (t: FireType | null) => (t === null ? UNCLASSIFIED : FIRE_TYPES[t])
+
 export const ALL_TYPES: FireType[] = [0, 1, 2, 3]
 
 export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const

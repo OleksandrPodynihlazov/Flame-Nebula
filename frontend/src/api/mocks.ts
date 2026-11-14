@@ -139,7 +139,7 @@ function filter(q: ApiQuery) {
   return dataset(q).filter(({ properties: p, geometry }) => {
     if (p.acq_date < q.from || p.acq_date > q.to) return false
     if (q.bbox && (p.latitude < south || p.latitude > north || p.longitude < west || p.longitude > east)) return false
-    if (types && !types.has(p.type)) return false
+    if (types && (p.type === null || !types.has(p.type))) return false
     if (q.daynight && p.daynight !== q.daynight) return false
     if (polygon) return inPolygon(geometry.coordinates, polygon)
     if (circle) return haversineKm(q.lat!, q.lon!, p.latitude, p.longitude) <= q.radius_km!
@@ -166,7 +166,7 @@ export function mockGrid(q: ApiQuery): Promise<GridResponse> {
     g.lat += p.latitude
     g.lon += p.longitude
     g.count++
-    g.types[p.type]++
+    if (p.type !== null) g.types[p.type]++
     groups.set(key, g)
   }
   const cells: GridCell[] = [...groups.values()].map((g) => {
