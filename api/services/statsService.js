@@ -1,13 +1,17 @@
 import { pool } from "../db.js";
+import { buildWhere } from "../lib/query.js";
 
 // GET /api/stats → { total, by_type, by_daynight } (docs/contracts.md [3]).
 // Keys with a zero count are left out, as the frontend requirements ask:
 // empty table → { total: 0, by_type: {}, by_daynight: {} }.
-export async function getStats() {
+export async function getStats(filters) {
+  const { where, params } = buildWhere(filters);
   const { rows } = await pool.query(
     `SELECT type, daynight, COUNT(*) AS count
        FROM hotspots
-      GROUP BY type, daynight`
+       ${where}
+      GROUP BY type, daynight`,
+    params
   );
 
   const result = { total: 0, by_type: {}, by_daynight: {} };

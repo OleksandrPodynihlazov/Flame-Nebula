@@ -28,7 +28,7 @@ async function expectBadRequest(request, path, params) {
 }
 
 test.describe('GET /api/stats', () => {
-  test.fixme('total, by_type and by_daynight are consistent', async ({ request }) => {
+  test('total, by_type and by_daynight are consistent', async ({ request }) => {
     const body = await getJson(request, '/api/stats');
     expect(Number.isInteger(body.total)).toBe(true);
     expect(body.total).toBeGreaterThanOrEqual(0);
@@ -42,7 +42,7 @@ test.describe('GET /api/stats', () => {
 });
 
 test.describe('GET /api/calendar', () => {
-  test.fixme('days are sorted, in range, and sum to stats total', async ({ request }) => {
+  test('days are sorted, in range, and sum to stats total', async ({ request }) => {
     const { days } = await getJson(request, '/api/calendar', YEAR_2008);
     expect(Array.isArray(days)).toBe(true);
     const dates = days.map((d) => d.date);
@@ -60,7 +60,7 @@ test.describe('GET /api/calendar', () => {
 });
 
 test.describe('GET /api/hotspots', () => {
-  test.fixme('returns a GeoJSON FeatureCollection of points in Italy', async ({ request }) => {
+  test('returns a GeoJSON FeatureCollection of points in Italy', async ({ request }) => {
     const body = await getJson(request, '/api/hotspots', YEAR_2008);
     expect(body.type).toBe('FeatureCollection');
     expect(Array.isArray(body.features)).toBe(true);
@@ -75,7 +75,7 @@ test.describe('GET /api/hotspots', () => {
     }
   });
 
-  test.fixme('hotspots.csv is text/csv with the contract [1] header', async ({ request }) => {
+  test('hotspots.csv is text/csv with the contract [1] header', async ({ request }) => {
     const res = await request.get('/api/hotspots.csv', { params: YEAR_2008 });
     expect(res.status()).toBe(200);
     expect(res.headers()['content-type']).toContain('text/csv');
@@ -98,22 +98,22 @@ test.describe('query validation', () => {
   ];
 
   for (const [name, params] of badParams) {
-    test.fixme(`${name} -> 400 JSON error`, async ({ request }) => {
+    test(`${name} -> 400 JSON error`, async ({ request }) => {
       await expectBadRequest(request, '/api/stats', params);
     });
   }
 
-  test.fixme('area far outside Italy -> 200 with total 0', async ({ request }) => {
+  test('area far outside Italy -> 200 with total 0', async ({ request }) => {
     const body = await getJson(request, '/api/stats', { lat: 0, lon: 0, radius_km: 10 });
     expect(body.total).toBe(0);
   });
 
-  test.fixme('date range outside data -> 200 with total 0', async ({ request }) => {
+  test('date range outside data -> 200 with total 0', async ({ request }) => {
     const body = await getJson(request, '/api/stats', { from: '1990-01-01', to: '1990-12-31' });
     expect(body.total).toBe(0);
   });
 
-  test.fixme('SQL-injection-looking type -> 400, stats still works', async ({ request }) => {
+  test('SQL-injection-looking type -> 400, stats still works', async ({ request }) => {
     await expectBadRequest(request, '/api/stats', { type: '0;DROP TABLE hotspots' });
     await getJson(request, '/api/stats');
   });
