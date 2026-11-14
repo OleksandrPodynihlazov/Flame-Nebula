@@ -1,0 +1,54 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+:root {
+  color-scheme: dark;
+  background: #020617;
+}
+
+body {
+  margin: 0;
+}
+
+/* Leaflet: dark popups and controls to match the app. */
+.leaflet-container {
+  background: #020617;
+  font-family: var(--font-sans);
+}
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: rgb(15 23 42 / 0.95);
+  color: #f8fafc;
+  border: 1px solid #334155;
+  border-radius: 0.65rem;
+  box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.7);
+}
+.leaflet-popup-content {
+  margin: 10px 12px;
+}
+.leaflet-container a.leaflet-popup-close-button {
+  color: #94a3b8;
+}
+.leaflet-container a.leaflet-popup-close-button:hover {
+  color: #fff;
+}
+.leaflet-control-attribution {
+  background: rgb(2 6 23 / 0.75) !important;
+  color: #64748b !important;
+  font-size: 10px;
+}
+.leaflet-control-attribution a {
+  color: #94a3b8 !important;
+}
+.leaflet-bar a {
+  background: rgb(15 23 42 / 0.9) !important;
+  color: #e2e8f0 !important;
+  border-color: #334155 !important;
+}
+.leaflet-bar a:hover {
+  background: #1e293b !important;
+}

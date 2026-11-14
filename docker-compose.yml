@@ -1,0 +1,115 @@
+name: flame-nebula
+
+# Every service logs to stdout; Docker keeps at most 3 x 10 MB per container.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # db teammate: mount schema/load scripts here, they run on first start of an empty volume:
+      # - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    # No published ports: the VPS host Postgres already owns 5432.
+
+  api:
+    build:
+      # Swap to ./api when the real api/Dockerfile exists.
+      context: ./api
+      args:
+        APP_VERSION: ${APP_VERSION:-dev}
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      APP_VERSION: ${APP_VERSION:-dev}
+      PORT: "3000"
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  web:
+    build:
+      # Real frontend (frontend/Dockerfile). Stub kept at ./infra/stubs/web as a fallback.
+      context: ./frontend
+    restart: unless-stopped
+    logging: *logging
+
+  # SECURITY: ":ro" on docker.sock does not limit the Docker API, so Dozzle talks to a read-only proxy on an isolated network.
+  socket-proxy:
+    image: tecnativa/docker-socket-proxy:v0.5.0
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      CONTAINERS: "1"
+      EVENTS: "1"
+      INFO: "1"
+      VERSION: "1"
+      PING: "1"
+      POST: "0"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - docker-api
+
+  dozzle:
+    image: amir20/dozzle:v8.14.12
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      DOZZLE_BASE: /logs
+      # SECURITY: the VPS runs other private containers; show only this project's.
+      DOZZLE_FILTER: label=com.docker.compose.project=flame-nebula
+      DOCKER_HOST: tcp://socket-proxy:2375
+    depends_on:
+      - socket-proxy
+    networks:
+      - default
+      - docker-api
+
+  gateway:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    logging: *logging
+    volumes:
+      - ./infra/nginx/gateway.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./infra/nginx/htpasswd:/etc/nginx/htpasswd:ro
+    ports:
+      # Loopback only: host nginx terminates TLS and proxies here.
+      - "127.0.0.1:${GATEWAY_PORT:-8090}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_started
+      dozzle:
+        condition: service_started
+
+volumes:
+  pgdata:
+
+networks:
+  # Only socket-proxy and dozzle join this; no internet, gateway/api/web cannot reach the proxy.
+  docker-api:
+    internal: true
