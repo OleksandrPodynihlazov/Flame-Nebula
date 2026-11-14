@@ -154,3 +154,30 @@ test.describe('query validation', () => {
     await getJson(request, '/api/stats');
   });
 });
+
+test.describe('GET /api/patterns', () => {
+  test('one month: cells with the contract fields', async ({ request }) => {
+    const body = await getJson(request, '/api/patterns', { month: '8' });
+    expect(body.month).toBe(8);
+    expect(Array.isArray(body.cells)).toBe(true);
+    for (const c of body.cells.slice(0, 50)) {
+      expect(Object.keys(c).sort()).toEqual(['lat', 'lon', 'median_count', 'probability', 'years_burned', 'years_observed']);
+      expect(c.probability).toBeGreaterThanOrEqual(0);
+      expect(c.probability).toBeLessThanOrEqual(1);
+      expect(c.years_burned).toBeLessThanOrEqual(c.years_observed);
+    }
+  });
+
+  test('summary has 12 months and matches the month answer', async ({ request }) => {
+    const { months } = await getJson(request, '/api/patterns/summary');
+    expect(months.map((m) => m.month)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+    const aug = await getJson(request, '/api/patterns', { month: '8' });
+    expect(months[7].cells).toBe(aug.cells.length);
+    expect(months[7].likely).toBe(aug.cells.filter((c) => c.probability >= 0.5).length);
+  });
+
+  test('missing or bad month -> 400', async ({ request }) => {
+    await expectBadRequest(request, '/api/patterns', {});
+    await expectBadRequest(request, '/api/patterns', { month: '13' });
+  });
+});
