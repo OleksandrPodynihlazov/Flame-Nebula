@@ -11,12 +11,14 @@
 Every merge to `main` runs the **Deploy** workflow (`.github/workflows/deploy.yml`):
 
 ```
-merge to main ─▶ Deploy workflow ─▶ ssh VPS ─▶ infra/deploy.sh <sha> ─▶ /api/health reports <sha> ─▶ smoke job
+merge to main ─▶ Deploy workflow ─▶ ssh VPS ─▶ infra/deploy.sh <sha> ─▶ /api/health reports <sha> ─▶ smoke job ─▶ e2e job
 ```
 
 `infra/deploy.sh` checks out the commit, runs `docker compose up -d --build`, and waits up to 90 s for `/api/health` to return that commit's sha as `version`. If it never does, the job fails and saves container logs to `deploy-failure.log` in the repo dir on the VPS (CI output is public, so logs are not printed). The smoke job then checks the public URL.
 
-PRs into `main` run **CI** (`.github/workflows/ci.yml`): build the whole stack and wait for health.
+The e2e job then runs the Playwright suite in `e2e/` against the public URL. Its HTML report is a downloadable artifact on the Actions run.
+
+PRs into `main` run **CI** (`.github/workflows/ci.yml`): build the whole stack, wait for health, then run the e2e suite without `@prod` tests.
 
 Do not edit files on the VPS: its checkout is reset on every deploy.
 
