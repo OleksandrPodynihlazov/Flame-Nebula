@@ -43,22 +43,27 @@ MVP: MODIS rows only; this is a cleaned copy of the raw file.
 
 ## [2] db/ schema
 
-Postgres 17. Load `hotspots.csv` into one table, then build aggregates as views.
+Postgres 17. name: hotspots-init.sql
 
 ```sql
 CREATE TABLE hotspots (
-  id          INTEGER PRIMARY KEY,
+  id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   latitude    DOUBLE PRECISION NOT NULL,
   longitude   DOUBLE PRECISION NOT NULL,
+  brightness  REAL,              -- MODIS: brightness, VIIRS: bright_ti4 (Kelvin)
+  scan        REAL,
+  track       REAL,
   acq_date    DATE NOT NULL,
-  acq_time    CHAR(4) NOT NULL,
-  sensor      TEXT NOT NULL,
-  satellite   TEXT NOT NULL,
-  daynight    CHAR(1) NOT NULL,
-  frp         DOUBLE PRECISION,
-  confidence  SMALLINT,
-  type        SMALLINT NOT NULL
+  acq_time    SMALLINT NOT NULL, -- HHMM in UTC, e.g. 105 = 01:05
+  satellite   TEXT NOT NULL,     -- Terra/Aqua, N/N20/N21
+  instrument  TEXT NOT NULL,     -- 'MODIS' or 'VIIRS'
+  confidence  TEXT,              -- MODIS: '0'-'100', VIIRS: 'l'/'n'/'h'
+  version     TEXT,
+  frp         DOUBLE PRECISION,              -- MW
+  daynight    CHAR(1),           -- 'D' or 'N'
+  type        SMALLINT NOT NULL          -- 0-3, empty in NRT data
 );
+
 ```
 
 Aggregates: TBD (owner: db). Minimum needed by the API: hotspot count per day, filtered by area and date range.
