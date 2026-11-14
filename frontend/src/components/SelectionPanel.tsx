@@ -11,6 +11,8 @@ interface Props {
   area: Area
   features: readonly HotspotFeature[]
   loading: boolean
+  /** Failed /hotspots request for the area (e.g. over the row cap): shown instead of the numbers. */
+  error: string | null
   fileTag: string
   downloading: boolean
   onDownloadCsv: () => void
@@ -112,14 +114,18 @@ function CircleInputs({ area, onAreaChange }: { area: CircleArea; onAreaChange: 
   )
 }
 
+const NO_FEATURES: readonly HotspotFeature[] = []
+
 const BUTTON =
   'flex flex-1 items-center justify-center rounded-lg border px-2 py-1.5 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-orange-500 disabled:opacity-60'
 
-export function SelectionPanel({ area, features, loading, fileTag, downloading, onDownloadCsv, onAreaChange }: Props) {
+export function SelectionPanel({ area, features: loaded, loading, error, fileTag, downloading, onDownloadCsv, onAreaChange }: Props) {
   const [expanded, setExpanded] = useState(false)
+  // Never summarize the previous area's dots under a failed request.
+  const features = error ? NO_FEATURES : loaded
   const s = useMemo(() => selectionSummary(area, features), [area, features])
   const areaText = `${formatAreaKm2(s.areaKm2)} km²`
-  const countText = loading ? '…' : fmt(s.count)
+  const countText = loading ? '…' : error ? '—' : fmt(s.count)
 
   const downloadGeoJson = () => {
     const json = JSON.stringify(selectionGeoJson(area, features))
@@ -195,7 +201,13 @@ export function SelectionPanel({ area, features, loading, fileTag, downloading, 
           )}
         </dl>
 
-        {s.count === 0 && !loading && (
+        {error && !loading && (
+          <p role="alert" className="text-[11px] text-rose-300" data-testid="selection-error">
+            {error}
+          </p>
+        )}
+
+        {s.count === 0 && !loading && !error && (
           <p className="text-[11px] text-slate-400" data-testid="selection-empty">
             No hotspots in this area
           </p>
@@ -232,7 +244,7 @@ export function SelectionPanel({ area, features, loading, fileTag, downloading, 
           <button
             type="button"
             onClick={downloadGeoJson}
-            disabled={loading}
+            disabled={loading || error !== null}
             data-testid="selection-download-geojson"
             className={`${BUTTON} border-slate-700 bg-slate-800/80 text-slate-100 hover:bg-slate-800`}
           >

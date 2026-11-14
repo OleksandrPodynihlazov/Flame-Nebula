@@ -1,5 +1,5 @@
-import type { ApiError, ApiQuery, CalendarResponse, HotspotCollection, StatsResponse } from '../types/api'
-import { mockCalendar, mockHotspots, mockStats } from './mocks'
+import type { ApiError, ApiQuery, CalendarResponse, GridResponse, HotspotCollection, StatsResponse } from '../types/api'
+import { mockCalendar, mockGrid, mockHotspots, mockStats } from './mocks'
 
 export const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true'
 
@@ -33,6 +33,9 @@ async function getJson<T>(
 
 export const fetchHotspots = (q: ApiQuery, signal?: AbortSignal) =>
   getJson<HotspotCollection>('hotspots', q, mockHotspots, signal)
+
+export const fetchGrid = (q: ApiQuery, signal?: AbortSignal) =>
+  getJson<GridResponse>('hotspots/grid', q, mockGrid, signal)
 
 export const fetchStats = (q: ApiQuery, signal?: AbortSignal) => getJson<StatsResponse>('stats', q, mockStats, signal)
 

@@ -1,12 +1,12 @@
 import "leaflet/dist/leaflet.css";
-import { useMemo, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { ControlPosition, FitBoundsOptions } from "leaflet";
 import { MapContainer, TileLayer, ZoomControl, useMap } from "react-leaflet";
 import { ITALY_BOUNDS } from "../constants/fire";
 import { useGeoman } from "../hooks/useGeoman";
 import { useHotspotLayer } from "../hooks/useHotspotLayer";
-import type { Area, HotspotCollection, Sensor } from "../types/api";
-import { createHotspotIndex, type HotspotIndex } from "../utils/clusters";
+import { useViewportData } from "../hooks/useViewportData";
+import type { ApiQuery, Area, HotspotFeature, Sensor } from "../types/api";
 import { MapLegend, SideLegend } from "./MapLegend";
 import { SelectionPanel } from "./SelectionPanel";
 
@@ -23,17 +23,65 @@ function DrawTools({
   return null;
 }
 
-function HotspotLayer({
-  index,
-  dimmed,
+function MapStatus({
+  label,
+  total,
+  totalLoading,
+  loading,
+  error,
   mobile,
+  fitOptions,
 }: {
-  index: HotspotIndex;
-  dimmed: boolean;
+  label: string;
+  total: number | null;
+  totalLoading: boolean;
+  loading: boolean;
+  error: string | null;
   mobile: boolean;
+  fitOptions?: FitBoundsOptions;
 }) {
-  useHotspotLayer(index, dimmed, mobile);
-  return null;
+  return (
+    <div
+      className={`absolute top-3 z-[1000] flex items-center gap-2 rounded-lg border bg-slate-900/90 px-3 py-1.5 shadow-xl backdrop-blur-md ${
+        error ? "border-rose-500/60" : "border-slate-700/80"
+      } ${mobile ? "left-3 max-w-[calc(100%-4.5rem)]" : "left-12 max-w-[calc(100%-4rem)]"}`}
+    >
+      <span
+        className={`h-2 w-2 shrink-0 rounded-full ${error ? "bg-rose-500" : "bg-orange-500"} ${
+          loading || totalLoading ? "animate-pulse" : ""
+        }`}
+      />
+      {error ? (
+        <span role="alert" data-testid="map-error" className="truncate text-xs font-medium text-rose-200" title={error}>
+          Map: {error}
+        </span>
+      ) : (
+        <span className="truncate text-xs font-medium text-slate-100" aria-live="polite">
+          {label} · {totalLoading || total === null ? "loading…" : `${total.toLocaleString()} hotspots`}
+        </span>
+      )}
+      <ResetView options={fitOptions} />
+    </div>
+  );
+}
+
+/** Loads the visible area, draws it, and shows the status pill (both need the map context). */
+function ViewportLayer({
+  query,
+  mobile,
+  ...status
+}: {
+  query: ApiQuery;
+  mobile: boolean;
+  label: string;
+  total: number | null;
+  totalLoading: boolean;
+  fitOptions?: FitBoundsOptions;
+}) {
+  const { data, loading, error } = useViewportData(query);
+  // Old view's data is drawn dimmed until the new view arrives; a failed request draws nothing.
+  useHotspotLayer(data, loading && data !== null, mobile);
+  return <MapStatus {...status} loading={loading} error={error} mobile={mobile} />;
 }
 
 function ResetView({ options }: { options?: FitBoundsOptions }) {
@@ -50,10 +98,13 @@ function ResetView({ options }: { options?: FitBoundsOptions }) {
 }
 
 interface Props {
-  data: HotspotCollection | null;
-  loading: boolean;
-  /** `data` belongs to an older query: drawn dimmed until the response arrives. */
-  stale: boolean;
+  /** Filters + area for the map; the map adds its own bbox (visible area). */
+  query: ApiQuery;
+  /** Hotspots for the whole selection (stats total), shown in the status pill. */
+  total: number | null;
+  totalLoading: boolean;
+  /** Whole-selection dots for the selection card (only loaded while an area is selected). */
+  selection: { features: readonly HotspotFeature[]; loading: boolean; error: string | null };
   label: string;
   sensors: Sensor[];
   area: Area | null;
@@ -66,9 +117,10 @@ interface Props {
 }
 
 export function HotspotMap({
-  data,
-  loading,
-  stale,
+  query,
+  total,
+  totalLoading,
+  selection,
   label,
   sensors,
   area,
@@ -79,9 +131,6 @@ export function HotspotMap({
   mobile = false,
   children,
 }: Props) {
-  const features = data?.features ?? [];
-  // Built once per hotspot data change; pan and zoom only query it.
-  const index = useMemo(() => createHotspotIndex(data?.features ?? []), [data]);
   const [legendOpen, setLegendOpen] = useState(!mobile);
   const fitOptions: FitBoundsOptions | undefined = mobile
     ? { paddingTopLeft: [0, 48], paddingBottomRight: [0, 96] }
@@ -109,33 +158,20 @@ export function HotspotMap({
           maxZoom={16}
         />
 
-        <HotspotLayer index={index} dimmed={stale} mobile={mobile} />
+        <ViewportLayer
+          query={query}
+          mobile={mobile}
+          label={label}
+          total={total}
+          totalLoading={totalLoading}
+          fitOptions={fitOptions}
+        />
 
         <DrawTools
           area={area}
           onAreaChange={onAreaChange}
           position={mobile ? "topright" : "topleft"}
         />
-
-        <div
-          className={`absolute top-3 z-[1000] flex items-center gap-2 rounded-lg border border-slate-700/80 bg-slate-900/90 px-3 py-1.5 shadow-xl backdrop-blur-md ${
-            mobile ? "left-3 max-w-[calc(100%-4.5rem)]" : "left-12"
-          }`}
-        >
-          <span
-            className={`h-2 w-2 rounded-full bg-orange-500 ${loading ? "animate-pulse" : ""}`}
-          />
-          <span
-            className="truncate text-xs font-medium text-slate-100"
-            aria-live="polite"
-          >
-            {label} ·{" "}
-            {stale
-              ? "loading…"
-              : `${features.length.toLocaleString()} hotspots`}
-          </span>
-          <ResetView options={fitOptions} />
-        </div>
       </MapContainer>
 
       {mobile ? (
@@ -155,8 +191,9 @@ export function HotspotMap({
       {area && (
         <SelectionPanel
           area={area}
-          features={features}
-          loading={stale}
+          features={selection.features}
+          loading={selection.loading}
+          error={selection.error}
           fileTag={fileTag}
           downloading={downloading}
           onDownloadCsv={onDownloadCsv}

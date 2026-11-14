@@ -31,6 +31,10 @@ export interface ApiQuery {
   type?: string
   /** Comma list, e.g. `MODIS,VIIRS`. */
   sensor?: string
+  /** Visible map area `west,south,east,north`; map requests only (never stats, calendar, CSV). */
+  bbox?: string
+  /** Grid cell in degrees; `/hotspots/grid` only. */
+  cell?: number
 }
 
 export interface HotspotProperties {
@@ -56,6 +60,21 @@ export interface HotspotFeature {
 export interface HotspotCollection {
   type: 'FeatureCollection'
   features: HotspotFeature[]
+}
+
+/** One non-empty cell of `GET /api/hotspots/grid`. */
+export interface GridCell {
+  /** Average position of the cell's hotspots. */
+  lat: number
+  lon: number
+  count: number
+  /** Most common type; null when no hotspot in the cell has one (FIRMS API rows). */
+  type: FireType | null
+}
+
+export interface GridResponse {
+  cell: number
+  cells: GridCell[]
 }
 
 export interface StatsResponse {

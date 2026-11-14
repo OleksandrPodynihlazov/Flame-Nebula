@@ -8,9 +8,11 @@ import { Brand, FilterControls, SearchField, TopBar } from './components/TopBar'
 import { DEFAULT_FILTERS } from './constants/fire'
 import { useDashboardData } from './hooks/useDashboardData'
 import { useIsDesktop } from './hooks/useMediaQuery'
-import type { Area, Filters } from './types/api'
+import type { Area, Filters, HotspotFeature } from './types/api'
 import { buildGrid } from './utils/calendar'
 import { activeSensors, selectionLabel } from './utils/filters'
+
+const NO_FEATURES: readonly HotspotFeature[] = []
 
 export default function App() {
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS)
@@ -18,7 +20,7 @@ export default function App() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const isDesktop = useIsDesktop()
-  const { calendar, stats, hotspots, isDemo, selectionQuery } = useDashboardData(filters)
+  const { calendar, stats, selection, isDemo, selectionQuery } = useDashboardData(filters)
 
   const grid = useMemo(() => (calendar.data ? buildGrid(filters.year, calendar.data) : null), [calendar.data, filters.year])
   const update = (patch: Partial<Filters>) => setFilters((f) => ({ ...f, ...patch }))
@@ -36,7 +38,8 @@ export default function App() {
     }
   }
 
-  const error = calendar.error ?? stats.error ?? hotspots.error
+  // Map and selection card show their own request errors.
+  const error = calendar.error ?? stats.error
 
   const errorBanner = error && (
     <p role="alert" className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
@@ -58,9 +61,14 @@ export default function App() {
 
   const controls = { filters, onChange: update, onDownload, downloading }
   const mapProps = {
-    data: hotspots.data,
-    loading: hotspots.loading,
-    stale: hotspots.stale,
+    query: selectionQuery,
+    total: stats.data?.total ?? null,
+    totalLoading: stats.loading,
+    selection: {
+      features: selection.data?.features ?? NO_FEATURES,
+      loading: selection.loading,
+      error: selection.error,
+    },
     label: selectionLabel(filters),
     sensors,
     area: filters.area,
