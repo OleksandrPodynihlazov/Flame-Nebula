@@ -1,5 +1,6 @@
-import { ALL_TYPES, FIRE_TYPES } from '../constants/fire'
-import type { DayNight, FireType, Filters } from '../types/api'
+import { ALL_SENSORS, ALL_TYPES, FIRE_TYPES, SENSORS, YEARS } from '../constants/fire'
+import type { DayNight, FireType, Filters, Sensor } from '../types/api'
+import { activeSensors, sensorAvailable } from '../utils/filters'
 
 interface Props {
   filters: Filters
@@ -9,14 +10,66 @@ interface Props {
   isDemo: boolean
 }
 
-export function TopBar({ filters, onChange, onDownload, downloading, isDemo }: Props) {
+export function Brand({ year, sensors, isDemo }: { year: number; sensors: Sensor[]; isDemo: boolean }) {
+  return (
+    <div className="flex min-w-0 items-center gap-2.5">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 to-red-600 shadow-lg shadow-orange-500/20">
+          <svg className="h-4 w-4 text-white" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 23c-4.97 0-9-3.58-9-8 0-3.19 2.13-6.48 4.46-8.77.45-.44 1.21-.15 1.25.48.13 2.02 1.21 3.29 2.29 3.29.41 0 .75-.34.75-.75 0-2.61 1.48-5.34 3.44-7.01.47-.4 1.19-.08 1.21.53.11 3.22 1.77 5.23 3.22 6.84C21.13 11.29 22 13.06 22 15c0 4.42-4.03 8-10 8z" />
+          </svg>
+        </div>
+        <h1 className="whitespace-nowrap text-sm font-bold tracking-tight text-white">Flame Nebula</h1>
+        <span className="hidden whitespace-nowrap rounded-full border border-orange-500/30 2xl:inline bg-orange-500/15 px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wider text-orange-300">
+          Italy · {year} · {sensors.join(' + ')}
+        </span>
+        {isDemo && (
+          <span
+            className="whitespace-nowrap rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wider text-amber-300"
+            title="The API is not reachable, so synthetic demo data is shown. Not real FIRMS detections."
+          >
+            Demo data
+          </span>
+        )}
+          </div>
+  )
+}
+
+export function SearchField() {
+  return (
+    <label className="relative block min-w-0 flex-1 lg:w-48 lg:flex-none xl:w-56">
+      <span className="sr-only">Search region</span>
+      <svg className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" />
+        <path strokeLinecap="round" d="m20 20-3.5-3.5" />
+      </svg>
+      <input
+        type="search"
+        placeholder="Search…"
+        className="w-full rounded-lg border border-slate-700 bg-slate-800/80 py-1.5 pr-2.5 pl-8 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+      />
+    </label>
+  )
+}
+
+export function FilterControls({ filters, onChange, onDownload, downloading, stacked = false }: Omit<Props, 'isDemo'> & { stacked?: boolean }) {
   const typeValue = filters.types.length === ALL_TYPES.length ? 'all' : String(filters.types[0])
 
   const setType = (v: string) => {
     if (v === 'all') return onChange({ types: ALL_TYPES })
     const t = Number(v) as FireType
-    // Picking a noise type explicitly would show nothing while Hide Noise is on.
     onChange({ types: [t], hideNoise: FIRE_TYPES[t].noise ? false : filters.hideNoise })
+  }
+
+  const sensors = activeSensors(filters)
+
+  const setYear = (year: number) => {
+    const kept = filters.sensors.filter((s) => sensorAvailable(s, year))
+    onChange({ year, month: null, date: null, sensors: kept.length ? kept : ['MODIS'] })
+  }
+
+  const toggleSensor = (s: Sensor) => {
+    const next = filters.sensors.includes(s) ? filters.sensors.filter((x) => x !== s) : [...filters.sensors, s]
+    if (next.some((x) => sensorAvailable(x, filters.year))) onChange({ sensors: next })
   }
 
   const toggleNoise = () => {
@@ -26,30 +79,24 @@ export function TopBar({ filters, onChange, onDownload, downloading, isDemo }: P
   }
 
   return (
-    <header className="z-30 flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-slate-800 bg-slate-900/95 px-3 py-2 lg:h-14 lg:px-4">
-      <div className="flex items-center gap-2.5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 to-red-600 shadow-lg shadow-orange-500/20">
-          <svg className="h-4 w-4 text-white" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M12 23c-4.97 0-9-3.58-9-8 0-3.19 2.13-6.48 4.46-8.77.45-.44 1.21-.15 1.25.48.13 2.02 1.21 3.29 2.29 3.29.41 0 .75-.34.75-.75 0-2.61 1.48-5.34 3.44-7.01.47-.4 1.19-.08 1.21.53.11 3.22 1.77 5.23 3.22 6.84C21.13 11.29 22 13.06 22 15c0 4.42-4.03 8-10 8z" />
-          </svg>
-        </div>
-        <h1 className="text-sm font-bold tracking-tight text-white">Flame Nebula</h1>
-        <span className="rounded-full border border-orange-500/30 bg-orange-500/15 px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wider text-orange-300">
-          Italy · {filters.year} · MODIS
-        </span>
-        {isDemo && (
-          <span
-            className="rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wider text-amber-300"
-            title="The API is not reachable, so synthetic demo data is shown. Not real FIRMS detections."
+    <div className={stacked ? 'flex flex-col items-stretch gap-2.5' : 'flex flex-nowrap items-center gap-2 xl:gap-3'}>
+        <label className={`flex items-center gap-1.5 text-xs ${stacked ? '[&>select]:flex-1' : ''}`}>
+          <span className={stacked ? 'w-14 text-slate-400' : 'hidden text-slate-400 2xl:inline'}>Year</span>
+          <select
+            value={filters.year}
+            onChange={(e) => setYear(Number(e.target.value))}
+            className="rounded-lg border border-slate-700 bg-slate-800/90 px-2.5 py-1.5 font-mono text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-orange-500"
           >
-            Demo data
-          </span>
-        )}
-      </div>
+            {YEARS.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
+        </label>
 
-      <div className="flex flex-wrap items-center gap-2 lg:gap-3">
-        <label className="flex items-center gap-1.5 text-xs">
-          <span className="hidden text-slate-400 xl:inline">Fire type</span>
+        <label className={`flex items-center gap-1.5 text-xs ${stacked ? '[&>select]:flex-1' : ''}`}>
+          <span className={stacked ? 'w-14 text-slate-400' : 'hidden text-slate-400 2xl:inline'}>Fire type</span>
           <select
             value={typeValue}
             onChange={(e) => setType(e.target.value)}
@@ -64,8 +111,8 @@ export function TopBar({ filters, onChange, onDownload, downloading, isDemo }: P
           </select>
         </label>
 
-        <label className="flex items-center gap-1.5 text-xs">
-          <span className="hidden text-slate-400 xl:inline">Pass</span>
+        <label className={`flex items-center gap-1.5 text-xs ${stacked ? '[&>select]:flex-1' : ''}`}>
+          <span className={stacked ? 'w-14 text-slate-400' : 'hidden text-slate-400 2xl:inline'}>Pass</span>
           <select
             value={filters.daynight ?? 'all'}
             onChange={(e) => onChange({ daynight: e.target.value === 'all' ? null : (e.target.value as DayNight) })}
@@ -83,7 +130,7 @@ export function TopBar({ filters, onChange, onDownload, downloading, isDemo }: P
           aria-checked={filters.hideNoise}
           onClick={toggleNoise}
           title="Hide non-vegetation detections: volcanoes, industrial sites, offshore"
-          className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800/80 px-2.5 py-1.5 text-xs transition-colors hover:bg-slate-800"
+          className="flex items-center gap-2 whitespace-nowrap rounded-lg border border-slate-700 bg-slate-800/80 px-2.5 py-1.5 text-xs transition-colors hover:bg-slate-800"
         >
           <span className={`flex h-4 w-7 items-center rounded-full px-0.5 transition-colors ${filters.hideNoise ? 'bg-orange-500' : 'bg-slate-700'}`}>
             <span className={`h-3 w-3 rounded-full transition-transform ${filters.hideNoise ? 'translate-x-3 bg-white' : 'bg-slate-300'}`} />
@@ -91,31 +138,67 @@ export function TopBar({ filters, onChange, onDownload, downloading, isDemo }: P
           <span className="font-medium text-slate-200">Hide noise</span>
         </button>
 
-        <div className="hidden items-center gap-2.5 rounded-lg border border-slate-800 bg-slate-950/60 px-2.5 py-1 text-xs sm:flex">
-          <label className="flex items-center gap-1.5 font-medium text-slate-200">
-            <input type="checkbox" checked readOnly disabled className="accent-orange-500" />
-            MODIS
-          </label>
-          <span className="text-slate-700">|</span>
-          <label className="flex cursor-not-allowed items-center gap-1.5 text-slate-500" title="VIIRS and harmonization come after the MVP">
-            <input type="checkbox" disabled className="opacity-50" />
-            VIIRS
-            <span className="rounded bg-slate-800 px-1.5 text-[9px] uppercase tracking-wider text-slate-400">Soon</span>
-          </label>
-        </div>
+        <fieldset
+          className={`items-center gap-2.5 rounded-lg border border-slate-800 bg-slate-950/60 px-2.5 py-1 text-xs ${stacked ? 'flex' : 'hidden xl:flex'}`}
+        >
+          <legend className="sr-only">Sensors</legend>
+          {ALL_SENSORS.map((s, i) => {
+            const available = sensorAvailable(s, filters.year)
+            const checked = available && filters.sensors.includes(s)
+            const isLast = checked && sensors.length === 1
+            const meta = SENSORS[s]
+            const title = !available
+              ? `${s} has data for ${meta.from}–${meta.to} only`
+              : isLast
+                ? 'At least one sensor must stay selected'
+                : `${s} · ${meta.pixel} pixels`
+            return (
+              <span key={s} className="contents">
+                {i > 0 && <span className="text-slate-700">|</span>}
+                <label
+                  title={title}
+                  className={`flex items-center gap-1.5 font-medium ${available ? 'cursor-pointer text-slate-200' : 'cursor-not-allowed text-slate-500'}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={!available || isLast}
+                    onChange={() => toggleSensor(s)}
+                    className="accent-orange-500"
+                  />
+                  {s}
+                  {!available && (
+                    <span className="rounded bg-slate-800 px-1.5 text-[9px] tracking-wider text-slate-400">{meta.from}+</span>
+                  )}
+                </label>
+              </span>
+            )
+          })}
+        </fieldset>
 
         <button
           type="button"
           onClick={onDownload}
           disabled={downloading}
-          className="flex items-center gap-1.5 rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-orange-500 active:bg-orange-700 disabled:opacity-60"
+          className="flex items-center justify-center gap-1.5 rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-orange-500 active:bg-orange-700 disabled:opacity-60"
         >
           <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3" />
           </svg>
           {downloading ? 'Preparing…' : 'CSV'}
         </button>
+          </div>
+  )
+}
+
+export function TopBar({ isDemo, ...rest }: Props) {
+  return (
+    <header className="z-30 flex h-14 shrink-0 items-center justify-between gap-3 border-b border-slate-800 bg-slate-900/95 px-4">
+      <div className="flex min-w-0 items-center gap-4">
+        <Brand year={rest.filters.year} sensors={activeSensors(rest.filters)} isDemo={isDemo} />
+        <SearchField />
       </div>
+      <FilterControls {...rest} />
     </header>
   )
 }

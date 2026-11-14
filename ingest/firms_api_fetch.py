@@ -189,7 +189,8 @@ def fetch_range(
     header = None
     parts: list[bytes] = []
     for path in paths:
-        lines = path.read_bytes().splitlines(keepends=True)
+        # Chunks may lack a final newline (or use CRLF): compare and emit bare lines, re-terminated below.
+        lines = [line for line in path.read_bytes().splitlines() if line]
         if not lines:
             continue
         if header is None:
@@ -198,7 +199,7 @@ def fetch_range(
         elif lines[0] != header:
             raise FirmsError(f"CSV header changed between chunks ({path.name}); refusing to merge")
         parts.extend(lines[1:])
-    write_atomic(merged, b"".join(parts))
+    write_atomic(merged, b"".join(line + b"\n" for line in parts))
     log(f"done: {total} rows -> {merged}")
     return merged
 
