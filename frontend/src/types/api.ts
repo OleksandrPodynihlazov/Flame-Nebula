@@ -4,9 +4,40 @@ export type Sensor = 'MODIS' | 'VIIRS'
 export type Month = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11
 export type LonLat = [number, number]
 
+/** Simplified region outline from `GET /api/regions/:id` (rings closed, `[lon, lat]`). */
+export type RegionGeometry =
+  | { type: 'Polygon'; coordinates: LonLat[][] }
+  | { type: 'MultiPolygon'; coordinates: LonLat[][][] }
+
 export type Area =
   | { kind: 'circle'; lat: number; lon: number; radiusKm: number }
   | { kind: 'polygon'; points: LonLat[] }
+  /** Named region picked in the search bar; sent as `region=<id>`, outline only drawn and measured. */
+  | { kind: 'region'; id: number; name: string; path: string; geometry: RegionGeometry }
+
+/** One row of `GET /api/regions`. */
+export interface Region {
+  id: number
+  name: string
+  /** 0 = country, 1, 2 (meaning varies by country; Italy: 2 = the 20 regions). */
+  level: number
+  country: string
+  parent_id: number | null
+  /** Ancestors, e.g. `Italy › Isole`; `""` for a country. */
+  path: string
+}
+
+export interface RegionsResponse {
+  regions: Region[]
+}
+
+/** `GET /api/regions/:id` */
+export interface RegionFeature {
+  type: 'Feature'
+  id: number
+  geometry: RegionGeometry
+  properties: Region
+}
 
 export interface Filters {
   year: number
@@ -27,6 +58,8 @@ export interface ApiQuery {
   lon?: number
   radius_km?: number
   polygon?: string
+  /** Region id from `/api/regions`; never sent with a circle or polygon. */
+  region?: number
   daynight?: DayNight
   type?: string
   /** Comma list, e.g. `MODIS,VIIRS`. */

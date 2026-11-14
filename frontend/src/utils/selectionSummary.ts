@@ -19,9 +19,10 @@ export interface SelectionSummary {
 
 const isMonth = (n: number): n is Month => Number.isInteger(n) && n >= 0 && n <= 11
 
-/** Area of the selection in km². Polygon: geodesic (@turf/area). Circle: π·r². */
+/** Area of the selection in km². Polygon and region outline: geodesic (@turf/area). Circle: π·r². */
 export function areaKm2(area: Area): number {
   if (area.kind === 'circle') return Math.PI * area.radiusKm ** 2
+  if (area.kind === 'region') return turfArea(area.geometry) / 1e6
   if (area.points.length < 3) return 0
   const ring = [...area.points, area.points[0]]
   return turfArea({ type: 'Polygon', coordinates: [ring] }) / 1e6

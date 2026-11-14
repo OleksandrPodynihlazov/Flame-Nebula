@@ -1,8 +1,12 @@
 import { COMPARE_COLORS, type CompareSide, type CompareYears } from '../constants/compare'
 import { ALL_SENSORS, ALL_TYPES, FIRE_TYPES, SENSORS, YEARS } from '../constants/fire'
-import type { DayNight, FireType, Filters, Sensor } from '../types/api'
+
+import type { Area, DayNight, FireType, Filters, Sensor } from '../types/api'
+import { RegionSearch } from './RegionSearch'
+
 import { defaultCompareYears } from '../utils/compare'
 import { activeSensors, sensorAvailable, yearPatch } from '../utils/filters'
+
 
 interface Props {
   filters: Filters
@@ -48,21 +52,9 @@ export function Brand({
   )
 }
 
-export function SearchField() {
-  return (
-    <label className="relative block min-w-0 flex-1 lg:w-48 lg:flex-none xl:w-56">
-      <span className="sr-only">Search region</span>
-      <svg className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
-        <circle cx="11" cy="11" r="7" />
-        <path strokeLinecap="round" d="m20 20-3.5-3.5" />
-      </svg>
-      <input
-        type="search"
-        placeholder="Search…"
-        className="w-full rounded-lg border border-slate-700 bg-slate-800/80 py-1.5 pr-2.5 pl-8 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
-      />
-    </label>
-  )
+/** Region search bound to `filters.area`. */
+export function SearchField({ area, onAreaChange }: { area: Area | null; onAreaChange: (area: Area | null) => void }) {
+  return <RegionSearch area={area} onSelect={onAreaChange} />
 }
 
 export function FilterControls({
@@ -258,10 +250,10 @@ export function TopBar({ isDemo, ...rest }: Props) {
   return (
     <header className="z-30 flex h-14 shrink-0 items-center justify-between gap-3 border-b border-slate-800 bg-slate-900/95 px-4">
       <div className="flex min-w-0 items-center gap-4">
-        <Brand year={rest.filters.year} sensors={activeSensors(rest.filters)} isDemo={isDemo} compare={rest.compare} />
-        <div className={rest.compare ? 'hidden 2xl:block' : 'contents'}>
-          <SearchField />
-        </div>
+<Brand year={rest.filters.year} sensors={activeSensors(rest.filters)} isDemo={isDemo} compare={rest.compare} />
+          <div className={rest.compare ? 'hidden 2xl:block' : 'contents'}>
+            <SearchField area={rest.filters.area} onAreaChange={(area) => rest.onChange({ area })} />
+          </div>
       </div>
       <FilterControls {...rest} />
     </header>

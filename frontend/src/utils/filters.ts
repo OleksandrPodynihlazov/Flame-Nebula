@@ -30,6 +30,7 @@ function baseQuery(f: Filters, from: string, to: string): ApiQuery {
   if (f.daynight) q.daynight = f.daynight
   if (f.area?.kind === 'circle') Object.assign(q, { lat: f.area.lat, lon: f.area.lon, radius_km: f.area.radiusKm })
   if (f.area?.kind === 'polygon') q.polygon = JSON.stringify(f.area.points)
+  if (f.area?.kind === 'region') q.region = f.area.id
   return q
 }
 
