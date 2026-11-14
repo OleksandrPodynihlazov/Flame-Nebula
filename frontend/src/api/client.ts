@@ -56,9 +56,14 @@ function triggerDownload(href: string, filename: string) {
   a.click()
 }
 
+/** Save a browser-made file; the object URL is revoked once the click is dispatched. */
+export function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob)
+  triggerDownload(url, filename)
+  setTimeout(() => URL.revokeObjectURL(url), 0)
+}
+
 export async function downloadCsv(q: ApiQuery, filename: string): Promise<void> {
   if (!USE_MOCKS) return triggerDownload(csvUrl(q), filename)
-  const url = URL.createObjectURL(await mockCsv(q))
-  triggerDownload(url, filename.replace(/\.csv$/, '_DEMO.csv'))
-  setTimeout(() => URL.revokeObjectURL(url), 0)
+  downloadBlob(await mockCsv(q), filename.replace(/\.csv$/, '_DEMO.csv'))
 }

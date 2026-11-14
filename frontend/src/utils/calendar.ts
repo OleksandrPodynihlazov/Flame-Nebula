@@ -1,7 +1,6 @@
 import type { CalendarResponse, Month } from '../types/api'
 
 export interface CalendarGrid {
-  /** counts[month][day-1]; `null` = day does not exist in that month. */
   counts: (number | null)[][]
   monthTotals: number[]
   total: number
@@ -27,11 +26,6 @@ export function buildGrid(year: number, cal: CalendarResponse): CalendarGrid {
   })
   return { counts, monthTotals, total, maxDay, peakMonth: peak }
 }
-
-/**
- * Sequential 6-step fire ramp (0 = none). Log scale, because a few August days
- * dwarf the rest and a linear scale would leave most of the year blank.
- */
 export const RAMP = ['#1e293b', '#4a2a12', '#8a3f0f', '#c2540a', '#ea580c', '#f97316', '#fdba74'] as const
 
 export function rampIndex(count: number, max: number): number {
@@ -39,8 +33,6 @@ export function rampIndex(count: number, max: number): number {
   const r = Math.log1p(count) / Math.log1p(max)
   return Math.min(RAMP.length - 1, 1 + Math.floor(r * (RAMP.length - 1 - 1e-9)))
 }
-
-/** Upper bound of each ramp step, for the legend. */
 export function rampBounds(max: number): number[] {
   const steps = RAMP.length - 1
   return Array.from({ length: steps }, (_, i) => Math.round(Math.expm1(((i + 1) / steps) * Math.log1p(max))))

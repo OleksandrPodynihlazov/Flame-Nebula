@@ -39,7 +39,21 @@ File: `data/processed/hotspots.csv`, UTF-8, comma, header row.
 
 MVP: MODIS rows only; this is a cleaned copy of the raw file.
 
-**Harmonization method: TBD** (owner: harmonization teammate). It may add columns (e.g. a weight or scaled count). Add them here before any downstream stage uses them.
+**Harmonization (owner: harmonization teammate). Implemented in the DB, on top of `hotspots`.** Raw rows are loaded as-is
+(`ingest/load_hotspots.py`); the processed CSV above is not produced. Nothing in `hotspots` is modified.
+How to build: `docs/data-sources.md` → *Harmonize*. Method and evidence: `research/07-harmonization-deep-dive.md` §8, §13.
+
+| Object | Kind | What the backend uses it for |
+|---|---|---|
+| `coverage(satellite, day, status, note)` | table | `status` ∈ `ok`/`partial`/`missing` per satellite × UTC day. **Draw non-ok days as "no data", never as 0.** |
+| `static_mask(cell_lat, cell_lon, category, core, qualifying_years)` | table | Industrial sites / flares (`static`) and `volcano` cells, grid `floor(deg*100)`, built from S-NPP. |
+| `hotspots_flagged` | view | `hotspots` + `mask_category` + `is_burning` (= not masked and `type` ≠ 3). **Count burning activity with `WHERE is_burning`.** Map/CSV can show all rows with the flag. |
+| `calibration` | table | Per-month junction factors (J1 Terra→Aqua, J2 Aqua→S-NPP) for `count` and `frp`, with interquartile band. |
+| `calibration_chain(satellite, month, metric, factor, band_lo, band_hi)` | view | **Multiplier to S-NPP-equivalent units.** For any AOI and month: take the month's reference satellite, aggregate `is_burning` rows, multiply by `factor` (band: `band_lo`/`band_hi`). Aggregates only, never single points. |
+| `harmonized_monthly` | view | Italy-wide ready series: `month_start, satellite` (reference), `raw_count, raw_frp, count_snpp_eq, count_lo, count_hi, frp_snpp_eq, frp_lo, frp_hi, days_ok, days_partial, days_missing`. |
+
+Reference satellite of a month = the newest one covering the **whole** month: Terra 2000-11 → 2002-07, Aqua 2002-08 → 2012-01,
+S-NPP 2012-02 →. Never sum satellites. Hotspot counts from the other satellites stay available for the map and CSV.
 
 ## [2] db/ schema
 

@@ -11,7 +11,6 @@ export type Area =
 export interface Filters {
   year: number
   month: Month | null
-  /** Selected day `YYYY-MM-DD` (UI only; sent as from = to = date). Wins over `month`. */
   date: string | null
   area: Area | null
   /** At least one. Sensors with no data in `year` are dropped from requests. */
@@ -76,11 +75,4 @@ export interface CalendarResponse {
 
 export interface ApiError {
   error: string
-}
-
-export interface MonthlyCalendar {
-  year: number
-  months: number[]
-  total: number
-  peakMonth: { month: Month; count: number } | null
 }
