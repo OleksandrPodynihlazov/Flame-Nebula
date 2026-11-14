@@ -1,19 +1,19 @@
 import { pool } from "../db.js";
-import { buildWhere, httpError } from "../lib/query.js";
+import {
+  DEFAULT_BBOX_MAX_ROWS,
+  DEFAULT_MAX_ROWS,
+  buildWhere,
+  httpError,
+  parseRowCap,
+  rowCapFor,
+} from "../lib/query.js";
 
 // Upper bound on rows per /api/hotspots(.csv) response. Without it a request with no date range
-// loads the whole table into memory and the API dies with a heap OOM.
-const DEFAULT_MAX_ROWS = 200000;
-
-function parseMaxRows(raw) {
-  if (raw === undefined || raw === "") return DEFAULT_MAX_ROWS;
-  if (!/^[1-9]\d*$/.test(raw) || !Number.isSafeInteger(Number(raw))) {
-    throw new Error(`HOTSPOTS_MAX_ROWS must be a positive integer, got "${raw}"`);
-  }
-  return Number(raw);
-}
-
-const MAX_ROWS = parseMaxRows(process.env.HOTSPOTS_MAX_ROWS);
+// loads the whole table into memory and the API dies with a heap OOM. bbox (viewport) requests use their own cap.
+const CAPS = {
+  maxRows: parseRowCap(process.env.HOTSPOTS_MAX_ROWS, "HOTSPOTS_MAX_ROWS", DEFAULT_MAX_ROWS),
+  bboxMaxRows: parseRowCap(process.env.HOTSPOTS_BBOX_MAX_ROWS, "HOTSPOTS_BBOX_MAX_ROWS", DEFAULT_BBOX_MAX_ROWS),
+};
 
 // Field names and types follow docs/contracts.md [1] (what the frontend expects),
 // not the DB schema [2]: instrument → sensor, acq_time 105 → "0105", confidence '76' → 76.
@@ -34,14 +34,13 @@ const SELECT_HOTSPOTS = `
 
 async function queryHotspots(filters) {
   const { where, params } = buildWhere(filters);
+  const { cap, message } = rowCapFor(filters, CAPS);
   // Fetch one row past the cap to tell "exactly at the cap" from "over it"; never truncate silently.
   const { rows } = await pool.query(
     `${SELECT_HOTSPOTS} ${where} ORDER BY acq_date, acq_time, id LIMIT $${params.length + 1}`,
-    [...params, MAX_ROWS + 1]
+    [...params, cap + 1]
   );
-  if (rows.length > MAX_ROWS) {
-    throw httpError(`Too many hotspots (more than ${MAX_ROWS}). Narrow the date range or area.`);
-  }
+  if (rows.length > cap) throw httpError(message);
   return rows;
 }
 

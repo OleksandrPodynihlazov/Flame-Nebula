@@ -148,7 +148,7 @@ Unknown `region` id → 400. No area given → all loaded data (currently Europe
 | `GET /api/regions` | `{ "regions": [ { "id": 812, "name": "Sicilia", "level": 2, "country": "ITA", "parent_id": 77, "path": "Italy › Isole" } ] }`. No params → countries (level 0, `path` `""`); `?parent=<id>` → its children; `?q=<text>` → name search, 2–100 chars, case- and accent-insensitive, prefix matches first, max 20. `q` with `parent` → 400. Sorted by name. Not loaded yet → `"regions": []` |
 | `GET /api/regions/:id` | GeoJSON `Feature`: `geometry` = simplified outline (Polygon / MultiPolygon), `properties` = the fields above. Unknown id → 404 `{ "error": … }` |
 
-Row cap: `GET /api/hotspots` and `GET /api/hotspots.csv` return at most `HOTSPOTS_MAX_ROWS` rows (env; 500000 in `docker-compose.yml`, code fallback 200000). More matching rows → 400 `{ "error": "Too many hotspots (more than <cap>). Narrow the date range or area." }`; never a truncated result.
+Row cap: `GET /api/hotspots` and `GET /api/hotspots.csv` return at most `HOTSPOTS_MAX_ROWS` rows (env; 500000 in `docker-compose.yml`, code fallback 200000). More matching rows → 400 `{ "error": "Too many hotspots (more than <cap>). Narrow the date range or area." }`; never a truncated result. With `bbox` (map viewport) the cap is `HOTSPOTS_BBOX_MAX_ROWS` instead (env, default 20000) → 400 `{ "error": "Too many hotspots in view (more than <cap>). Zoom in." }`.
 
 `GET /api/hotspots/grid` — shared params + `bbox` (**required**) + `cell` (**required**, degrees, `0.01 ≤ cell ≤ 10`):
 
