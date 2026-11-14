@@ -34,6 +34,7 @@ export APP_VERSION="$SHA"
 
 echo "==> docker compose up (APP_VERSION=$APP_VERSION)"
 docker compose up -d --build --remove-orphans
+bash infra/sync-gateway.sh
 
 echo "==> waiting for $HEALTH_URL to report version $SHA"
 deadline=$((SECONDS + 90))
