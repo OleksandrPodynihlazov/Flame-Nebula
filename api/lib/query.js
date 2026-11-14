@@ -15,6 +15,28 @@ export const MAX_CELL = 10;
 export const MAX_GRID_CELLS = 20000;
 export const TOO_MANY_CELLS = "Too many cells, zoom in or use a bigger cell";
 
+// Row caps for /api/hotspots(.csv). A viewport request (bbox) gets its own, smaller cap: the map asks for points
+// only when zoomed in, so a huge answer there means a bad request, not a download.
+export const DEFAULT_MAX_ROWS = 200000;
+export const DEFAULT_BBOX_MAX_ROWS = 20000;
+
+// Strict env parsing: unset or "" → fallback; anything but a positive safe integer fails startup.
+export function parseRowCap(raw, name, fallback) {
+  if (raw === undefined || raw === "") return fallback;
+  if (!/^[1-9]\d*$/.test(raw) || !Number.isSafeInteger(Number(raw))) {
+    throw new Error(`${name} must be a positive integer, got "${raw}"`);
+  }
+  return Number(raw);
+}
+
+// Which cap applies to these filters, and the 400 message when a query goes over it.
+export function rowCapFor(filters, { maxRows, bboxMaxRows }) {
+  if (filters.bbox) {
+    return { cap: bboxMaxRows, message: `Too many hotspots in view (more than ${bboxMaxRows}). Zoom in.` };
+  }
+  return { cap: maxRows, message: `Too many hotspots (more than ${maxRows}). Narrow the date range or area.` };
+}
+
 export function httpError(message) {
   const err = new Error(message);
   err.status = 400;

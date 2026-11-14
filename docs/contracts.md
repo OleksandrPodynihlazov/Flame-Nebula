@@ -178,7 +178,7 @@ Unknown `region` id → 400. No area given → all loaded data (currently Europe
 | `GET /api/regions` | `{ "regions": [ { "id": 812, "name": "Sicilia", "level": 2, "country": "ITA", "parent_id": 77, "path": "Italy › Isole" } ] }`. No params → countries (level 0, `path` `""`); `?parent=<id>` → its children; `?q=<text>` → name search, 2–100 chars, case- and accent-insensitive, prefix matches first, max 20. `q` with `parent` → 400. Sorted by name. Not loaded yet → `"regions": []` |
 | `GET /api/regions/:id` | GeoJSON `Feature`: `geometry` = simplified outline (Polygon / MultiPolygon), `properties` = the fields above. Unknown id → 404 `{ "error": … }` |
 
-Row cap: `GET /api/hotspots` and `GET /api/hotspots.csv` return at most `HOTSPOTS_MAX_ROWS` rows (env; 500000 in `docker-compose.yml`, code fallback 200000). More matching rows → 400 `{ "error": "Too many hotspots (more than <cap>). Narrow the date range or area." }`; never a truncated result.
+Row cap: `GET /api/hotspots` and `GET /api/hotspots.csv` return at most `HOTSPOTS_MAX_ROWS` rows (env; 500000 in `docker-compose.yml`, code fallback 200000). More matching rows → 400 `{ "error": "Too many hotspots (more than <cap>). Narrow the date range or area." }`; never a truncated result. With `bbox` (map viewport) the cap is `HOTSPOTS_BBOX_MAX_ROWS` instead (env, default 20000) → 400 `{ "error": "Too many hotspots in view (more than <cap>). Zoom in." }`.
 
 `GET /api/hotspots/grid` — shared params + `bbox` (**required**) + `cell` (**required**, degrees, `0.01 ≤ cell ≤ 10`):
 
@@ -191,7 +191,7 @@ Row cap: `GET /api/hotspots` and `GET /api/hotspots.csv` return at most `HOTSPOT
 - `type` = most common `type` in the cell (`mode()`), lowest on a tie. Rows with `type` NULL (FIRMS API files) are skipped by `mode()`; `type` is `null` only when no point in the cell has one.
 - Missing / invalid `bbox` or `cell` → 400. More than 20,000 cells → 400 `{ "error": "Too many cells, zoom in or use a bigger cell" }`. Nothing in the box → 200 `{ "cell": …, "cells": [] }`.
 
-Concurrency: the gateway allows at most 2 parallel hotspots requests per client IP and 3 in total. Over the limit → 503 `{ "error": "Server busy, try again in a moment" }` with `Retry-After`. `/api/hotspots/grid` has no such limit.
+Concurrency (`/api/hotspots` and `/api/hotspots.csv`), two separate classes: without `bbox` (heavy) at most 2 parallel requests per client IP and 3 in total; with `bbox` (light, map viewport) at most 6 per client IP and 20 in total. One class never uses up the other. Over the limit → 503 `{ "error": "Server busy, try again in a moment" }` with `Retry-After`. `/api/hotspots/grid` has no such limit.
 
 Cache: the gateway caches `200` answers of every `GET /api/...` except `/api/health` for 10 minutes, keyed by path + query string (`X-Cache-Status: MISS` / `HIT` / …). After loading new data, clear it (`docs/deploy.md`). Clients should send identical query strings for identical views (the frontend rounds `bbox` to 0.01° and picks `cell` from a fixed set).
 
