@@ -146,6 +146,8 @@ Unknown `region` id → 400. No area given → whole dataset.
 | `GET /api/regions` | `{ "regions": [ { "id": 812, "name": "Sicilia", "level": 2, "country": "ITA", "parent_id": 77, "path": "Italy › Isole" } ] }`. No params → countries (level 0, `path` `""`); `?parent=<id>` → its children; `?q=<text>` → name search, 2–100 chars, case- and accent-insensitive, prefix matches first, max 20. `q` with `parent` → 400. Sorted by name. Not loaded yet → `"regions": []` |
 | `GET /api/regions/:id` | GeoJSON `Feature`: `geometry` = simplified outline (Polygon / MultiPolygon), `properties` = the fields above. Unknown id → 404 `{ "error": … }` |
 
+Row cap: `GET /api/hotspots` and `GET /api/hotspots.csv` return at most `HOTSPOTS_MAX_ROWS` rows (env, default 200000). More matching rows → 400 `{ "error": "Too many hotspots (more than 200000). Narrow the date range or area." }`; never a truncated result.
+
 Owner may change these; update this table first.
 
 ### Frontend requirements for [3]
