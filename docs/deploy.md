@@ -63,7 +63,7 @@ The gateway caches `200` answers of `GET /api/...` (not `/api/health`, not `/log
 docker compose exec gateway sh -c 'rm -rf /var/cache/nginx/api/*'
 ```
 
-Recreating the gateway (a `gateway.conf` change, `infra/sync-gateway.sh`) also empties it. The `/api/hotspots` connection limit is checked before the cache lookup, so a cache hit also holds a slot while it is sent; `/api/hotspots/grid` has no limit.
+Every deploy empties it (`infra/deploy.sh`, after `sync-gateway.sh`), so a new API never serves cached answers from the old one. The command above is still needed after a data load without a deploy. Recreating the gateway also empties it. The `/api/hotspots` connection limit is checked before the cache lookup, so a cache hit also holds a slot while it is sent; `/api/hotspots/grid` has no limit.
 
 ## Run locally
 
