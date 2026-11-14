@@ -3,6 +3,8 @@ import type {
   CalendarResponse,
   DayNight,
   FireType,
+  GridCell,
+  GridResponse,
   HotspotCollection,
   HotspotFeature,
   LonLat,
@@ -133,8 +135,10 @@ function filter(q: ApiQuery) {
   const types = q.type ? new Set(q.type.split(',').map(Number)) : null
   const polygon: LonLat[] | null = q.polygon ? JSON.parse(q.polygon) : null
   const circle = q.lat !== undefined && q.lon !== undefined && q.radius_km !== undefined
+  const [west, south, east, north] = q.bbox ? q.bbox.split(',').map(Number) : []
   return dataset(q).filter(({ properties: p, geometry }) => {
     if (p.acq_date < q.from || p.acq_date > q.to) return false
+    if (q.bbox && (p.latitude < south || p.latitude > north || p.longitude < west || p.longitude > east)) return false
     if (types && !types.has(p.type)) return false
     if (q.daynight && p.daynight !== q.daynight) return false
     if (polygon) return inPolygon(geometry.coordinates, polygon)
@@ -150,6 +154,27 @@ function delay<T>(value: T): Promise<T> {
 
 export function mockHotspots(q: ApiQuery): Promise<HotspotCollection> {
   return delay({ type: 'FeatureCollection', features: filter(q) })
+}
+
+/** Same grouping as the API: floor(lat / cell), floor(lon / cell); type = most common, lowest on a tie. */
+export function mockGrid(q: ApiQuery): Promise<GridResponse> {
+  const cell = q.cell ?? 1
+  const groups = new Map<string, { lat: number; lon: number; count: number; types: [number, number, number, number] }>()
+  for (const { properties: p } of filter(q)) {
+    const key = `${Math.floor(p.latitude / cell)}|${Math.floor(p.longitude / cell)}`
+    const g = groups.get(key) ?? { lat: 0, lon: 0, count: 0, types: [0, 0, 0, 0] }
+    g.lat += p.latitude
+    g.lon += p.longitude
+    g.count++
+    g.types[p.type]++
+    groups.set(key, g)
+  }
+  const cells: GridCell[] = [...groups.values()].map((g) => {
+    let type: FireType = 0
+    for (const t of [1, 2, 3] as const) if (g.types[t] > g.types[type]) type = t
+    return { lat: +(g.lat / g.count).toFixed(4), lon: +(g.lon / g.count).toFixed(4), count: g.count, type }
+  })
+  return delay({ cell, cells })
 }
 
 export function mockStats(q: ApiQuery): Promise<StatsResponse> {
