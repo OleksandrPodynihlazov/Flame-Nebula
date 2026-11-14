@@ -13,7 +13,7 @@ CREATE TABLE hotspots (
   version     TEXT,
   frp         DOUBLE PRECISION,              -- MW
   daynight    CHAR(1),           -- 'D' or 'N'
-  type        SMALLINT NOT NULL          -- 0-3, empty in NRT data
+  type        SMALLINT                   -- 0-3; NULL in NRT/API files (they have no type)
 );
 
 CREATE INDEX ON hotspots (acq_date);
