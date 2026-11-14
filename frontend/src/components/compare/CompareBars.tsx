@@ -13,7 +13,10 @@ interface Props {
   series: [BarSeries, BarSeries]
   loading?: boolean
   footer?: ReactNode
+  format?: (v: number) => string
 }
+
+const AXIS = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
 
 function niceMax(n: number): number {
   if (n <= 0) return 1
@@ -23,7 +26,7 @@ function niceMax(n: number): number {
 }
 
 /** Grouped bars: one group per category, one bar per series. Plain DOM, scales to its container. */
-export function CompareBars({ title, subtitle, categories, series, loading = false, footer }: Props) {
+export function CompareBars({ title, subtitle, categories, series, loading = false, footer, format = (v) => v.toLocaleString() }: Props) {
   const max = niceMax(Math.max(0, ...series.flatMap((s) => s.values)))
   const ticks = [max, max / 2, 0]
 
@@ -51,7 +54,7 @@ export function CompareBars({ title, subtitle, categories, series, loading = fal
       <div className={`flex gap-2 transition-opacity ${loading ? 'opacity-50' : ''}`}>
         <div className="flex h-44 flex-col justify-between pb-5 text-right font-mono text-[9px] text-slate-500 sm:h-56 sm:text-[10px]">
           {ticks.map((t) => (
-            <span key={t}>{Math.round(t).toLocaleString()}</span>
+            <span key={t}>{AXIS.format(t)}</span>
           ))}
         </div>
         <div className="relative flex h-44 flex-1 flex-col sm:h-56">
@@ -70,7 +73,7 @@ export function CompareBars({ title, subtitle, categories, series, loading = fal
                       key={s.label}
                       className="w-full max-w-4 rounded-t-sm transition-[height] duration-300"
                       style={{ height: `${(v / max) * 100}%`, background: s.color, minHeight: v > 0 ? 1 : 0 }}
-                      title={`${c} ${s.label}: ${v.toLocaleString()}`}
+                      title={`${c} ${s.label}: ${format(v)}`}
                       data-testid="compare-bar"
                     />
                   )

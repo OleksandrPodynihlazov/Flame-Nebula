@@ -3,6 +3,8 @@ import type { CalendarResponse, Month } from '../types/api'
 export interface CalendarGrid {
   counts: (number | null)[][]
   monthTotals: number[]
+  /** Summed FRP (MW) per month. */
+  monthFrp: number[]
   total: number
   maxDay: number
   peakMonth: { month: Month; count: number } | null
@@ -13,9 +15,13 @@ export function buildGrid(year: number, cal: CalendarResponse): CalendarGrid {
     const len = new Date(Date.UTC(year, m + 1, 0)).getUTCDate()
     return Array.from({ length: 31 }, (_, d) => (d < len ? 0 : null))
   })
-  for (const { date, count } of cal.days) {
+  const monthFrp = new Array<number>(12).fill(0)
+  for (const { date, count, frp } of cal.days) {
     const [y, m, d] = date.split('-').map(Number)
-    if (y === year && counts[m - 1]?.[d - 1] !== null) counts[m - 1][d - 1] = count
+    if (y === year && counts[m - 1]?.[d - 1] !== null) {
+      counts[m - 1][d - 1] = count
+      monthFrp[m - 1] += frp ?? 0
+    }
   }
   const monthTotals = counts.map((row) => row.reduce<number>((a, c) => a + (c ?? 0), 0))
   const total = monthTotals.reduce((a, c) => a + c, 0)
@@ -24,7 +30,7 @@ export function buildGrid(year: number, cal: CalendarResponse): CalendarGrid {
   monthTotals.forEach((c, m) => {
     if (c > 0 && (!peak || c > peak.count)) peak = { month: m as Month, count: c }
   })
-  return { counts, monthTotals, total, maxDay, peakMonth: peak }
+  return { counts, monthTotals, monthFrp: monthFrp.map((v) => Math.round(v * 10) / 10), total, maxDay, peakMonth: peak }
 }
 export const RAMP = ['#1e293b', '#4a2a12', '#8a3f0f', '#c2540a', '#ea580c', '#f97316', '#fdba74'] as const
 

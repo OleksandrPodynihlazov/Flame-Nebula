@@ -7,8 +7,8 @@ Two years on one map, split by a draggable vertical divider. Left of the divider
 - **Compare** in the filters (desktop: top bar; phone: Filters button) turns it on. Year A starts at the selected year, year B at the latest year.
 - Fire type, day/night, hide noise, sensors and the drawn area apply to both years. Month and day selection do not: each side is a full year.
 - Drag the round handle, or focus it and use ←/→ (Home/End for the edges).
-- Stats: one row per year; year B shows the change in hotspots vs year A.
-- Below the stats (phone: pull the sheet up), the burn calendar is replaced by a bar chart of hotspots per month for both years.
+- Stats: one row per year — total FRP (summed fire radiative power, MW, from `/api/stats` `frp_sum`), peak month by FRP, hotspot count. Year B shows the % change vs year A.
+- Below the stats (phone: pull the sheet up), the burn calendar is replaced by a bar chart of FRP per month for both years (`/api/calendar` `frp`).
 - CSV export and the area summary card are off while comparing; they work on one year.
 - A sensor that has no data in a year is dropped for that year; if none is left, MODIS is used.
 

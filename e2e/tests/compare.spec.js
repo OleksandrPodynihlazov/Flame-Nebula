@@ -20,18 +20,20 @@ test('compare mode splits the map, stacks the stats and charts both years', asyn
 
   await expect(page.getByTestId('compare-label-a')).toContainText('2010');
   await expect(page.getByTestId('compare-label-b')).toContainText('2020');
+  await expect(page.getByTestId('compare-stats').getByTestId('stat-frp')).toHaveCount(2);
   await expect(page.getByTestId('compare-stats').getByTestId('stat-total')).toHaveCount(2);
   await expect(page.getByTestId('compare-bars').getByTestId('compare-bar')).toHaveCount(24);
 
   const divider = page.getByTestId('compare-divider');
-  await expect(divider).toHaveAttribute('aria-valuenow', '50');
+  const start = Number(await divider.getAttribute('aria-valuenow'));
+  expect(start).toBeGreaterThan(15);
   const map = await page.locator('.leaflet-container').boundingBox();
   const handle = await divider.boundingBox();
   await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
   await page.mouse.down();
   await page.mouse.move(map.x + map.width * 0.25, handle.y + handle.height / 2, { steps: 6 });
   await page.mouse.up();
-  await expect.poll(async () => Number(await divider.getAttribute('aria-valuenow'))).toBeLessThan(35);
+  await expect.poll(async () => Number(await divider.getAttribute('aria-valuenow'))).toBeLessThan(Math.min(start, 35));
 
   await divider.focus();
   const before = Number(await divider.getAttribute('aria-valuenow'));

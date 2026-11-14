@@ -84,3 +84,10 @@ body {
     bottom: 160px;
   }
 }
+
+@media (min-width: 1024px) {
+  .leaflet-bottom.leaflet-right {
+    right: var(--panel-inset, 0px);
+    transition: right 200ms;
+  }
+}

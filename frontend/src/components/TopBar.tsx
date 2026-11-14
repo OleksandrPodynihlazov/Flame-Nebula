@@ -2,8 +2,8 @@ import { COMPARE_COLORS, type CompareSide, type CompareYears } from '../constant
 import { ALL_SENSORS, ALL_TYPES, FIRE_TYPES, SENSORS, YEARS } from '../constants/fire'
 import type { Area, DayNight, FireType, Filters, Sensor } from '../types/api'
 import { defaultCompareYears } from '../utils/compare'
+import { activeSensors, sensorAvailable, yearPatch } from '../utils/filters'
 import { RegionSearch } from './RegionSearch'
-import { activeSensors, sensorAvailable } from '../utils/filters'
 
 interface Props {
   filters: Filters
@@ -62,7 +62,8 @@ export function FilterControls({
   compare,
   onCompareChange,
   stacked = false,
-}: Omit<Props, 'isDemo'> & { stacked?: boolean }) {
+  hideYear = false,
+}: Omit<Props, 'isDemo'> & { stacked?: boolean; hideYear?: boolean }) {
   const typeValue = filters.types.length === ALL_TYPES.length ? 'all' : String(filters.types[0])
 
   const setType = (v: string) => {
@@ -73,10 +74,7 @@ export function FilterControls({
 
   const sensors = activeSensors(filters)
 
-  const setYear = (year: number) => {
-    const kept = filters.sensors.filter((s) => sensorAvailable(s, year))
-    onChange({ year, month: null, date: null, sensors: kept.length ? kept : ['MODIS'] })
-  }
+  const setYear = (year: number) => onChange(yearPatch(filters, year))
 
   const toggleSensor = (s: Sensor) => {
     const next = filters.sensors.includes(s) ? filters.sensors.filter((x) => x !== s) : [...filters.sensors, s]
@@ -131,7 +129,7 @@ export function FilterControls({
               </select>
             </label>
           ))
-        ) : (
+        ) : hideYear ? null : (
           <label className={`flex items-center gap-1.5 text-xs ${stacked ? '[&>select]:flex-1' : ''}`}>
             <span className={stacked ? 'w-14 text-slate-400' : 'hidden text-slate-400 2xl:inline'}>Year</span>
             <select

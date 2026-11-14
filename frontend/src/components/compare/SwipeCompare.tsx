@@ -18,15 +18,20 @@ interface Props {
   right: ReactNode
   leftColor: string
   rightColor: string
+  /** Px covered on the right (e.g. by a side panel): the divider stays left of it. */
+  rightInset?: number
 }
 
 /**
  * One map, two panes: each pane is clipped to its side of a draggable vertical divider.
  * Works with any layers drawn into `leftPane` / `rightPane`, so other map views can reuse it.
  */
-export function SwipeCompare({ leftPane, rightPane, left, right, leftColor, rightColor }: Props) {
+export function SwipeCompare({ leftPane, rightPane, left, right, leftColor, rightColor, rightInset = 0 }: Props) {
   const map = useMap()
-  const [ratio, setRatio] = useState(0.5)
+  const width = map.getSize().x || 1
+  const maxRatio = Math.max(MIN + 0.1, Math.min(MAX, 1 - rightInset / width - 0.02))
+  const [raw, setRatio] = useState(() => (1 - rightInset / width) / 2)
+  const ratio = Math.min(raw, maxRatio)
   const handleRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -86,10 +91,10 @@ export function SwipeCompare({ leftPane, rightPane, left, right, leftColor, righ
   }, [map])
 
   const onKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'ArrowLeft') setRatio((r) => clamp(r - KEY_STEP))
-    else if (e.key === 'ArrowRight') setRatio((r) => clamp(r + KEY_STEP))
+    if (e.key === 'ArrowLeft') setRatio((r) => clamp(Math.min(r, maxRatio) - KEY_STEP))
+    else if (e.key === 'ArrowRight') setRatio((r) => Math.min(maxRatio, clamp(Math.min(r, maxRatio) + KEY_STEP)))
     else if (e.key === 'Home') setRatio(MIN)
-    else if (e.key === 'End') setRatio(MAX)
+    else if (e.key === 'End') setRatio(maxRatio)
     else return
     e.preventDefault()
   }

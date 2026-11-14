@@ -112,6 +112,8 @@ export interface GridResponse {
 
 export interface StatsResponse {
   total: number
+  /** Summed FRP (MW) of the matching hotspots. */
+  frp_sum: number
   by_type: Partial<Record<`${FireType}` | 'null', number>>
   by_daynight: Partial<Record<DayNight, number>>
 }
@@ -119,6 +121,8 @@ export interface StatsResponse {
 export interface CalendarDay {
   date: string
   count: number
+  /** Summed FRP (MW) of the day. */
+  frp: number
 }
 
 export interface CalendarResponse {
