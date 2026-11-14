@@ -9,6 +9,11 @@ const SENSORS = ["MODIS", "VIIRS"];
 export const MAX_POLYGON_VERTICES = 200;
 export const ONE_AREA = "Send one area: region, polygon or circle";
 const MAX_ID = 2147483647;
+// /api/hotspots/grid: cell size in degrees, and the most cells one answer may hold.
+export const MIN_CELL = 0.01;
+export const MAX_CELL = 10;
+export const MAX_GRID_CELLS = 20000;
+export const TOO_MANY_CELLS = "Too many cells, zoom in or use a bigger cell";
 
 export function httpError(message) {
   const err = new Error(message);
@@ -70,12 +75,33 @@ function parsePolygon(raw) {
   return ring;
 }
 
-// Returns { from, to, circle, polygon, region, daynight, types, sensors }. Missing params are undefined / null.
+// bbox=west,south,east,north in degrees. No antimeridian wrap: west must be < east.
+function parseBbox(raw) {
+  const parts = raw.split(",");
+  if (parts.length !== 4) throw httpError("bbox must be 4 numbers: west,south,east,north");
+  const west = parseNumber(parts[0], "bbox west", -180, 180);
+  const south = parseNumber(parts[1], "bbox south", -90, 90);
+  const east = parseNumber(parts[2], "bbox east", -180, 180);
+  const north = parseNumber(parts[3], "bbox north", -90, 90);
+  if (west >= east) throw httpError("bbox west must be less than east");
+  if (south >= north) throw httpError("bbox south must be less than north");
+  return { west, south, east, north };
+}
+
+// `cell` for /api/hotspots/grid: required there, degrees.
+export function parseCell(query) {
+  const raw = single(query, "cell");
+  if (raw === undefined) throw httpError("cell is required (degrees)");
+  return parseNumber(raw, "cell", MIN_CELL, MAX_CELL);
+}
+
+// Returns { from, to, circle, polygon, region, bbox, daynight, types, sensors }. Missing params are undefined / null.
 // A polygon overrides a circle (the frontend never sends both). A region (id from /api/regions) cannot be
 // combined with a polygon or a circle: that is a 400.
 export function parseFilters(query) {
   const f = {
-    from: undefined, to: undefined, circle: null, polygon: null, region: null, daynight: null, types: null, sensors: null,
+    from: undefined, to: undefined, circle: null, polygon: null, region: null, bbox: null, daynight: null, types: null,
+    sensors: null,
   };
 
   const from = single(query, "from");
@@ -115,6 +141,10 @@ export function parseFilters(query) {
     if (circleParts === 3 || f.polygon) throw httpError(ONE_AREA);
     f.region = Number(regionRaw);
   }
+
+  // The visible map area; combines (AND) with any area above.
+  const bboxRaw = single(query, "bbox");
+  if (bboxRaw !== undefined) f.bbox = parseBbox(bboxRaw);
 
   const daynight = single(query, "daynight");
   if (daynight !== undefined) {
@@ -156,6 +186,14 @@ export function buildWhere(f) {
   if (f.types) conds.push(`type = ANY(${add(f.types)}::smallint[])`);
   if (f.sensors) conds.push(`instrument = ANY(${add(f.sensors)}::text[])`);
 
+  if (f.bbox) {
+    // Same shape as the circle's box: uses the (latitude, longitude) index.
+    const { west, south, east, north } = f.bbox;
+    conds.push(
+      `latitude BETWEEN ${add(south)} AND ${add(north)} AND longitude BETWEEN ${add(west)} AND ${add(east)}`
+    );
+  }
+
   if (f.circle) {
     const { lat, lon, radiusKm } = f.circle;
     const dLat = radiusKm / 111.32;
@@ -192,4 +230,25 @@ export function buildWhere(f) {
   }
 
   return { where: conds.length ? `WHERE ${conds.join(" AND ")}` : "", params };
+}
+
+// GET /api/hotspots/grid: one row per non-empty cell of `cell` degrees. lat/lon = average position,
+// rounded to 4 decimals (~10 m). type = most common non-NULL type (mode() skips NULLs: FIRMS API rows
+// have none), lowest on a tie (mode() keeps the first of equally frequent values in ORDER BY order);
+// NULL only when every point in the cell has no type. One row past the cap tells "over" from "at".
+export function buildGridQuery(filters, cell) {
+  const { where, params } = buildWhere(filters);
+  const c = `$${params.length + 1}`;
+  const limit = `$${params.length + 2}`;
+  return {
+    text: `SELECT round(avg(latitude)::numeric, 4)::float8 AS lat,
+                  round(avg(longitude)::numeric, 4)::float8 AS lon,
+                  COUNT(*) AS count,
+                  mode() WITHIN GROUP (ORDER BY type) AS type
+             FROM hotspots
+             ${where}
+            GROUP BY floor(latitude / ${c}::float8), floor(longitude / ${c}::float8)
+            LIMIT ${limit}`,
+    values: [...params, cell, MAX_GRID_CELLS + 1],
+  };
 }
