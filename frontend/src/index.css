@@ -69,3 +69,12 @@ body {
 .leaflet-pm-toolbar .leaflet-pm-actions-container a.leaflet-pm-action:hover {
   background: #334155 !important;
 }
+
+@media (max-width: 1023px) {
+  .leaflet-bottom {
+    bottom: 104px;
+  }
+  .leaflet-top.leaflet-right {
+    top: 46px;
+  }
+}
