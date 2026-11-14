@@ -78,3 +78,9 @@ body {
     top: 46px;
   }
 }
+
+@media (max-width: 1023px) {
+  .compare-mode .leaflet-bottom {
+    bottom: 160px;
+  }
+}

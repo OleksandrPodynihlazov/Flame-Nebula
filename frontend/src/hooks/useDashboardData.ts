@@ -39,15 +39,16 @@ function useEndpoint<T>(fetcher: (q: ApiQuery, s: AbortSignal) => Promise<T>, qu
   return { data: settled.data, error: settled.error, loading: settled.key !== key }
 }
 
-export function useDashboardData(filters: Filters) {
+/** `enabled` false = no requests (e.g. the second compare year while compare mode is off). */
+export function useDashboardData(filters: Filters, enabled = true) {
   const yearQ = useMemo(() => yearQuery(filters), [filters])
   const selQ = useMemo(() => selectionQuery(filters), [filters])
 
-  const calendar = useEndpoint<CalendarResponse>(fetchCalendar, yearQ)
-  const stats = useEndpoint<StatsResponse>(fetchStats, selQ)
+  const calendar = useEndpoint<CalendarResponse>(fetchCalendar, enabled ? yearQ : null)
+  const stats = useEndpoint<StatsResponse>(fetchStats, enabled ? selQ : null)
   // The map loads only its visible area (useViewportData). Whole-selection dots are needed only
   // for the selection card, so /hotspots without a bbox runs only while an area is selected.
-  const selection = useEndpoint<HotspotCollection>(fetchHotspots, filters.area ? selQ : null)
+  const selection = useEndpoint<HotspotCollection>(fetchHotspots, enabled && filters.area ? selQ : null)
 
   return { calendar, stats, selection, isDemo: USE_MOCKS, selectionQuery: selQ }
 }
