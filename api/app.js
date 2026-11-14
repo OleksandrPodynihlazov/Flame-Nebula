@@ -1,11 +1,13 @@
 import express from "express";
 import healthRouter from "./routes/health.js";
+import regionsRouter from "./routes/regions.js";
 
 const PORT = Number(process.env.PORT) || 3000;
 
 const app = express();
 app.use(express.json());
 app.use("/api", healthRouter);
+app.use("/api", regionsRouter);
 
 app.use((req, res) => {
   res.status(404).json({ error: `not found: ${req.path}` });

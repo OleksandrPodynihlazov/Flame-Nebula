@@ -62,18 +62,74 @@ Troubleshooting: `table "hotspots" does not exist` → add `--create-table`. `co
 "hotspots_natural_key"` → the table already has duplicates from an older load: `TRUNCATE hotspots`, then re-run.
 `service "db" is not running` → `docker compose up -d db`.
 
+## Regions (boundaries)
+
+The region filter (`region=<id>`, `/api/regions`) needs every hotspot's country and sub-national regions. They come from
+**geoBoundaries CGAZ** (global composite, ADM0–ADM2, no overlaps between countries). Licence CC BY 4.0: show
+"Boundaries: geoBoundaries" in the app. Design: `docs/superpowers/specs/2026-11-14-region-filter-design.md`.
+
+Run after the hotspot load, from the repo root. Same commands on a laptop and on the VPS (one-time step, like the load):
+
+```sh
+python3 -m venv .venv && .venv/bin/pip install -r ingest/requirements.txt   # shapely, only for this step
+python3 ingest/boundaries_fetch.py      # → data/raw/boundaries/, 401 + 361 + 550 MB, skips complete files, resumes
+.venv/bin/python ingest/load_regions.py   # Europe: loads its regions, then assigns hotspots that have no region yet
+```
+
+On a server, start it with `nohup … > data/regions.log 2>&1 &` and `tail -f data/regions.log`: it prints one line per chunk.
+
+Expect (measured 2026-11-14, 473,936 Italy points, default scope, `--chunk 100000`, 2 min, **0.3 GB RAM peak**):
+
+```
+scope: 45 countries
+regions: loaded 10721
+chunk 1: 100000 points, ids 1..100000
+…
+ADM0: 473415 inside, 480 nearest, 41 unassigned
+```
+
+**Scope.** `--countries` picks the countries whose boundaries are read and loaded. Default `europe` = 45 countries
+(`ingest/regions_scope.py`; Russia, Turkey, Kazakhstan, the Caucasus and Greenland are left out on purpose). Other values:
+`--countries europe,RUS` (preset + extra codes), `--countries ITA,FRA`, `--countries all` (world: 52,457 regions, ~1.1 GB RAM
+for the boundaries alone). A later run with a bigger scope adds the missing regions and assigns the points that had none.
+A hotspot outside the scope stays unassigned (and is looked at again on every run), so load only the FIRMS data you need.
+
+**Chunks.** Hotspots are processed `--chunk` at a time (default 250,000), each chunk in its own transaction. Memory is the
+boundaries plus one chunk (≈1 KB per point), whatever the table size. If a run dies, run it again: it continues where it stopped.
+
+| Question | Answer |
+|---|---|
+| Safe to run again? | Yes. Regions load once; only hotspots without a region are assigned. Run it after every new hotspot load. |
+| Boundary files changed, or the scope should shrink? | `.venv/bin/python ingest/load_regions.py --rebuild [--countries …]` (reloads regions, reassigns all; region ids change). Without `--rebuild`, regions of an earlier, bigger scope stay in the table. |
+| `hotspots` rebuilt with `DROP TABLE … CASCADE`? | The next run sees the missing FK, clears the stale assignments (ids were reused) and reassigns all. |
+| What is "nearest"? | A point outside every country (coast, offshore `type=3`) goes to the nearest one within `--coast-km` (25). Lower levels: nearest unit inside that country. |
+| What does a level mean? | It differs per country. Italy: ADM1 = 5 macro-zones (`Isole` = Sicily + Sardinia), **ADM2 = the 20 regions**, provinces are not loaded. |
+| Names? | Local spelling from the source: `Sicilia`, not "Sicily". Search ignores case and accents. |
+| Copies? | CGAZ repeats ADM1 as ADM2 where a country has no ADM2 (334 units, e.g. Malta, Libya); the copies are dropped. |
+| Numeric country codes? | `111`–`129` are disputed areas in CGAZ (e.g. `111` Abyei, `112` Aksai Chin). |
+
+Italy result: 473,861 points (99.98 %) → `ITA`; 17 → `FRA` and 14 → `CHE` (Alpine border, FIRMS clip vs CGAZ);
+3 → `SMR` (San Marino). `Sicilia` = 132,198 points (Etna and Stromboli included: filter `type=0` for vegetation fires).
+
+**Known gap:** CGAZ has no Lampedusa or Linosa (the per-country gbOpen file does). Their 41 detections stay unassigned:
+they appear in queries with no area, but not under Italy or Sicilia.
+
 ## Harmonize
 
 After loading MODIS **and** S-NPP (`--sensor viirs-snpp --years 2012-2025` in the fetch step), run in this order.
-Each step rebuilds its own tables/views from scratch, so re-running is safe. Total ~15 s.
+Each step rebuilds its own tables/views from scratch, so re-running is safe. Total ~20 s.
 
 ```sh
 python3 harmonize/coverage_table.py   # coverage: satellite × day ok/partial/missing (known gaps, research/07 §6)
 python3 harmonize/static_mask.py      # static_mask + view hotspots_flagged
 python3 harmonize/calibrate.py        # calibration + views calibration_chain, harmonized_monthly; prints the factors
+python3 harmonize/patterns.py         # fire_patterns: recurring fires per 0.1° cell × month, S-NPP only
 ```
 
-Re-run all three after loading new data. Outputs and how the backend uses them: `docs/contracts.md` §[1].
+`patterns.py` on Italy 2012–2025 (measured 2026-11-14, ~1.5 s): `fire_patterns: 16955 cell-months, 3117 with
+probability >= 0.5`. Peak August (855 likely cells); top cells are western Sicily, burned 14 of 14 Augusts.
+
+Re-run all four after loading new data. Outputs and how the backend uses them: `docs/contracts.md` §[1].
 Tests (real throwaway Postgres): `python3 -m unittest discover -s harmonize/tests`.
 
 Other sources:
