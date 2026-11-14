@@ -55,6 +55,16 @@ Demo vs real data is the `web` build arg `VITE_USE_MOCKS`: default `false` = rea
 
 The stub stays in `infra/stubs/web`. To fall back to it, change the `web` `build:` `context:` in `docker-compose.yml` from `./frontend` back to `./infra/stubs/web`.
 
+## API cache (gateway)
+
+The gateway caches `200` answers of `GET /api/...` (not `/api/health`, not `/logs/`) for 10 minutes in `/var/cache/nginx/api` inside the container (max 500 MB). Responses carry `X-Cache-Status` (`MISS`, `HIT`, `EXPIRED`, `UPDATING`); the access log has `cache=`. Data changes only when someone loads it, so **after a data load clear the cache**, from the repo dir:
+
+```sh
+docker compose exec gateway sh -c 'rm -rf /var/cache/nginx/api/*'
+```
+
+Recreating the gateway (a `gateway.conf` change, `infra/sync-gateway.sh`) also empties it. The `/api/hotspots` connection limit is checked before the cache lookup, so a cache hit also holds a slot while it is sent; `/api/hotspots/grid` has no limit.
+
 ## Run locally
 
 ```sh

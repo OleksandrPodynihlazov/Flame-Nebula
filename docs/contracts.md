@@ -133,6 +133,7 @@ Shared query params (area + filters):
 | `daynight` | `D` / `N` | Optional |
 | `type` | `0` | Optional, comma list |
 | `sensor` | `MODIS` or `MODIS,VIIRS` | Optional, comma list. Matches `instrument` in [2] / `sensor` in [1] |
+| `bbox` | `6.50,36.50,18.75,47.10` | Optional visible map area `west,south,east,north` in degrees: 4 numbers, `-180 ≤ west < east ≤ 180`, `-90 ≤ south < north ≤ 90`, else 400. No antimeridian wrap. ANDed with every other filter, including `region` / `polygon` / circle. SQL `latitude BETWEEN … AND longitude BETWEEN …` (uses the `(latitude, longitude)` index) |
 
 `region` cannot be combined with `polygon` or a circle → 400 `Send one area: region, polygon or circle`. If `polygon` and a circle are both sent, the polygon wins (the frontend never sends both).
 Unknown `region` id → 400. No area given → all loaded data (currently Europe; send `region` to limit to a country).
@@ -142,13 +143,27 @@ Unknown `region` id → 400. No area given → all loaded data (currently Europe
 | `GET /api/hotspots` | GeoJSON `FeatureCollection` of points; properties = CSV columns |
 | `GET /api/stats` | `{ "total": 6689, "by_type": { "0": 6473, ... }, "by_daynight": { "D": 5821, "N": 868 } }` |
 | `GET /api/calendar` | `{ "days": [ { "date": "2008-08-14", "count": 42 }, ... ] }` |
+| `GET /api/hotspots/grid` | Hotspots counted per grid cell, for the zoomed-out map. See below |
 | `GET /api/hotspots.csv` | CSV download, same columns as [1] |
 | `GET /api/regions` | `{ "regions": [ { "id": 812, "name": "Sicilia", "level": 2, "country": "ITA", "parent_id": 77, "path": "Italy › Isole" } ] }`. No params → countries (level 0, `path` `""`); `?parent=<id>` → its children; `?q=<text>` → name search, 2–100 chars, case- and accent-insensitive, prefix matches first, max 20. `q` with `parent` → 400. Sorted by name. Not loaded yet → `"regions": []` |
 | `GET /api/regions/:id` | GeoJSON `Feature`: `geometry` = simplified outline (Polygon / MultiPolygon), `properties` = the fields above. Unknown id → 404 `{ "error": … }` |
 
 Row cap: `GET /api/hotspots` and `GET /api/hotspots.csv` return at most `HOTSPOTS_MAX_ROWS` rows (env; 500000 in `docker-compose.yml`, code fallback 200000). More matching rows → 400 `{ "error": "Too many hotspots (more than <cap>). Narrow the date range or area." }`; never a truncated result.
 
-Concurrency: the gateway allows at most 2 parallel hotspots requests per client IP and 3 in total. Over the limit → 503 `{ "error": "Server busy, try again in a moment" }` with `Retry-After`.
+`GET /api/hotspots/grid` — shared params + `bbox` (**required**) + `cell` (**required**, degrees, `0.01 ≤ cell ≤ 10`):
+
+```json
+{ "cell": 0.5, "cells": [ { "lat": 41.93, "lon": 12.48, "count": 812, "type": 0 } ] }
+```
+
+- One entry per non-empty cell `floor(latitude / cell)`, `floor(longitude / cell)`; no order.
+- `lat` / `lon` = average position of the cell's points, rounded to 4 decimals. `count` = points in the cell.
+- `type` = most common `type` in the cell (`mode()`), lowest on a tie. Rows with `type` NULL (FIRMS API files) are skipped by `mode()`; `type` is `null` only when no point in the cell has one.
+- Missing / invalid `bbox` or `cell` → 400. More than 20,000 cells → 400 `{ "error": "Too many cells, zoom in or use a bigger cell" }`. Nothing in the box → 200 `{ "cell": …, "cells": [] }`.
+
+Concurrency: the gateway allows at most 2 parallel hotspots requests per client IP and 3 in total. Over the limit → 503 `{ "error": "Server busy, try again in a moment" }` with `Retry-After`. `/api/hotspots/grid` has no such limit.
+
+Cache: the gateway caches `200` answers of every `GET /api/...` except `/api/health` for 10 minutes, keyed by path + query string (`X-Cache-Status: MISS` / `HIT` / …). After loading new data, clear it (`docs/deploy.md`). Clients should send identical query strings for identical views (the frontend rounds `bbox` to 0.01° and picks `cell` from a fixed set).
 
 Owner may change these; update this table first.
 
@@ -167,12 +182,15 @@ Requests: all endpoints accept every shared param from the table above, with the
 | `type` | `0` or `0,2` | Absent → all types |
 | `daynight` | `D` / `N` | Absent → both |
 | `sensor` | `MODIS`, `VIIRS` or `MODIS,VIIRS` | Always sent. Absent → all sensors. Counts are raw sums, not harmonized (method TBD) |
+| `bbox` | `5.33,35.11,17.34,47.12` | Map requests only (`/hotspots` from zoom 9, `/hotspots/grid` below): visible bounds + 10 % per side, rounded outward to 0.01°. Never sent to stats, calendar, CSV, or the selection card's `/hotspots` |
+| `cell` | `1` | `/hotspots/grid` only: `90 / 2^zoom` snapped to 10, 5, 2, 1, 0.5, 0.25, 0.1, 0.05, 0.02, 0.01 |
 
 Responses:
 
 | Endpoint | Frontend expects |
 |---|---|
 | `GET /api/hotspots` | `FeatureCollection`, coordinates `[lon, lat]`. `properties` use the [1] column names and types (not [2]): `sensor`, `acq_time` as 4-digit string, `confidence` as integer. Only `frp` and `confidence` may be `null`. No match → `"features": []` |
+| `GET /api/hotspots/grid` | Shape as above. No match → `"cells": []` |
 | `GET /api/stats` | Shape as above. No match → `{ "total": 0, "by_type": {}, "by_daynight": {} }` |
 | `GET /api/calendar` | Days sorted by `date` ascending; days with count 0 omitted. No match → `{ "days": [] }` |
 | `GET /api/hotspots.csv` | `Content-Type: text/csv`, `Content-Disposition: attachment; filename="hotspots_<from>_<to>.csv"` |

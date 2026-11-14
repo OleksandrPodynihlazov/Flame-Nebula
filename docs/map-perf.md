@@ -1,6 +1,6 @@
 # Map performance
 
-Owner: DevOps (helping web). Branch: `web/map-perf`. Status: built.
+Owner: DevOps (helping web). Branch: `web/map-perf`. Status: built. Browser clustering (supercluster) was later replaced by server grid cells for the visible area: `docs/viewport.md`.
 
 ## Problem
 
