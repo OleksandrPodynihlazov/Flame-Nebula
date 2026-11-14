@@ -7,7 +7,7 @@ const { test, expect } = require('@playwright/test');
 
 const CSV_COLUMNS = [
   'id', 'latitude', 'longitude', 'acq_date', 'acq_time', 'sensor',
-  'satellite', 'daynight', 'frp', 'confidence', 'type',
+  'satellite', 'daynight', 'frp', 'confidence', 'confidence_level', 'type',
 ];
 const YEAR_2008 = { from: '2008-01-01', to: '2008-12-31' };
 const ROME_CIRCLE = { lat: 41.9, lon: 12.5, radius_km: 300 };

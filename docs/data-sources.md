@@ -121,6 +121,7 @@ After loading MODIS **and** S-NPP (`--sensor viirs-snpp --years 2012-2025` in th
 Each step rebuilds its own tables/views from scratch, so re-running is safe. Total ~20 s.
 
 ```sh
+python3 harmonize/canonical.py       # view hotspots_canonical: confidence_level / platform for both sensors
 python3 harmonize/coverage_table.py   # coverage: satellite × day ok/partial/missing (known gaps, research/07 §6)
 python3 harmonize/static_mask.py      # static_mask + view hotspots_flagged
 python3 harmonize/calibrate.py        # calibration + views calibration_chain, harmonized_monthly; prints the factors

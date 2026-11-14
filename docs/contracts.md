@@ -34,7 +34,8 @@ File: `data/processed/hotspots.csv`, UTF-8, comma, header row.
 | `satellite` | text | Archive spelling: `Terra` / `Aqua`, `N` / `N20` / `N21`. API `T` / `A` are stored as `Terra` / `Aqua` |
 | `daynight` | `D` / `N` | |
 | `frp` | float | MW |
-| `confidence` | integer 0–100 | MODIS: as is. VIIRS: mapping TBD |
+| `confidence` | integer 0–100, or empty | Raw MODIS percentage. **Empty for VIIRS**: VIIRS has no percentage, only a class |
+| `confidence_level` | `low` / `nominal` / `high` | **Both sensors, one scale.** VIIRS `l`/`n`/`h` as delivered; MODIS binned with the FIRMS thresholds: <30 low, 30–79 nominal, ≥80 high. Use this one for display and filters |
 | `type` | integer 0–3, or empty | As in raw file. Empty (NULL) for NRT/API rows: those files have no `type` |
 
 MVP: MODIS rows only; this is a cleaned copy of the raw file.
@@ -47,6 +48,7 @@ How to build: `docs/data-sources.md` → *Harmonize*. Method and evidence: `rese
 |---|---|---|
 | `coverage(satellite, day, status, note)` | table | `status` ∈ `ok`/`partial`/`missing` per satellite × UTC day. **Draw non-ok days as "no data", never as 0.** |
 | `static_mask(cell_lat, cell_lon, category, core, qualifying_years)` | table | Industrial sites / flares (`static`) and `volcano` cells, grid `floor(deg*100)`, built from S-NPP. |
+| `hotspots_canonical` | view | `hotspots` + sensor-neutral fields: `confidence_level` (low/nominal/high, both sensors), `confidence_pct` (raw MODIS 0–100, NULL for VIIRS), `platform` (terra/aqua/snpp/noaa20/noaa21). SQL in `db/init/hotspots-views.sql` (fresh DBs get it automatically; `python3 harmonize/canonical.py` re-applies it). **Read per-hotspot fields from here, never branch on the sensor in the API.** |
 | `hotspots_flagged` | view | `hotspots` + `mask_category` + `is_burning` (= not masked and `type` ≠ 3; NULL `type` counts as land). **Count burning activity with `WHERE is_burning`.** Map/CSV can show all rows with the flag. |
 | `calibration` | table | Per-month junction factors (J1 Terra→Aqua, J2 Aqua→S-NPP) for `count` and `frp`, with interquartile band. |
 | `calibration_chain(satellite, month, metric, factor, band_lo, band_hi)` | view | **Multiplier to S-NPP-equivalent units.** For any AOI and month: take the month's reference satellite, aggregate `is_burning` rows, multiply by `factor` (band: `band_lo`/`band_hi`). Aggregates only, never single points. |
@@ -219,7 +221,7 @@ Responses:
 
 | Endpoint | Frontend expects |
 |---|---|
-| `GET /api/hotspots` | `FeatureCollection`, coordinates `[lon, lat]`. `properties` use the [1] column names and types (not [2]): `sensor`, `acq_time` as 4-digit string, `confidence` as integer. Only `frp` and `confidence` may be `null`. No match → `"features": []` |
+| `GET /api/hotspots` | `FeatureCollection`, coordinates `[lon, lat]`. `properties` use the [1] column names and types (not [2]): `sensor`, `acq_time` as 4-digit string, `confidence` as integer (MODIS only, `null` for VIIRS), `confidence_level` as `low`/`nominal`/`high` for both sensors. Only `frp`, `confidence` and `confidence_level` may be `null`. No match → `"features": []` |
 | `GET /api/hotspots/grid` | Shape as above. No match → `"cells": []` |
 | `GET /api/stats` | Shape as above. No match → `{ "total": 0, "by_type": {}, "by_daynight": {} }` |
 | `GET /api/calendar` | Days sorted by `date` ascending; days with count 0 omitted. No match → `{ "days": [] }` |
