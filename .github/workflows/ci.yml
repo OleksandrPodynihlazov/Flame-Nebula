@@ -41,6 +41,36 @@ jobs:
           echo "stack did not become healthy in 90s" >&2
           exit 1
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+
+      - name: Install e2e dependencies
+        working-directory: e2e
+        run: npm ci
+
+      - name: Install Chromium
+        working-directory: e2e
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright against the stack
+        working-directory: e2e
+        env:
+          BASE_URL: http://127.0.0.1:8090
+          EXPECTED_VERSION: ci
+          CI: "true"
+        run: npm run test:local
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-ci
+          path: e2e/playwright-report
+          retention-days: 7
+
       - name: Dump state on failure
         if: failure()
         run: |

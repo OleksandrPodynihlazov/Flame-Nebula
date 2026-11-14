@@ -25,3 +25,8 @@ infra/nginx/htpasswd
 
 # deploy failure logs, kept on the VPS only
 deploy-failure.log
+
+# e2e (Playwright)
+e2e/node_modules/
+e2e/test-results/
+e2e/playwright-report/
