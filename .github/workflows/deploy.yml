@@ -1,0 +1,79 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  APP_URL: https://nebula.excl.sh
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://nebula.excl.sh
+    env:
+      VPS_HOST: ${{ vars.VPS_HOST || 'excl.sh' }}
+      VPS_USER: ${{ vars.VPS_USER || 'excl' }}
+      VPS_PORT: ${{ vars.VPS_PORT || '2222' }}
+      SHA: ${{ github.sha }}
+    steps:
+      - name: Configure SSH
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Deploy over SSH
+        run: |
+          ssh -p "$VPS_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "$VPS_USER@$VPS_HOST" \
+            "cd /home/excl/hackathlone/Flame-Nebula && git fetch --quiet origin && git checkout --quiet --detach $SHA && bash infra/deploy.sh $SHA"
+
+  smoke:
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SHA: ${{ github.sha }}
+    steps:
+      - name: Health reports this commit
+        run: |
+          for i in $(seq 1 15); do
+            code="$(curl -sS -o body.json -w '%{http_code}' --max-time 10 "$APP_URL/api/health" || echo 000)"
+            if [ "$code" = "200" ] && grep -q "\"version\":\"$SHA\"" body.json; then
+              echo "ok: $(cat body.json)"
+              exit 0
+            fi
+            echo "attempt $i: HTTP $code $(cat body.json 2>/dev/null || true)"
+            sleep 4
+          done
+          echo "health check failed" >&2
+          exit 1
+
+      - name: Web root returns 200
+        run: |
+          code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 "$APP_URL/")"
+          echo "GET / -> $code"
+          test "$code" = "200"
+
+      - name: Logs require auth
+        run: |
+          code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 "$APP_URL/logs/")"
+          echo "GET /logs/ -> $code"
+          test "$code" = "401"

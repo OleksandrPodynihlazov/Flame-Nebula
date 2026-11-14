@@ -19,3 +19,6 @@ build/
 .DS_Store
 .idea/
 .vscode/
+
+# infra — team logs password, created per machine
+infra/nginx/htpasswd

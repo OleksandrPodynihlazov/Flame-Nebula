@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Flame-Nebula</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 40rem; margin: 3rem auto; padding: 0 1rem; color: #222; }
+    pre { background: #f4f4f4; padding: 1rem; border-radius: 4px; overflow-x: auto; }
+    .ok { color: #1a7f37; } .bad { color: #cf222e; }
+  </style>
+</head>
+<body>
+  <h1>Flame-Nebula — placeholder</h1>
+  <p>The real web app replaces this page. API health:</p>
+  <p id="summary">Checking /api/health…</p>
+  <pre id="raw"></pre>
+  <script>
+    const summary = document.getElementById('summary');
+    const raw = document.getElementById('raw');
+    fetch('/api/health', { cache: 'no-store' })
+      .then(async (r) => {
+        const body = await r.json();
+        summary.textContent = `status: ${body.status} · version: ${body.version} · db: ${body.db}`;
+        summary.className = r.ok ? 'ok' : 'bad';
+        raw.textContent = JSON.stringify(body, null, 2);
+      })
+      .catch((err) => {
+        summary.textContent = `API unreachable: ${err.message}`;
+        summary.className = 'bad';
+      });
+  </script>
+</body>
+</html>

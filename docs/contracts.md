@@ -9,6 +9,16 @@ Status: **DRAFT** — sections marked TBD are filled by their owner.
 data/raw/*.csv ─[1]─▶ data/processed/hotspots.csv ─[2]─▶ Postgres ─[3]─▶ HTTP JSON ─▶ web/
 ```
 
+## [0] Service contract (Docker)
+
+How each service runs in `docker-compose.yml`. Details in `docs/deploy.md`.
+
+- Each service has a `Dockerfile` in its own folder.
+- `api` listens on port 3000 and serves `GET /api/health`: 200 + JSON with `"version"` (from env `APP_VERSION`) when ready.
+- `web` serves the built app on port 80.
+- Logs go to stdout, one line per event.
+- No service publishes host ports except `gateway`.
+
 ## [1] harmonize/ → processed CSV
 
 File: `data/processed/hotspots.csv`, UTF-8, comma, header row.
