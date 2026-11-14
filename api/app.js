@@ -2,6 +2,7 @@ import express from "express";
 import healthRouter from "./routes/health.js";
 import hotspotsRouter from "./routes/hotspots.js";
 import statsRouter from "./routes/stats.js";
+import calendarRouter from "./routes/calendar.js";
 
 const PORT = Number(process.env.PORT) || 3000;
 
@@ -10,6 +11,7 @@ app.use(express.json());
 app.use("/api", healthRouter);
 app.use("/api", hotspotsRouter);
 app.use("/api", statsRouter);
+app.use("/api", calendarRouter);
 
 app.use((req, res) => {
   res.status(404).json({ error: `not found: ${req.path}` });
