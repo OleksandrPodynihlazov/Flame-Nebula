@@ -161,9 +161,11 @@ class HotspotCanvasLayer extends L.Layer {
     const dots: Hit[] = []
     const bubbles: Hit[] = []
     if (data.kind === 'grid') {
+      // Neighbor bubbles must not overlap: at most half a cell wide on screen (Web Mercator, 256 px tiles).
+      const maxR = (data.cell / 360) * 256 * 2 ** map.getZoom() / 2
       for (const c of data.cells) {
         const { x, y } = map.latLngToContainerPoint([c.lat, c.lon])
-        const r = bubbleRadius(c.count)
+        const r = bubbleRadius(c.count, maxR)
         if (!onCanvas(x, y, r)) continue
         // A NULL type (FIRMS API rows have none) is drawn as vegetation, the common case.
         const target: Target = { kind: 'cell', lat: c.lat, lon: c.lon, cell: data.cell, type: c.type ?? 0, label: abbreviateCount(c.count) }

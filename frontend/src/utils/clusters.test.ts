@@ -9,6 +9,12 @@ describe('bubbleRadius', () => {
     expect(bubbleRadius(1e6)).toBe(32)
     expect(bubbleRadius(400)).toBeGreaterThan(bubbleRadius(100))
   })
+
+  it('stays within a smaller max, but never under 10 px', () => {
+    expect(bubbleRadius(1e6, 22.5)).toBe(22.5)
+    expect(bubbleRadius(100, 22.5)).toBe(18)
+    expect(bubbleRadius(1e6, 4)).toBe(10)
+  })
 })
 
 describe('abbreviateCount', () => {
