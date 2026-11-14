@@ -5,7 +5,10 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const NUMBER_RE = /^[+-]?(\d+\.?\d*|\.\d+)$/;
 const TYPE_LIST_RE = /^[0-3](,[0-3])*$/;
 const SENSORS = ["MODIS", "VIIRS"];
-const MAX_POLYGON_VERTICES = 500;
+// 200 points keeps the GET url under nginx's default 8 KB header limit (docs/contracts.md [3]).
+export const MAX_POLYGON_VERTICES = 200;
+export const ONE_AREA = "Send one area: region, polygon or circle";
+const MAX_ID = 2147483647;
 
 export function httpError(message) {
   const err = new Error(message);
@@ -49,10 +52,10 @@ function parsePolygon(raw) {
   if (!Array.isArray(pts) || pts.length < 3) {
     throw httpError("polygon needs at least 3 [lon,lat] points");
   }
-  if (pts.length > MAX_POLYGON_VERTICES) {
+  if (pts.length > MAX_POLYGON_VERTICES + 1) { // +1: an optional closing point is not counted
     throw httpError(`polygon may have at most ${MAX_POLYGON_VERTICES} points`);
   }
-  return pts.map((p) => {
+  const ring = pts.map((p) => {
     if (!Array.isArray(p) || p.length !== 2) throw httpError("each polygon point must be [lon,lat]");
     const lon = Number(p[0]);
     const lat = Number(p[1]);
@@ -60,12 +63,20 @@ function parsePolygon(raw) {
     if (!Number.isFinite(lat) || lat < -90 || lat > 90) throw httpError("polygon lat must be between -90 and 90");
     return [lon, lat];
   });
+  const [first, last] = [ring[0], ring[ring.length - 1]];
+  if (first[0] === last[0] && first[1] === last[1]) ring.pop();
+  if (ring.length < 3) throw httpError("polygon needs at least 3 [lon,lat] points");
+  if (ring.length > MAX_POLYGON_VERTICES) throw httpError(`polygon may have at most ${MAX_POLYGON_VERTICES} points`);
+  return ring;
 }
 
-// Returns { from, to, circle, polygon, daynight, types, sensors }. Missing params are undefined / null.
-// A polygon overrides a circle (the frontend never sends both).
+// Returns { from, to, circle, polygon, region, daynight, types, sensors }. Missing params are undefined / null.
+// A polygon overrides a circle (the frontend never sends both). A region (id from /api/regions) cannot be
+// combined with a polygon or a circle: that is a 400.
 export function parseFilters(query) {
-  const f = { from: undefined, to: undefined, circle: null, polygon: null, daynight: null, types: null, sensors: null };
+  const f = {
+    from: undefined, to: undefined, circle: null, polygon: null, region: null, daynight: null, types: null, sensors: null,
+  };
 
   const from = single(query, "from");
   const to = single(query, "to");
@@ -94,6 +105,15 @@ export function parseFilters(query) {
   if (polygonRaw !== undefined) {
     f.polygon = parsePolygon(polygonRaw);
     f.circle = null;
+  }
+
+  const regionRaw = single(query, "region");
+  if (regionRaw !== undefined) {
+    if (!/^\d+$/.test(regionRaw) || Number(regionRaw) < 1 || Number(regionRaw) > MAX_ID) {
+      throw httpError("region must be a positive integer id (see /api/regions)");
+    }
+    if (circleParts === 3 || f.polygon) throw httpError(ONE_AREA);
+    f.region = Number(regionRaw);
   }
 
   const daynight = single(query, "daynight");
@@ -162,6 +182,13 @@ export function buildWhere(f) {
   if (f.polygon) {
     const text = "(" + f.polygon.map(([x, y]) => `(${x},${y})`).join(",") + ")";
     conds.push(`point(longitude, latitude) <@ ${add(text)}::polygon`);
+  }
+
+  if (f.region) {
+    // Assigned once at load time (ingest/load_regions.py): a plain index lookup, no geometry here.
+    conds.push(
+      `EXISTS (SELECT 1 FROM hotspot_regions hr WHERE hr.hotspot_id = hotspots.id AND hr.region_id = ${add(f.region)})`
+    );
   }
 
   return { where: conds.length ? `WHERE ${conds.join(" AND ")}` : "", params };
