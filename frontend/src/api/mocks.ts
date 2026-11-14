@@ -6,8 +6,10 @@ import type {
   HotspotCollection,
   HotspotFeature,
   LonLat,
+  Sensor,
   StatsResponse,
 } from '../types/api'
+import { SENSORS } from '../constants/fire'
 import { haversineKm, inPolygon } from '../utils/area'
 
 /** Positive integer from an env value, else null. */
@@ -62,34 +64,48 @@ function pad(n: number, len = 2) {
   return String(n).padStart(len, '0')
 }
 
-function generate(): HotspotFeature[] {
-  const rand = rng(2008)
+/** VIIRS (375 m) detects many more small fires than MODIS (1 km). Rough ratio, mock only. */
+const VIIRS_FACTOR = 2.2
+
+function generate(year: number, sensor: Sensor): HotspotFeature[] {
+  const { from, to } = SENSORS[sensor]
+  if (year < from || year > to) return []
+  const viirs = sensor === 'VIIRS'
+  // MODIS 2008 keeps seed 2008 and MOCK_SIZE so existing demo numbers don't change.
+  const rand = rng(viirs ? year * 7 + 1 : year)
+  const yearFactor = year === 2008 ? 1 : 0.6 + rng(year * 31)() * 0.9
+  const size = Math.round(MOCK_SIZE * yearFactor * (viirs ? VIIRS_FACTOR : 1))
+  // FIRMS MODIS archive starts in Nov 2000.
+  const firstMonth = sensor === 'MODIS' && year === 2000 ? 10 : 0
   const clusters = CLUSTERS.map((c) => [c, c.weight] as [typeof c, number])
-  const months = MONTH_WEIGHTS.map((w, i) => [i, w] as [number, number])
+  const months = MONTH_WEIGHTS.map((w, i) => [i, i < firstMonth ? 0 : w] as [number, number])
+  const idBase = year * 1_000_000 + (viirs ? 500_000 : 0)
   const features: HotspotFeature[] = []
-  for (let id = 1; id <= MOCK_SIZE; id++) {
+  for (let i = 1; i <= size; i++) {
     const c = pickWeighted(clusters, rand())
     const latitude = +(c.lat + gaussian(rand) * c.spread).toFixed(4)
     const longitude = +(c.lon + gaussian(rand) * c.spread).toFixed(4)
     const month = pickWeighted(months, rand())
-    const day = 1 + Math.floor(rand() * new Date(Date.UTC(2008, month + 1, 0)).getUTCDate())
+    const day = 1 + Math.floor(rand() * new Date(Date.UTC(year, month + 1, 0)).getUTCDate())
     const daynight: DayNight = rand() < 0.87 ? 'D' : 'N'
     const terra = rand() < 0.5
-    const hour = daynight === 'D' ? (terra ? 9 : 12) : (terra ? 21 : 0)
+    // Overpass hours (UTC): Terra ~09/21, Aqua and S-NPP ~12/00-01.
+    const hour = daynight === 'D' ? (terra && !viirs ? 9 : 12) : terra && !viirs ? 21 : 0
     features.push({
       type: 'Feature',
       geometry: { type: 'Point', coordinates: [longitude, latitude] },
       properties: {
-        id,
+        id: idBase + i,
         latitude,
         longitude,
-        acq_date: `2008-${pad(month + 1)}-${pad(day)}`,
+        acq_date: `${year}-${pad(month + 1)}-${pad(day)}`,
         acq_time: `${pad(hour)}${pad(Math.floor(rand() * 60))}`,
-        sensor: 'MODIS',
-        satellite: terra ? 'Terra' : 'Aqua',
+        sensor,
+        satellite: viirs ? 'N' : terra ? 'Terra' : 'Aqua',
         daynight,
-        frp: +(5 + rand() * rand() * 300).toFixed(1),
-        confidence: 30 + Math.floor(rand() * 71),
+        frp: +((viirs ? 1 : 5) + rand() * rand() * (viirs ? 80 : 300)).toFixed(1),
+        // VIIRS confidence is l/n/h; the numeric mapping is TBD in contracts.md, so null for now.
+        confidence: viirs ? null : 30 + Math.floor(rand() * 71),
         type: pickWeighted(TYPE_WEIGHTS, rand()),
       },
     })
@@ -97,18 +113,27 @@ function generate(): HotspotFeature[] {
   return features.sort((a, b) => a.properties.acq_date.localeCompare(b.properties.acq_date))
 }
 
-let cache: HotspotFeature[] | null = null
+const cache = new Map<string, HotspotFeature[]>()
 
-function dataset() {
-  cache ??= generate()
-  return cache
+/** Features for every year in [from, to] and every requested sensor (absent = all). */
+function dataset(q: ApiQuery): HotspotFeature[] {
+  const sensors = (q.sensor ? q.sensor.split(',') : ['MODIS', 'VIIRS']) as Sensor[]
+  const out: HotspotFeature[] = []
+  for (let y = Number(q.from.slice(0, 4)); y <= Number(q.to.slice(0, 4)); y++) {
+    for (const s of sensors) {
+      const key = `${y}-${s}`
+      if (!cache.has(key)) cache.set(key, generate(y, s))
+      out.push(...cache.get(key)!)
+    }
+  }
+  return out
 }
 
 function filter(q: ApiQuery) {
   const types = q.type ? new Set(q.type.split(',').map(Number)) : null
   const polygon: LonLat[] | null = q.polygon ? JSON.parse(q.polygon) : null
   const circle = q.lat !== undefined && q.lon !== undefined && q.radius_km !== undefined
-  return dataset().filter(({ properties: p, geometry }) => {
+  return dataset(q).filter(({ properties: p, geometry }) => {
     if (p.acq_date < q.from || p.acq_date > q.to) return false
     if (types && !types.has(p.type)) return false
     if (q.daynight && p.daynight !== q.daynight) return false

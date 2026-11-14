@@ -10,7 +10,7 @@ import { useDashboardData } from './hooks/useDashboardData'
 import { useIsDesktop } from './hooks/useMediaQuery'
 import type { Area, Filters } from './types/api'
 import { buildGrid } from './utils/calendar'
-import { selectionLabel } from './utils/filters'
+import { activeSensors, selectionLabel } from './utils/filters'
 
 export default function App() {
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS)
@@ -23,12 +23,14 @@ export default function App() {
   const grid = useMemo(() => (calendar.data ? buildGrid(filters.year, calendar.data) : null), [calendar.data, filters.year])
   const update = (patch: Partial<Filters>) => setFilters((f) => ({ ...f, ...patch }))
   const setArea = useCallback((area: Area | null) => setFilters((f) => ({ ...f, area })), [])
-  const fileTag = filters.date ?? (filters.month !== null ? `${filters.year}-${String(filters.month + 1).padStart(2, '0')}` : String(filters.year))
+  const sensors = activeSensors(filters)
+  const dateTag = filters.date ?? (filters.month !== null ? `${filters.year}-${String(filters.month + 1).padStart(2, '0')}` : String(filters.year))
+  const fileTag = `${sensors.join('_').toLowerCase()}_${dateTag}`
 
   const onDownload = async () => {
     setDownloading(true)
     try {
-      await downloadCsv(selectionQuery, `firms_italy_modis_${fileTag}.csv`)
+      await downloadCsv(selectionQuery, `firms_italy_${fileTag}.csv`)
     } finally {
       setDownloading(false)
     }
@@ -46,6 +48,7 @@ export default function App() {
     <BurnCalendar
       grid={grid}
       filters={filters}
+      sensors={sensors}
       loading={calendar.loading}
       onSelectMonth={(month) => update({ month, date: null })}
       onSelectDate={(date) => update({ month: (Number(date.slice(5, 7)) - 1) as Filters['month'], date })}
@@ -59,6 +62,7 @@ export default function App() {
     loading: hotspots.loading,
     stale: hotspots.stale,
     label: selectionLabel(filters),
+    sensors,
     area: filters.area,
     onAreaChange: setArea,
     fileTag,
@@ -70,7 +74,7 @@ export default function App() {
     return (
       <div className="flex h-dvh flex-col overflow-hidden bg-slate-950 font-sans text-slate-100 antialiased">
         <header className="z-30 flex h-14 shrink-0 items-center gap-3 border-b border-slate-800 bg-slate-900/95 px-3">
-          <Brand year={filters.year} isDemo={isDemo} />
+          <Brand year={filters.year} sensors={sensors} isDemo={isDemo} />
           <SearchField />
         </header>
 
@@ -122,7 +126,7 @@ export default function App() {
 
         <section className="flex h-full w-[55%] flex-col gap-4 overflow-y-auto bg-slate-950 p-5">
           {errorBanner}
-          <StatCards stats={stats.data} grid={grid} scope={selectionLabel(filters)} loading={stats.loading} />
+          <StatCards stats={stats.data} grid={grid} scope={selectionLabel(filters)} loading={stats.loading} sensors={sensors} />
           {calendarView}
         </section>
       </main>

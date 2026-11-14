@@ -1,5 +1,6 @@
-import { ALL_TYPES, FIRE_TYPES } from '../constants/fire'
-import type { DayNight, FireType, Filters } from '../types/api'
+import { ALL_SENSORS, ALL_TYPES, FIRE_TYPES, SENSORS, YEARS } from '../constants/fire'
+import type { DayNight, FireType, Filters, Sensor } from '../types/api'
+import { activeSensors, sensorAvailable } from '../utils/filters'
 
 interface Props {
   filters: Filters
@@ -9,7 +10,7 @@ interface Props {
   isDemo: boolean
 }
 
-export function Brand({ year, isDemo }: { year: number; isDemo: boolean }) {
+export function Brand({ year, sensors, isDemo }: { year: number; sensors: Sensor[]; isDemo: boolean }) {
   return (
     <div className="flex min-w-0 items-center gap-2.5">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 to-red-600 shadow-lg shadow-orange-500/20">
@@ -19,7 +20,7 @@ export function Brand({ year, isDemo }: { year: number; isDemo: boolean }) {
         </div>
         <h1 className="whitespace-nowrap text-sm font-bold tracking-tight text-white">Flame Nebula</h1>
         <span className="hidden whitespace-nowrap rounded-full border border-orange-500/30 2xl:inline bg-orange-500/15 px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wider text-orange-300">
-          Italy · {year} · MODIS
+          Italy · {year} · {sensors.join(' + ')}
         </span>
         {isDemo && (
           <span
@@ -59,6 +60,18 @@ export function FilterControls({ filters, onChange, onDownload, downloading, sta
     onChange({ types: [t], hideNoise: FIRE_TYPES[t].noise ? false : filters.hideNoise })
   }
 
+  const sensors = activeSensors(filters)
+
+  const setYear = (year: number) => {
+    const kept = filters.sensors.filter((s) => sensorAvailable(s, year))
+    onChange({ year, month: null, date: null, sensors: kept.length ? kept : ['MODIS'] })
+  }
+
+  const toggleSensor = (s: Sensor) => {
+    const next = filters.sensors.includes(s) ? filters.sensors.filter((x) => x !== s) : [...filters.sensors, s]
+    if (next.some((x) => sensorAvailable(x, filters.year))) onChange({ sensors: next })
+  }
+
   const toggleNoise = () => {
     const hideNoise = !filters.hideNoise
     const onlyNoise = filters.types.every((t) => FIRE_TYPES[t].noise)
@@ -67,6 +80,21 @@ export function FilterControls({ filters, onChange, onDownload, downloading, sta
 
   return (
     <div className={stacked ? 'flex flex-col items-stretch gap-2.5' : 'flex flex-nowrap items-center gap-2 xl:gap-3'}>
+        <label className={`flex items-center gap-1.5 text-xs ${stacked ? '[&>select]:flex-1' : ''}`}>
+          <span className={stacked ? 'w-14 text-slate-400' : 'hidden text-slate-400 2xl:inline'}>Year</span>
+          <select
+            value={filters.year}
+            onChange={(e) => setYear(Number(e.target.value))}
+            className="rounded-lg border border-slate-700 bg-slate-800/90 px-2.5 py-1.5 font-mono text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-orange-500"
+          >
+            {YEARS.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
+        </label>
+
         <label className={`flex items-center gap-1.5 text-xs ${stacked ? '[&>select]:flex-1' : ''}`}>
           <span className={stacked ? 'w-14 text-slate-400' : 'hidden text-slate-400 2xl:inline'}>Fire type</span>
           <select
@@ -110,18 +138,43 @@ export function FilterControls({ filters, onChange, onDownload, downloading, sta
           <span className="font-medium text-slate-200">Hide noise</span>
         </button>
 
-        <div className={`items-center gap-2.5 rounded-lg border border-slate-800 bg-slate-950/60 px-2.5 py-1 text-xs ${stacked ? 'flex' : 'hidden xl:flex'}`}>
-          <label className="flex items-center gap-1.5 font-medium text-slate-200">
-            <input type="checkbox" checked readOnly disabled className="accent-orange-500" />
-            MODIS
-          </label>
-          <span className="text-slate-700">|</span>
-          <label className="flex cursor-not-allowed items-center gap-1.5 text-slate-500" title="VIIRS and harmonization come after the MVP">
-            <input type="checkbox" disabled className="opacity-50" />
-            VIIRS
-            <span className="rounded bg-slate-800 px-1.5 text-[9px] uppercase tracking-wider text-slate-400">Soon</span>
-          </label>
-        </div>
+        <fieldset
+          className={`items-center gap-2.5 rounded-lg border border-slate-800 bg-slate-950/60 px-2.5 py-1 text-xs ${stacked ? 'flex' : 'hidden xl:flex'}`}
+        >
+          <legend className="sr-only">Sensors</legend>
+          {ALL_SENSORS.map((s, i) => {
+            const available = sensorAvailable(s, filters.year)
+            const checked = available && filters.sensors.includes(s)
+            const isLast = checked && sensors.length === 1
+            const meta = SENSORS[s]
+            const title = !available
+              ? `${s} has data for ${meta.from}–${meta.to} only`
+              : isLast
+                ? 'At least one sensor must stay selected'
+                : `${s} · ${meta.pixel} pixels`
+            return (
+              <span key={s} className="contents">
+                {i > 0 && <span className="text-slate-700">|</span>}
+                <label
+                  title={title}
+                  className={`flex items-center gap-1.5 font-medium ${available ? 'cursor-pointer text-slate-200' : 'cursor-not-allowed text-slate-500'}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={!available || isLast}
+                    onChange={() => toggleSensor(s)}
+                    className="accent-orange-500"
+                  />
+                  {s}
+                  {!available && (
+                    <span className="rounded bg-slate-800 px-1.5 text-[9px] tracking-wider text-slate-400">{meta.from}+</span>
+                  )}
+                </label>
+              </span>
+            )
+          })}
+        </fieldset>
 
         <button
           type="button"
@@ -142,7 +195,7 @@ export function TopBar({ isDemo, ...rest }: Props) {
   return (
     <header className="z-30 flex h-14 shrink-0 items-center justify-between gap-3 border-b border-slate-800 bg-slate-900/95 px-4">
       <div className="flex min-w-0 items-center gap-4">
-        <Brand year={rest.filters.year} isDemo={isDemo} />
+        <Brand year={rest.filters.year} sensors={activeSensors(rest.filters)} isDemo={isDemo} />
         <SearchField />
       </div>
       <FilterControls {...rest} />

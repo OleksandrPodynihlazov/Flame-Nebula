@@ -1,11 +1,12 @@
 import { MONTHS, MONTHS_FULL } from '../constants/fire'
-import type { Filters, Month } from '../types/api'
+import type { Filters, Month, Sensor } from '../types/api'
 import { RAMP, rampBounds, rampIndex, type CalendarGrid } from '../utils/calendar'
 import { isoDate } from '../utils/filters'
 
 interface Props {
   grid: CalendarGrid | null
   filters: Filters
+  sensors: Sensor[]
   loading: boolean
   onSelectMonth: (m: Month) => void
   onSelectDate: (date: string) => void
@@ -15,7 +16,7 @@ interface Props {
 const DAYS = Array.from({ length: 31 }, (_, i) => i + 1)
 const COLS = 'grid-cols-[28px_repeat(31,minmax(0,1fr))_38px] sm:grid-cols-[38px_repeat(31,minmax(14px,1fr))_52px]'
 
-export function BurnCalendar({ grid, filters, loading, onSelectMonth, onSelectDate, onClear }: Props) {
+export function BurnCalendar({ grid, filters, sensors, loading, onSelectMonth, onSelectDate, onClear }: Props) {
   const hasSelection = filters.month !== null || filters.date !== null
 
   return (
@@ -24,6 +25,11 @@ export function BurnCalendar({ grid, filters, loading, onSelectMonth, onSelectDa
         <div>
           <h2 className="text-sm font-semibold text-white">Burning activity calendar · {filters.year}</h2>
           <p className="text-xs text-slate-400">Hotspots per day (UTC). Tap a day or a month to filter the map.</p>
+          {sensors.length > 1 && (
+            <p className="mt-1 text-[11px] text-amber-300/90">
+              MODIS + VIIRS raw counts added together — not harmonized. VIIRS detects more, smaller fires.
+            </p>
+          )}
         </div>
         <button
           type="button"

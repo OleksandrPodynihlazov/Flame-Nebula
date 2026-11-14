@@ -123,7 +123,7 @@ export function SelectionPanel({ area, features, loading, fileTag, downloading, 
 
   const downloadGeoJson = () => {
     const json = JSON.stringify(selectionGeoJson(area, features))
-    const name = `firms_italy_modis_${fileTag}_area${USE_MOCKS ? '_DEMO' : ''}.geojson`
+    const name = `firms_italy_${fileTag}_area${USE_MOCKS ? '_DEMO' : ''}.geojson`
     downloadBlob(new Blob([json], { type: 'application/geo+json' }), name)
   }
 

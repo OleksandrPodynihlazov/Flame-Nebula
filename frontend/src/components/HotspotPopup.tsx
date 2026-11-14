@@ -1,4 +1,4 @@
-import { FIRE_TYPES } from "../constants/fire";
+import { FIRE_TYPES, SENSORS } from "../constants/fire";
 import type { HotspotProperties } from "../types/api";
 
 /** Body of the popup that opens when a single hotspot dot is clicked. */
@@ -23,7 +23,7 @@ export function HotspotPopup({ p }: { p: HotspotProperties }) {
         </dd>
         <dt className="text-slate-400">Sensor</dt>
         <dd className="text-right">
-          {p.sensor} ({p.satellite})
+          {p.sensor} ({p.satellite}) · {SENSORS[p.sensor].pixel}
         </dd>
         <dt className="text-slate-400">Pass · FRP</dt>
         <dd className="text-right font-mono">

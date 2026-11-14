@@ -1,5 +1,5 @@
-import { ALL_TYPES, FIRE_TYPES, MONTHS, MONTHS_FULL } from '../constants/fire'
-import type { ApiQuery, FireType, Filters, Month } from '../types/api'
+import { ALL_TYPES, FIRE_TYPES, MONTHS, MONTHS_FULL, SENSORS } from '../constants/fire'
+import type { ApiQuery, FireType, Filters, Month, Sensor } from '../types/api'
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
@@ -15,8 +15,16 @@ export function activeTypes(f: Filters): FireType[] {
   return f.hideNoise ? f.types.filter((t) => !FIRE_TYPES[t].noise) : f.types
 }
 
+export function sensorAvailable(s: Sensor, year: number): boolean {
+  return year >= SENSORS[s].from && year <= SENSORS[s].to
+}
+
+export function activeSensors(f: Filters): Sensor[] {
+  return f.sensors.filter((s) => sensorAvailable(s, f.year))
+}
+
 function baseQuery(f: Filters, from: string, to: string): ApiQuery {
-  const q: ApiQuery = { from, to }
+  const q: ApiQuery = { from, to, sensor: activeSensors(f).join(',') }
   const types = activeTypes(f)
   if (types.length < ALL_TYPES.length) q.type = types.join(',')
   if (f.daynight) q.daynight = f.daynight

@@ -4,8 +4,8 @@ import { flushSync } from 'react-dom'
 import { createRoot } from 'react-dom/client'
 import { useMap } from 'react-leaflet'
 import { HotspotPopup } from '../components/HotspotPopup'
-import { FIRE_TYPES } from '../constants/fire'
-import type { FireType, HotspotProperties } from '../types/api'
+import { FIRE_TYPES, SENSORS } from '../constants/fire'
+import type { FireType, HotspotProperties, Sensor } from '../types/api'
 import { bubbleRadius, majorityType, type HotspotIndex } from '../utils/clusters'
 import { HOTSPOT_PANE } from './useGeoman'
 
@@ -31,10 +31,10 @@ interface Hit {
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
 
 /** Same look as the old <CircleMarker>: type color, dark 0.5 px stroke. */
-function drawDot(ctx: CanvasRenderingContext2D, d: Hit, type: FireType) {
+function drawDot(ctx: CanvasRenderingContext2D, d: Hit, type: FireType, sensor: Sensor) {
   ctx.beginPath()
   ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2)
-  ctx.globalAlpha = 0.85
+  ctx.globalAlpha = sensor === 'VIIRS' ? 0.95 : 0.75
   ctx.fillStyle = FIRE_TYPES[type].color
   ctx.fill()
   ctx.globalAlpha = 0.9
@@ -174,12 +174,13 @@ class HotspotCanvasLayer extends L.Layer {
           target: { kind: 'cluster', id: props.cluster_id, lat, lon, type: majorityType(props), label: String(props.point_count_abbreviated) },
         })
       } else {
-        dots.push({ x, y, r: props.type === 0 ? 3.5 : 5, target: { kind: 'dot', p: props } })
+        dots.push({ x, y, r: SENSORS[props.sensor].radius, target: { kind: 'dot', p: props } })
       }
     }
 
+    dots.sort((a, b) => b.r - a.r)
     ctx.translate(pad.x, pad.y)
-    for (const d of dots) if (d.target.kind === 'dot') drawDot(ctx, d, d.target.p.type)
+    for (const d of dots) if (d.target.kind === 'dot') drawDot(ctx, d, d.target.p.type, d.target.p.sensor)
     for (const b of bubbles) if (b.target.kind === 'cluster') drawBubble(ctx, b, b.target.type, b.target.label)
     // Bubbles are drawn last, so they win hit tests (searched from the end).
     this.hits = [...dots, ...bubbles]

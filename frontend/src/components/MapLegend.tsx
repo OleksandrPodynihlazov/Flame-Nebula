@@ -1,22 +1,40 @@
-import { ALL_TYPES, FIRE_TYPES } from '../constants/fire'
+import { ALL_TYPES, FIRE_TYPES, SENSORS } from '../constants/fire'
+import type { Sensor } from '../types/api'
 
-function LegendList() {
+function LegendList({ sensors }: { sensors: Sensor[] }) {
   return (
-    <ul className="space-y-1.5 text-[11px]">
-      {ALL_TYPES.map((t) => (
-        <li key={t} className="flex items-center gap-2">
-          <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: FIRE_TYPES[t].color }} />
-          <span className="text-slate-200">
-            <strong className="font-mono text-slate-400">{t}</strong> {FIRE_TYPES[t].label}
-            {FIRE_TYPES[t].noise && <span className="text-slate-500"> · noise</span>}
-          </span>
-        </li>
-      ))}
-    </ul>
+    <div className="space-y-2">
+      <ul className="space-y-1.5 text-[11px]">
+        {ALL_TYPES.map((t) => (
+          <li key={t} className="flex items-center gap-2">
+            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: FIRE_TYPES[t].color }} />
+            <span className="text-slate-200">
+              <strong className="font-mono text-slate-400">{t}</strong> {FIRE_TYPES[t].label}
+              {FIRE_TYPES[t].noise && <span className="text-slate-500"> · noise</span>}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <ul className="space-y-1.5 border-t border-slate-800/80 pt-2 text-[11px]">
+        {sensors.map((s) => (
+          <li key={s} className="flex items-center gap-2">
+            <span className="flex w-3 shrink-0 justify-center">
+              <span
+                className="rounded-full border border-slate-950 bg-slate-300"
+                style={{ width: SENSORS[s].radius * 2, height: SENSORS[s].radius * 2 }}
+              />
+            </span>
+            <span className="text-slate-200">
+              {s} <span className="text-slate-500">· {SENSORS[s].pixel} pixel</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 
-export function MapLegend({ open, onToggle }: { open: boolean; onToggle: () => void }) {
+export function MapLegend({ open, onToggle, sensors }: { open: boolean; onToggle: () => void; sensors: Sensor[] }) {
   return (
     <div className="absolute bottom-5 left-3 z-20 max-w-[240px] overflow-hidden rounded-xl border border-slate-700/80 bg-slate-900/90 shadow-xl backdrop-blur-md">
       <button
@@ -30,14 +48,14 @@ export function MapLegend({ open, onToggle }: { open: boolean; onToggle: () => v
       </button>
       {open && (
         <div className="border-t border-slate-800/80 px-3 pt-1 pb-2.5">
-          <LegendList />
+          <LegendList sensors={sensors} />
         </div>
       )}
     </div>
   )
 }
 
-export function SideLegend({ open, onToggle }: { open: boolean; onToggle: () => void }) {
+export function SideLegend({ open, onToggle, sensors }: { open: boolean; onToggle: () => void; sensors: Sensor[] }) {
   return (
     <div
       className={`absolute top-1/2 left-0 z-[1000] flex -translate-y-1/2 items-center transition-transform duration-200 ${
@@ -46,7 +64,7 @@ export function SideLegend({ open, onToggle }: { open: boolean; onToggle: () => 
     >
       <div className="rounded-r-xl border border-l-0 border-slate-700/80 bg-slate-900/90 px-3 py-2.5 shadow-xl backdrop-blur-md">
         <p className="mb-2 text-[11px] font-semibold text-slate-200">FIRMS hotspot types</p>
-        <LegendList />
+        <LegendList sensors={sensors} />
       </div>
       <button
         type="button"

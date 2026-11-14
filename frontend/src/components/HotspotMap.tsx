@@ -5,7 +5,7 @@ import { MapContainer, TileLayer, ZoomControl, useMap } from "react-leaflet";
 import { ITALY_BOUNDS } from "../constants/fire";
 import { useGeoman } from "../hooks/useGeoman";
 import { useHotspotLayer } from "../hooks/useHotspotLayer";
-import type { Area, HotspotCollection } from "../types/api";
+import type { Area, HotspotCollection, Sensor } from "../types/api";
 import { createHotspotIndex, type HotspotIndex } from "../utils/clusters";
 import { MapLegend, SideLegend } from "./MapLegend";
 import { SelectionPanel } from "./SelectionPanel";
@@ -55,6 +55,7 @@ interface Props {
   /** `data` belongs to an older query: drawn dimmed until the response arrives. */
   stale: boolean;
   label: string;
+  sensors: Sensor[];
   area: Area | null;
   onAreaChange: (area: Area | null) => void;
   fileTag: string;
@@ -69,6 +70,7 @@ export function HotspotMap({
   loading,
   stale,
   label,
+  sensors,
   area,
   onAreaChange,
   fileTag,
@@ -140,11 +142,13 @@ export function HotspotMap({
         <SideLegend
           open={legendOpen}
           onToggle={() => setLegendOpen((o) => !o)}
+          sensors={sensors}
         />
       ) : (
         <MapLegend
           open={legendOpen}
           onToggle={() => setLegendOpen((o) => !o)}
+          sensors={sensors}
         />
       )}
 
