@@ -148,6 +148,8 @@ Unknown `region` id → 400. No area given → all loaded data (currently Europe
 
 Row cap: `GET /api/hotspots` and `GET /api/hotspots.csv` return at most `HOTSPOTS_MAX_ROWS` rows (env; 500000 in `docker-compose.yml`, code fallback 200000). More matching rows → 400 `{ "error": "Too many hotspots (more than <cap>). Narrow the date range or area." }`; never a truncated result.
 
+Concurrency: the gateway allows at most 2 parallel hotspots requests per client IP and 3 in total. Over the limit → 503 `{ "error": "Server busy, try again in a moment" }` with `Retry-After`.
+
 Owner may change these; update this table first.
 
 ### Frontend requirements for [3]
