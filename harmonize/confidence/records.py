@@ -77,31 +77,45 @@ def raw_dir(data_dir):
     return Path(data_dir) / "raw" / "firms_archive"
 
 
-def _available_years(data_dir, sensor):
+def _available_years(data_dir, sensor, country):
     prefix = config.RAW_FILE_PREFIX[sensor] + "_"
     years = []
-    for p in raw_dir(data_dir).glob(prefix + "*_Italy.csv"):
+    for p in raw_dir(data_dir).glob(f"{prefix}*_{country}.csv"):
         year = p.name[len(prefix):len(prefix) + 4]
         if year.isdigit():
             years.append(int(year))
     return sorted(years)
 
 
-def load(data_dir, years=None):
+def _inside(h, clip):
+    w, s, e, n = clip
+    return w <= h.lon <= e and s <= h.lat <= n
+
+
+def load(data_dir, years=None, country="Italy"):
     """Return (hotspots, missing) where missing = {sensor: [years expected but without a file]}.
 
-    years=None loads every file present.
+    years=None loads every file present. Countries listed in config.COUNTRY_CLIP keep only points inside that box
+    (e.g. metropolitan France, without overseas territories).
     """
+    clip = config.COUNTRY_CLIP.get(country)
     hotspots, missing = [], {}
     for sensor, (first, last) in config.SENSOR_YEARS.items():
-        wanted = _available_years(data_dir, sensor) if years is None else list(years)
+        wanted = _available_years(data_dir, sensor, country) if years is None else list(years)
         missing[sensor] = []
         for year in wanted:
-            path = raw_dir(data_dir) / f"{config.RAW_FILE_PREFIX[sensor]}_{year}_Italy.csv"
+            path = raw_dir(data_dir) / f"{config.RAW_FILE_PREFIX[sensor]}_{year}_{country}.csv"
             if not path.exists():
                 if first <= year <= last:
                     missing[sensor].append(year)
                 continue
             with path.open(newline="") as f:
-                hotspots.extend(_row(r) for r in csv.DictReader(f))
+                rows = (_row(r) for r in csv.DictReader(f))
+                hotspots.extend(h for h in rows if clip is None or _inside(h, clip))
     return hotspots, missing
+
+
+def bbox(hotspots, pad=0.1):
+    """(w, s, e, n) of the points, padded by `pad` degrees and rounded to 4 decimals."""
+    lats, lons = [h.lat for h in hotspots], [h.lon for h in hotspots]
+    return tuple(round(v, 4) for v in (min(lons) - pad, min(lats) - pad, max(lons) + pad, max(lats) + pad))

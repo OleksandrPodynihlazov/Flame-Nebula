@@ -22,7 +22,7 @@ def big_event(date="2008-07-24", n=12):
 
 def series(values_by_day):
     """values_by_day: {date: value} -> fake daily_values(product, day, cache_dir)."""
-    def fake(product, day, cache_dir):
+    def fake(product, day, cache_dir, bbox=None):
         v = values_by_day.get(product, {}).get(day)
         return {} if v is None else {CELL: v}
     return fake

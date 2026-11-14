@@ -141,3 +141,52 @@ def _markdown(d):
     if any(d["missing_years"].values()):
         lines += ["", f"Missing raw files: {d['missing_years']}"]
     return "\n".join(lines) + "\n"
+
+
+SUPPORT_COLS = ("l3", "l5", "l6", "l8")
+
+
+def country_stats(rows):
+    """Streaming per-country totals from CSV-shaped rows (an iterator is fine)."""
+    classes = {c: 0 for c in CLASS_ORDER}
+    non_fire, support, by_sensor = Counter(), {c: 0 for c in SUPPORT_COLS}, Counter()
+    total, y0, y1 = 0, None, None
+    for r in rows:
+        total += 1
+        cls = r["class"]
+        classes[_bucket(cls)] += 1
+        if cls.startswith("non_fire"):
+            non_fire[cls] += 1
+        for c in SUPPORT_COLS:
+            support[c] += int(r.get(c) or 0) > 0
+        by_sensor[r["sensor"]] += 1
+        y = int(str(r["acq_date"])[:4])
+        y0, y1 = (y if y0 is None else min(y0, y)), (y if y1 is None else max(y1, y))
+    return {"total": total, "classes": classes, "non_fire": dict(non_fire), "support": support,
+            "by_sensor": dict(by_sensor), "years": [y0, y1]}
+
+
+def summary(stats_by_country):
+    lines = [
+        "# Fire-confidence summary by country",
+        "",
+        "Same ladder (L0-L9), same weights and thresholds for every country. `non_fire` = volcano, persistent "
+        "industrial source, offshore, water without support, or city (fires in cities are out of scope).",
+        "",
+        "| country | hotspots | years | confirmed | likely | unverified | doubtful | non-fire | "
+        "VIIRS↔MODIS (L3) | MCD64A1 scar (L5) | EFFIS (L6) | Landsat (L8) |",
+        "|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+    ]
+    for country, s in stats_by_country.items():
+        t, c, sup = s["total"], s["classes"], s["support"]
+        lines.append(f"| {country} | {t} | {s['years'][0]}–{s['years'][1]} | "
+                     + " | ".join(_pct(c[k], t) for k in CLASS_ORDER) + " | "
+                     + " | ".join(_pct(sup[k], t) for k in SUPPORT_COLS) + " |")
+    lines += ["", "## Non-fire breakdown", "", "| country | static | urban | volcano | offshore |",
+              "|---|---:|---:|---:|---:|"]
+    for country, s in stats_by_country.items():
+        nf = s["non_fire"]
+        lines.append(f"| {country} | "
+                     + " | ".join(str(nf.get(f"non_fire:{k}", 0)) for k in ("static", "urban", "volcano", "offshore"))
+                     + " |")
+    return "\n".join(lines) + "\n", stats_by_country

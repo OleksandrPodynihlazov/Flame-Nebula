@@ -38,13 +38,13 @@ def load_tile(path):
         return {"pix": pix, "gt": tuple(d["gt"]), "crs": str(d["crs"]), "shape": tuple(d["shape"])}
 
 
-def month_hrefs(year, cache_dir):
+def month_hrefs(year, cache_dir, bbox=config.ITALY_BBOX):
     """{'h18v04_200807': href} for every tile-month intersecting Italy in that year (cached)."""
     path = Path(cache_dir) / NAME / f"items_{year}.json"
     if path.exists():
         return json.loads(path.read_text())
     out = {}
-    for item in pc.search(COLLECTION, config.ITALY_BBOX, f"{year}-01-01/{year}-12-31"):
+    for item in pc.search(COLLECTION, bbox, f"{year}-01-01/{year}-12-31"):
         tile = item["id"].split(".")[2]
         when = item["properties"].get("start_datetime") or item["properties"]["datetime"]
         out[f"{tile}_{when[:4]}{when[5:7]}"] = item["assets"]["Burn_Date"]["href"]
@@ -85,7 +85,7 @@ def run(ctx):
     hrefs, failed_years = {}, set()
     for year in sorted({int(m[:4]) for ms in need.values() for m in ms}):
         try:
-            hrefs.update(month_hrefs(year, ctx.cache_dir))
+            hrefs.update(month_hrefs(year, ctx.cache_dir, ctx.bbox))
         except http.SourceDown:
             failed_years.add(year)
     months_needed = {m for ms in need.values() for m in ms}

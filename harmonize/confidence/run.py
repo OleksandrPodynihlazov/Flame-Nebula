@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """Fire-confidence ladder CLI.
 
-    python3 harmonize/confidence/run.py run --data-dir data --years all --levels L0-L6 --report-year 2008
-    python3 harmonize/confidence/run.py report --data-dir data --report-year 2008
-    python3 harmonize/confidence/run.py load-db --data-dir data
+    python3 harmonize/confidence/run.py run --data-dir data --countries Italy,Spain --years all --levels L0-L9
+    python3 harmonize/confidence/run.py report --data-dir data --countries Italy --report-year 2008
+    python3 harmonize/confidence/run.py summary --data-dir data --countries Italy,Spain,Portugal,Greece,France
+    python3 harmonize/confidence/run.py load-db --data-dir data --countries Italy
 
-Outputs go to <data-dir>/processed/, downloads are cached in <data-dir>/cache/confidence/.
+Raw input: <data-dir>/raw/firms_archive/{modis,viirs-snpp}_<year>_<Country>.csv (ingest/firms_archive_fetch.py).
+Outputs per country: <data-dir>/processed/confidence/<Country>/; caches: <data-dir>/cache/confidence/<Country>/.
+Countries run one after another, so memory peaks at the largest country, not the sum.
 Spec: docs/superpowers/specs/2026-11-14-fire-confidence-design.md
 """
 
@@ -20,7 +23,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from confidence import config, events, output, records, report, score  # noqa: E402
+from confidence import events, output, records, report, score  # noqa: E402
 from confidence.levels import Ctx  # noqa: E402
 
 LEVEL_MODULES = {"L0": "l0_product", "L1": "l1_nonfire", "L2": "l2_consistency", "L3": "l3_cross_sensor",
@@ -49,11 +52,15 @@ def parse_levels(text):
     return [p.strip() for p in text.split(",")]
 
 
-def paths(data_dir):
-    out = Path(data_dir) / "processed"
+def parse_countries(text):
+    return [c.strip() for c in text.split(",") if c.strip()]
+
+
+def paths(data_dir, country):
+    out = Path(data_dir) / "processed" / "confidence" / country
     return {"hotspots": out / "hotspot_confidence.csv", "events": out / "fire_events.csv",
             "md": out / "confidence_report.md", "json": out / "confidence_report.json",
-            "cache": Path(data_dir) / "cache" / "confidence"}
+            "cache": Path(data_dir) / "cache" / "confidence" / country}
 
 
 def run_levels(ctx, names, refresh=()):
@@ -86,20 +93,27 @@ def write_report(p, rows, event_rows, year, missing=None):
     print(f"report: {p['md']}")
 
 
-def cmd_run(args):
-    p = paths(args.data_dir)
-    all_hotspots, missing = records.load(args.data_dir, None)
+def run_country(args, country):
+    p = paths(args.data_dir, country)
+    all_hotspots, missing = records.load(args.data_dir, None, country=country)
+    if not all_hotspots:
+        print(f"{country}: no raw files under {records.raw_dir(args.data_dir)}, skipped")
+        return 1
     years = parse_years(args.years)
     scored = all_hotspots if years is None else [h for h in all_hotspots if h.date.year in years]
     event_of = events.cluster(scored)
     ev = events.summarize(scored, event_of)
-    print(f"scoring {len(scored)} hotspots in {len(ev)} events", flush=True)
+    bbox = records.bbox(all_hotspots)
+    print(f"{country}: scoring {len(scored)} hotspots in {len(ev)} events, bbox {bbox}", flush=True)
     ctx = Ctx(hotspots=scored, by_key={h.key: h for h in scored}, event_of=event_of, events=ev,
-              cache_dir=p["cache"], years=years, all_hotspots_for_masks=all_hotspots)
+              cache_dir=p["cache"], years=years, all_hotspots_for_masks=all_hotspots, bbox=bbox, country=country)
     signals = run_levels(ctx, parse_levels(args.levels), set(args.refresh))
     results = score.combine(signals) if signals else {}
+    fallback = None
     for h in scored:
-        results.setdefault(h.key, score.combine({"L0": {h.key: (0, "")}})[h.key])
+        if h.key not in results:
+            fallback = fallback or score.combine({"L0": {h.key: (0, "")}})[h.key]
+            results[h.key] = fallback
     rows = output.hotspot_rows(scored, results, event_of, ctx.extra_cols)
     erows = output.event_rows(ev, ctx.event_signals)
     output.write_csv(p["hotspots"], rows, output.HOTSPOT_COLUMNS)
@@ -109,27 +123,51 @@ def cmd_run(args):
     return 0
 
 
+def cmd_run(args):
+    return max(run_country(args, c) for c in parse_countries(args.countries))
+
+
 def cmd_report(args):
-    p = paths(args.data_dir)
-    with p["hotspots"].open(newline="") as f:
-        rows = list(csv.DictReader(f))
-    with p["events"].open(newline="") as f:
-        erows = list(csv.DictReader(f))
-    write_report(p, rows, erows, args.report_year)
+    for country in parse_countries(args.countries):
+        p = paths(args.data_dir, country)
+        with p["hotspots"].open(newline="") as f:
+            rows = list(csv.DictReader(f))
+        with p["events"].open(newline="") as f:
+            erows = list(csv.DictReader(f))
+        write_report(p, rows, erows, args.report_year)
+    return 0
+
+
+def cmd_summary(args):
+    stats = {}
+    for country in parse_countries(args.countries):
+        path = paths(args.data_dir, country)["hotspots"]
+        if not path.exists():
+            print(f"{country}: {path} missing, run it first")
+            continue
+        with path.open(newline="") as f:
+            stats[country] = report.country_stats(csv.DictReader(f))
+    md, data = report.summary(stats)
+    out = Path(args.data_dir) / "processed" / "confidence"
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "summary.md").write_text(md)
+    (out / "summary.json").write_text(json.dumps(data, indent=2))
+    print(f"summary: {out / 'summary.md'}")
     return 0
 
 
 def cmd_load_db(args):
     from confidence import load_db
-    return load_db.main(paths(args.data_dir)["hotspots"])
+    return max(load_db.main(paths(args.data_dir, c)["hotspots"]) for c in parse_countries(args.countries))
 
 
 def build_parser():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
-    for name in ("run", "report", "load-db"):
+    for name in ("run", "report", "summary", "load-db"):
         s = sub.add_parser(name)
         s.add_argument("--data-dir", type=Path, default=Path("data"))
+        s.add_argument("--countries", default="Italy", help="Italy | Spain,Portugal,Greece,France (FIRMS file names)")
         s.add_argument("--years", default="all", help="all | 2008 | 2007,2008 | 2012-2025")
         s.add_argument("--levels", default="L0-L9", help="L0-L6 | L0,L1,L3")
         s.add_argument("--report-year", type=int, default=2008)
@@ -139,7 +177,7 @@ def build_parser():
 
 def main(argv=None):
     args = build_parser().parse_args(argv)
-    return {"run": cmd_run, "report": cmd_report, "load-db": cmd_load_db}[args.cmd](args)
+    return {"run": cmd_run, "report": cmd_report, "summary": cmd_summary, "load-db": cmd_load_db}[args.cmd](args)
 
 
 if __name__ == "__main__":

@@ -7,6 +7,8 @@ gets (0, 'n/a:<why>'). Absence of evidence is never -1.
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from confidence import config
+
 
 @dataclass
 class Ctx:
@@ -19,6 +21,8 @@ class Ctx:
     all_hotspots_for_masks: list   # every hotspot on disk, for spatial masks and cross-sensor lookups
     event_signals: dict = field(default_factory=dict)   # event id -> {column: value}, written by event levels
     extra_cols: dict = field(default_factory=dict)      # key -> {column: value}, e.g. worldview_url (L9)
+    bbox: tuple = config.ITALY_BBOX                     # (w, s, e, n) of the country being scored
+    country: str = "Italy"
 
 
 def na(ctx, why):

@@ -50,9 +50,11 @@ L0 product confidence · L1 known non-fire (volcano, persistent industrial sourc
 L3 VIIRS↔MODIS cross-check · L4 land cover · L5 MODIS burn scar (MCD64A1) · L6 EFFIS burned-area polygon ·
 L7 smoke/CO · L8 Landsat dNBR · plus a NASA Worldview before/after link. Spec: `docs/superpowers/specs/2026-11-14-fire-confidence-design.md`.
 
-Run: `python3 harmonize/confidence/run.py run --data-dir data --years all --levels L0-L9`, then `... load-db`.
+Run: `python3 harmonize/confidence/run.py run --data-dir data --countries Italy,Spain --years all --levels L0-L9`,
+then `... load-db --countries Italy,Spain` and `... summary --countries Italy,Spain` (cross-country table).
 
-File `data/processed/hotspot_confidence.csv` and table `hotspot_confidence` (DDL: `harmonize/confidence/sql/hotspot_confidence.sql`):
+File `data/processed/confidence/<Country>/hotspot_confidence.csv` (one per country, FIRMS country names) and table
+`hotspot_confidence` (all countries in one table; DDL: `harmonize/confidence/sql/hotspot_confidence.sql`):
 
 | Column | Type | Rule |
 |---|---|---|

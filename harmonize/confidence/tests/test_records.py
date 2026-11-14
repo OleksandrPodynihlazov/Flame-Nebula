@@ -78,6 +78,37 @@ class RecordsTest(unittest.TestCase):
         self.assertEqual(missing["MODIS"], [2009, 2013])
         self.assertEqual(missing["VIIRS"], [2013])  # 2008/2009 are before the VIIRS era, not missing
 
+    def test_country_files_selected(self):
+        write_raw(self.root, "modis_2008_Italy.csv", MODIS_HEADER, [
+            "41.4350,13.1141,315.3,1.3,1.1,2008-01-02,105,Aqua,MODIS,85,6.2,285.4,21.7,D,0",
+        ])
+        write_raw(self.root, "modis_2008_Spain.csv", MODIS_HEADER, [
+            "40.0000,-3.7000,315.3,1.3,1.1,2008-01-02,105,Aqua,MODIS,85,6.2,285.4,21.7,D,0",
+            "28.6100,-17.8700,315.3,1.3,1.1,2008-01-02,106,Aqua,MODIS,85,6.2,285.4,21.7,D,0",
+        ])
+        hs, missing = records.load(self.root, None, country="Spain")
+        self.assertEqual([h.lon for h in hs], [-3.7, -17.87])   # Canary Islands are kept
+        self.assertEqual(missing["MODIS"], [])
+        self.assertEqual(len(records.load(self.root, [2008])[0]), 1)   # default country stays Italy
+
+    def test_france_clipped_to_metropolitan(self):
+        write_raw(self.root, "modis_2008_France.csv", MODIS_HEADER, [
+            "44.0000,5.0000,315.3,1.3,1.1,2008-01-02,105,Aqua,MODIS,85,6.2,285.4,21.7,D,0",   # Provence
+            "42.2000,9.1000,315.3,1.3,1.1,2008-01-02,106,Aqua,MODIS,85,6.2,285.4,21.7,D,0",   # Corsica
+            "4.9000,-52.3000,315.3,1.3,1.1,2008-01-02,107,Aqua,MODIS,85,6.2,285.4,21.7,D,0",  # French Guiana
+            "-21.2000,55.7000,315.3,1.3,1.1,2008-01-02,108,Aqua,MODIS,85,6.2,285.4,21.7,D,0", # Reunion
+        ])
+        hs, _ = records.load(self.root, [2008], country="France")
+        self.assertEqual(sorted(h.lat for h in hs), [42.2, 44.0])
+
+    def test_bbox_from_points(self):
+        write_raw(self.root, "modis_2008_Spain.csv", MODIS_HEADER, [
+            "40.0000,-3.7000,315.3,1.3,1.1,2008-01-02,105,Aqua,MODIS,85,6.2,285.4,21.7,D,0",
+            "28.6100,-17.8700,315.3,1.3,1.1,2008-01-02,106,Aqua,MODIS,85,6.2,285.4,21.7,D,0",
+        ])
+        hs, _ = records.load(self.root, [2008], country="Spain")
+        self.assertEqual(records.bbox(hs, pad=0.1), (-17.97, 28.51, -3.6, 40.1))
+
     def test_all_years_when_none(self):
         write_raw(self.root, "modis_2008_Italy.csv", MODIS_HEADER, [
             "41.4350,13.1141,315.3,1.3,1.1,2008-01-02,105,Aqua,MODIS,85,6.2,285.4,21.7,D,0",

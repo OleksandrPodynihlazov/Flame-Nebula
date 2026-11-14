@@ -77,12 +77,14 @@ def tiles(bbox):
         lat += TILE_DEG
 
 
-def fetch_polygons(bbox, cache_dir):
-    """Returns (polygons deduplicated by id, failed tile bboxes)."""
+def fetch_polygons(bbox, cache_dir, only_tiles=None):
+    """Returns (polygons deduplicated by id, failed tile bboxes). only_tiles limits the 1-degree tiles requested."""
     cache = Path(cache_dir) / "L6"
     cache.mkdir(parents=True, exist_ok=True)
     by_id, failed = {}, []
     for t in tiles(bbox):
+        if only_tiles is not None and t not in only_tiles:
+            continue
         path = cache / f"tile_{t[1]:g}_{t[0]:g}.json"
         if path.exists():
             polys = [_from_json(d) for d in json.loads(path.read_text())]

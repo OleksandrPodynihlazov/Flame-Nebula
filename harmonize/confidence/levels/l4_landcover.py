@@ -60,13 +60,13 @@ def mosaic(hrefs, bbox):
     return out, (x0, res, 0.0, y0, 0.0, -res)
 
 
-def fetch_year(year, cache_path):
-    items = pc.search(COLLECTION, config.ITALY_BBOX, f"{year}-01-01/{year}-12-31")
+def fetch_year(year, cache_path, bbox=config.ITALY_BBOX):
+    items = pc.search(COLLECTION, bbox, f"{year}-01-01/{year}-12-31")
     if not items:
         raise LookupError(f"no {COLLECTION} items for {year}")
     from rasterio.errors import RasterioIOError
     hrefs = [pc.sign(i["assets"]["lccs_class"]["href"]) for i in items]
-    cls, gt = http.with_retries(lambda: mosaic(hrefs, config.ITALY_BBOX), retries=RETRIES, delay=RETRY_DELAY,
+    cls, gt = http.with_retries(lambda: mosaic(hrefs, bbox), retries=RETRIES, delay=RETRY_DELAY,
                                 retry_on=(RasterioIOError,))
     save_cache(cache_path, cls, gt)
     return cls, gt
@@ -96,7 +96,7 @@ def run(ctx):
         if y not in maps and y not in failed:
             path = Path(ctx.cache_dir) / NAME / f"lc_{y}.npz"
             try:
-                maps[y] = load_cache(path) if path.exists() else fetch_year(y, path)
+                maps[y] = load_cache(path) if path.exists() else fetch_year(y, path, ctx.bbox)
             except http.SourceDown:
                 failed[y] = "n/a:service"
             except LookupError:

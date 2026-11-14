@@ -40,8 +40,9 @@ def covers(product, day):
     return p["start"] <= day and (p["end"] is None or day <= p["end"])
 
 
-def italy_cells():
-    w, s, e, n = config.ITALY_BBOX
+def cells(bbox):
+    """Centres of the 1-degree grid cells covering bbox (w, s, e, n)."""
+    w, s, e, n = bbox
     return [(lat + 0.5, lon + 0.5) for lat in range(math.floor(s), math.ceil(n))
             for lon in range(math.floor(w), math.ceil(e))]
 
@@ -133,7 +134,7 @@ def read_cells(product, path, cells):
     return out
 
 
-def daily_values(product, day, cache_dir):
+def daily_values(product, day, cache_dir, bbox=config.ITALY_BBOX):
     """{(lat_c, lon_c): value} for Italy 1-degree cells on that day; {} when there is no granule."""
     path = Path(cache_dir) / "L7" / product / f"{day.isoformat()}.json"
     if path.exists():
@@ -144,7 +145,7 @@ def daily_values(product, day, cache_dir):
         with tempfile.TemporaryDirectory() as d:
             tmp = Path(d) / "g.he5"
             download(url, tmp)
-            vals = read_cells(product, tmp, italy_cells())
+            vals = read_cells(product, tmp, cells(bbox))
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({f"{k[0]},{k[1]}": v for k, v in vals.items()}))
     return vals

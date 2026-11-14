@@ -50,7 +50,7 @@ def run(ctx):
         if not earthdata.covers(product, day):
             return None
         if (product, day) not in cache:
-            cache[(product, day)] = earthdata.daily_values(product, day, ctx.cache_dir)
+            cache[(product, day)] = earthdata.daily_values(product, day, ctx.cache_dir, ctx.bbox)
         return cache[(product, day)].get(cell)
 
     daily_frp = defaultdict(lambda: defaultdict(float))

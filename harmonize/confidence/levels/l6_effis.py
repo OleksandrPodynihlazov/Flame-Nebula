@@ -62,7 +62,10 @@ def run(ctx):
             todo.append(h)
     if not todo:
         return out
-    polys, failed = effis.fetch_polygons(config.ITALY_BBOX, ctx.cache_dir)
+    td = effis.TILE_DEG
+    need = {(math.floor(h.lon / td) * td, math.floor(h.lat / td) * td,
+             math.floor(h.lon / td) * td + td, math.floor(h.lat / td) * td + td) for h in todo}
+    polys, failed = effis.fetch_polygons(ctx.bbox, ctx.cache_dir, only_tiles=need)
     index = defaultdict(list)
     pad = BUFFER_KM / 80.0   # degrees, generous at Italian latitudes
     for p in polys:

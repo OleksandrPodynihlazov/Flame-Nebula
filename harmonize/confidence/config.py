@@ -3,6 +3,10 @@
 # Italy, w,s,e,n (research/04).
 ITALY_BBOX = (6.76, 35.49, 18.52, 46.90)
 
+# Countries whose FIRMS file includes territories outside Europe: keep only this box (w, s, e, n).
+# France: mainland + Corsica (drops French Guiana, Reunion, Martinique, Guadeloupe, Mayotte, New Caledonia...).
+COUNTRY_CLIP = {"France": (-5.5, 41.2, 9.8, 51.2)}
+
 # Years each sensor archive is expected to exist (a missing file inside the range is reported as missing).
 SENSOR_YEARS = {"MODIS": (2000, 2025), "VIIRS": (2012, 2025)}
 RAW_FILE_PREFIX = {"MODIS": "modis", "VIIRS": "viirs-snpp"}
@@ -33,6 +37,7 @@ MODIS_CONF_LOW = 30
 VOLCANOES = (
     ("Etna", 37.748, 14.999, 7.0),
     ("Stromboli", 38.789, 15.213, 2.0),
+    ("La Palma", 28.613, -17.866, 7.0),   # Tajogaite (Cumbre Vieja) eruption Sep-Dec 2021, lava reached the coast ~6 km W
 )
 STATIC_MIN_DAYS = 16   # detection days in one calendar year (MOD14 type=2 rule, research/03 §3)
 STATIC_MIN_YEARS = 3   # separate years (decision D3/I6)
