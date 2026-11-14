@@ -11,7 +11,7 @@ The table is fully derived from GAPS below, so every run replaces it (no manual 
     python3 harmonize/coverage_table.py                 # until 2025-12-31 (archive end)
     python3 harmonize/coverage_table.py --until 2026-11-14
 
-Satellite values match hotspots.satellite in the archive: Terra, Aqua, N (S-NPP).
+Satellite values match hotspots.satellite: Terra, Aqua, N (S-NPP), N20 (NOAA-20).
 """
 
 import argparse
@@ -22,15 +22,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import pg  # noqa: E402
+import platforms as pf  # noqa: E402
 
 D = dt.date
 
-# First and last day of usable data per platform (None = still operating).
-PLATFORMS = {
-    "Terra": (D(2000, 11, 1), None),   # FIRMS archive start; earlier Terra data unusable (MODIS guide §7.2.1)
-    "Aqua": (D(2002, 7, 4), None),     # first Aqua day in the archive (MEASURED: 2002-07-04)
-    "N": (D(2012, 1, 20), D(2026, 11, 2)),  # VIIRS guide §4 effective start; end of S-NPP mission
-}
+# First and last day of usable data per platform (None = still operating): harmonize/platforms.py.
+PLATFORMS = {p.satellite: (p.first_day, p.last_day) for p in pf.PLATFORMS}
 MODIS = ("Terra", "Aqua")
 STATUS_RANK = {"ok": 0, "partial": 1, "missing": 2}
 
