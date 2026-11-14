@@ -57,6 +57,7 @@ export default function App() {
   const mapProps = {
     data: hotspots.data,
     loading: hotspots.loading,
+    stale: hotspots.stale,
     label: selectionLabel(filters),
     area: filters.area,
     onAreaChange: setArea,
