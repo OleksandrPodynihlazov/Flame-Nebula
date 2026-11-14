@@ -7,7 +7,7 @@ import { ITALY_BOUNDS } from "../constants/fire";
 import { HOTSPOT_PANE, HOTSPOT_PANE_B, useGeoman } from "../hooks/useGeoman";
 import { useHotspotLayer } from "../hooks/useHotspotLayer";
 import { useViewportData } from "../hooks/useViewportData";
-import type { ApiQuery, Area, HotspotFeature, Sensor } from "../types/api";
+import type { ApiQuery, Area, SelectionSummaryResponse, Sensor } from "../types/api";
 import { MapLegend, SideLegend } from "./MapLegend";
 import { RegionOutline } from "./RegionOutline";
 import { SelectionPanel } from "./SelectionPanel";
@@ -127,8 +127,8 @@ interface Props {
   /** Hotspots for the whole selection (stats total), shown in the status pill. */
   total: number | null;
   totalLoading: boolean;
-  /** Whole-selection dots for the selection card (only loaded while an area is selected). */
-  selection: { features: readonly HotspotFeature[]; loading: boolean; error: string | null };
+  /** Selection card numbers from `/api/selection-summary` (only loaded while the card is shown). */
+  selection: { summary: SelectionSummaryResponse | null; loading: boolean; error: string | null };
   label: string;
   sensors: Sensor[];
   area: Area | null;
@@ -240,9 +240,10 @@ export function HotspotMap({
       {area && !compare && (
         <SelectionPanel
           area={area}
-          features={selection.features}
+          summary={selection.summary}
           loading={selection.loading}
           error={selection.error}
+          query={query}
           fileTag={fileTag}
           downloading={downloading}
           onDownloadCsv={onDownloadCsv}

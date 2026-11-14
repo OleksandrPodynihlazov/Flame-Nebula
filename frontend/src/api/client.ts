@@ -7,9 +7,10 @@ import type {
   Region,
   RegionFeature,
   RegionsResponse,
+  SelectionSummaryResponse,
   StatsResponse,
 } from '../types/api'
-import { mockCalendar, mockGrid, mockHotspots, mockStats } from './mocks'
+import { mockCalendar, mockGrid, mockHotspots, mockSelectionSummary, mockStats } from './mocks'
 
 export const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true'
 
@@ -51,6 +52,9 @@ export const fetchStats = (q: ApiQuery, signal?: AbortSignal) => getJson<StatsRe
 
 export const fetchCalendar = (q: ApiQuery, signal?: AbortSignal) =>
   getJson<CalendarResponse>('calendar', q, mockCalendar, signal)
+
+export const fetchSelectionSummary = (q: ApiQuery, signal?: AbortSignal) =>
+  getJson<SelectionSummaryResponse>('selection-summary', q, mockSelectionSummary, signal)
 
 /**
  * `GET /api/regions?q=` — name search, 2–100 chars, prefix matches first, max 20.
