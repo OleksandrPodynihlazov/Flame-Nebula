@@ -41,6 +41,34 @@ MVP: MODIS rows only; this is a cleaned copy of the raw file.
 
 **Harmonization method: TBD** (owner: harmonization teammate). It may add columns (e.g. a weight or scaled count). Add them here before any downstream stage uses them.
 
+## [1b] harmonize/confidence → fire confidence per hotspot
+
+Status: **proposal** (owner: harmonization). Owners of [2] and [3] decide whether and how to adopt it. Nothing in `hotspots` changes.
+
+Answers the question "is this hotspot a real landscape fire?" with independent evidence, cheap → expensive:
+L0 product confidence · L1 known non-fire (volcano, persistent industrial source, offshore) · L2 event self-consistency ·
+L3 VIIRS↔MODIS cross-check · L4 land cover · L5 MODIS burn scar (MCD64A1) · L6 EFFIS burned-area polygon ·
+L7 smoke/CO · L8 Landsat dNBR · plus a NASA Worldview before/after link. Spec: `docs/superpowers/specs/2026-11-14-fire-confidence-design.md`.
+
+Run: `python3 harmonize/confidence/run.py run --data-dir data --years all --levels L0-L9`, then `... load-db`.
+
+File `data/processed/hotspot_confidence.csv` and table `hotspot_confidence` (DDL: `harmonize/confidence/sql/hotspot_confidence.sql`):
+
+| Column | Type | Rule |
+|---|---|---|
+| `satellite`, `acq_date`, `acq_time`, `latitude`, `longitude` | as in `hotspots` | Join key = the loader's natural key |
+| `sensor` | `MODIS` / `VIIRS` | |
+| `event_id` | text | Fire event the hotspot belongs to (`fire_events.csv`) |
+| `l0` … `l8` | smallint −1/0/1 | Per-level signal: refutes / no information / supports |
+| `score` | smallint 0–100 | 50 + Σ weight × signal. 50 = no evidence either way |
+| `class` | text | `confirmed` ≥80 · `likely` 60–79 · `unverified` 40–59 · `doubtful` <40 · `non_fire:volcano/static/offshore/urban` |
+| `reasons` | text | `L1:static;L3:xsensor:snpp;L6:effis:123:450ha` — human-readable evidence |
+| `worldview_url` | text | NASA Worldview link: detection day vs 10 days earlier, swipe compare |
+
+Suggested API use ([3] owner decides): add `confidence_score`, `confidence_class`, `confidence_reasons`, `worldview_url`
+to `GET /api/hotspots` feature properties via `LEFT JOIN hotspot_confidence USING (satellite, acq_date, acq_time, latitude, longitude)`;
+optional filter `min_confidence=<0-100>` and `exclude_non_fire=true`. Missing join row → properties are `null`.
+
 ## [2] db/ schema
 
 Postgres 17. name: hotspots-init.sql
