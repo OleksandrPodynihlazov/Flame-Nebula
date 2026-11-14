@@ -134,22 +134,33 @@ export function SelectionPanel({ area, features, loading, fileTag, downloading, 
       aria-busy={loading}
       className="absolute top-14 right-14 left-12 z-20 flex max-h-[calc(100%-4.5rem)] flex-col overflow-hidden rounded-xl border border-slate-700/80 bg-slate-900/90 shadow-xl backdrop-blur-md lg:right-3 lg:left-auto lg:w-64"
     >
-      <button
-        type="button"
-        onClick={() => setExpanded((e) => !e)}
-        aria-expanded={expanded}
-        aria-controls="selection-details"
-        data-testid="selection-toggle"
-        className="flex w-full items-center justify-between gap-3 px-3 py-2 text-xs text-slate-200 transition-colors hover:bg-slate-800/60 lg:hidden"
-      >
-        <span className="flex min-w-0 items-center gap-2">
-          <span className="h-2 w-2 shrink-0 rounded-full bg-orange-500" />
-          <span className="truncate font-medium">
-            <span className="font-mono">{countText}</span> hotspots · <span className="font-mono">{areaText}</span>
+      <div className="flex items-stretch lg:hidden">
+        <button
+          type="button"
+          onClick={() => setExpanded((e) => !e)}
+          aria-expanded={expanded}
+          aria-controls="selection-details"
+          data-testid="selection-toggle"
+          className="flex min-w-0 flex-1 items-center justify-between gap-3 py-2 pr-1 pl-3 text-xs text-slate-200 transition-colors hover:bg-slate-800/60"
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="h-2 w-2 shrink-0 rounded-full bg-orange-500" />
+            <span className="truncate font-medium">
+              <span className="font-mono">{countText}</span> hotspots · <span className="font-mono">{areaText}</span>
+            </span>
           </span>
-        </span>
-        <span className="text-[10px] text-slate-400">{expanded ? '▲' : '▼'}</span>
-      </button>
+          <span className="text-[10px] text-slate-400">{expanded ? '▲' : '▼'}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => onAreaChange(null)}
+          aria-label="Clear selection"
+          data-testid="selection-clear-compact"
+          className="flex min-h-8 min-w-8 shrink-0 items-center justify-center px-2 text-base leading-none text-slate-400 transition-colors hover:bg-slate-800/60 hover:text-white focus:outline-none focus-visible:ring-1 focus-visible:ring-orange-500"
+        >
+          <span aria-hidden="true">×</span>
+        </button>
+      </div>
 
       <h2 className="hidden items-center gap-2 px-3 pt-2.5 text-xs font-semibold text-slate-200 lg:flex">
         <span className="h-2 w-2 rounded-full bg-orange-500" />

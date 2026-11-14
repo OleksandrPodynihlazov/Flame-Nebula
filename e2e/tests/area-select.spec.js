@@ -60,3 +60,33 @@ test('drawing a rectangle filters the dashboard and Clear restores it', async ({
 
   expect(errors).toEqual([]);
 });
+
+test.describe('phone viewport', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test('collapsed selection card has a clear button that does not expand it', async ({ page }) => {
+    await page.goto('/');
+    await expect.poll(() => statTotal(page)).toBeGreaterThan(0);
+
+    // Upper band of the map: clear of the legend (bottom-left) and the toolbar (right).
+    const box = await page.locator('.leaflet-container').boundingBox();
+    await page.locator('[title="Draw Rectangle"]').click();
+    await page.mouse.click(box.x + box.width * 0.35, box.y + 60);
+    await page.mouse.move(box.x + box.width * 0.65, box.y + 110, { steps: 5 });
+    await page.mouse.click(box.x + box.width * 0.65, box.y + 110);
+
+    const panel = page.getByTestId('selection-panel');
+    await expect(panel).toBeVisible();
+    await expect(page.getByTestId('selection-toggle')).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.getByTestId('selection-clear')).toBeHidden();
+
+    const clear = page.getByRole('button', { name: 'Clear selection' });
+    await expect(clear).toHaveAttribute('data-testid', 'selection-clear-compact');
+    const target = await clear.boundingBox();
+    expect(target.width).toBeGreaterThanOrEqual(32);
+    expect(target.height).toBeGreaterThanOrEqual(32);
+
+    await clear.click();
+    await expect(panel).toBeHidden();
+  });
+});
