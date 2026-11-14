@@ -135,7 +135,7 @@ Shared query params (area + filters):
 | `sensor` | `MODIS` or `MODIS,VIIRS` | Optional, comma list. Matches `instrument` in [2] / `sensor` in [1] |
 
 `region` cannot be combined with `polygon` or a circle → 400 `Send one area: region, polygon or circle`. If `polygon` and a circle are both sent, the polygon wins (the frontend never sends both).
-Unknown `region` id → 400. No area given → whole dataset.
+Unknown `region` id → 400. No area given → all loaded data (currently Europe; send `region` to limit to a country).
 
 | Method + path | Returns |
 |---|---|
