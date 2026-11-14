@@ -1,6 +1,6 @@
 # Area selection (map tool)
 
-Owner: DevOps (helping web). Branch: `web/area-select`. Status: **SPEC — review before build.**
+Owner: DevOps (helping web). Branch: `web/area-select`. Status: built (PR #17)
 
 Covers challenge.md Should #1 (location picker) and Could #2 (CSV with filters).
 
@@ -65,6 +65,7 @@ Pin exact versions in `frontend/package.json`.
 - Changing year, month, day, type or day/night keeps the shape.
 - Clicking a dot still opens its popup when no tool is active.
 - Phone width: card collapses to one line (count + area) and expands on tap. Map is 42vh there.
+- Phone collapsed line has × to clear (`selection-clear-compact`), so no need to expand first.
 - Long polygons: a click polygon has few points; URL length is fine.
 
 ## Tests
