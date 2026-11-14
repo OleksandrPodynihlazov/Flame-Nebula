@@ -4,7 +4,7 @@ signal: +1 supports a real landscape fire, -1 refutes it, 0 no information. A ro
 gets (0, 'n/a:<why>'). Absence of evidence is never -1.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 
@@ -17,6 +17,8 @@ class Ctx:
     cache_dir: Path                # <data-dir>/cache/confidence
     years: list | None             # years being scored (None = all on disk)
     all_hotspots_for_masks: list   # every hotspot on disk, for spatial masks and cross-sensor lookups
+    event_signals: dict = field(default_factory=dict)   # event id -> {column: value}, written by event levels
+    extra_cols: dict = field(default_factory=dict)      # key -> {column: value}, e.g. worldview_url (L9)
 
 
 def na(ctx, why):
