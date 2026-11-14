@@ -47,6 +47,8 @@ test.describe('GET /api/stats', () => {
     const { D = 0, N = 0 } = body.by_daynight;
     expect(Object.keys(body.by_daynight).every((k) => k === 'D' || k === 'N')).toBe(true);
     expect(D + N).toBe(body.total);
+    expect(typeof body.frp_sum).toBe('number');
+    expect(body.frp_sum).toBeGreaterThanOrEqual(0);
   });
 });
 
@@ -56,7 +58,9 @@ test.describe('GET /api/calendar', () => {
     expect(Array.isArray(days)).toBe(true);
     const dates = days.map((d) => d.date);
     expect(dates).toEqual([...dates].sort());
-    for (const { date, count } of days) {
+    for (const { date, count, frp } of days) {
+      expect(typeof frp).toBe('number');
+      expect(frp).toBeGreaterThanOrEqual(0);
       expect(date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       expect(date >= YEAR_2008.from && date <= YEAR_2008.to).toBe(true);
       expect(Number.isInteger(count)).toBe(true);
@@ -65,6 +69,8 @@ test.describe('GET /api/calendar', () => {
     const sum = days.reduce((acc, d) => acc + d.count, 0);
     const stats = await getJson(request, '/api/stats', YEAR_2008);
     expect(sum).toBe(stats.total);
+    const frpSum = days.reduce((acc, d) => acc + d.frp, 0);
+    expect(Math.abs(frpSum - stats.frp_sum)).toBeLessThan(days.length * 0.05 + 0.1);
   });
 });
 

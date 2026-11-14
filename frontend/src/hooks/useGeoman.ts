@@ -8,6 +8,9 @@ import type { Area, LonLat } from '../types/api'
 
 /** Pane that holds the hotspot dots; it stops taking clicks while a tool is active. */
 export const HOTSPOT_PANE = 'hotspots'
+/** Second hotspot pane, used by compare mode for the right-hand year. */
+export const HOTSPOT_PANE_B = 'hotspots-b'
+const HOTSPOT_PANES = [HOTSPOT_PANE, HOTSPOT_PANE_B]
 
 const SHAPE_STYLE: L.PathOptions = { color: '#fb923c', weight: 2, fillColor: '#f97316', fillOpacity: 0.08 }
 
@@ -100,8 +103,10 @@ export function useGeoman(area: Area | null, onAreaChange: (area: Area | null) =
       const pm = map.pm
       const active =
         pm.globalDrawModeEnabled() || pm.globalEditModeEnabled() || pm.globalDragModeEnabled() || pm.globalRemovalModeEnabled()
-      const pane = map.getPane(HOTSPOT_PANE)
-      if (pane) pane.style.pointerEvents = active ? 'none' : ''
+      for (const name of HOTSPOT_PANES) {
+        const pane = map.getPane(name)
+        if (pane) pane.style.pointerEvents = active ? 'none' : ''
+      }
     }
 
     map.pm.setGlobalOptions({ allowSelfIntersection: false, snappable: false, pathOptions: SHAPE_STYLE })

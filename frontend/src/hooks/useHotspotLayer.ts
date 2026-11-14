@@ -4,7 +4,7 @@ import { flushSync } from 'react-dom'
 import { createRoot } from 'react-dom/client'
 import { useMap } from 'react-leaflet'
 import { HotspotPopup } from '../components/HotspotPopup'
-import { FIRE_TYPES, SENSORS } from '../constants/fire'
+import { FIRE_TYPES, SENSORS, typeMeta } from '../constants/fire'
 import type { FireType, HotspotProperties, Sensor } from '../types/api'
 import { abbreviateCount, bubbleRadius } from '../utils/clusters'
 import { cellBounds } from '../utils/viewport'
@@ -31,11 +31,11 @@ interface Hit {
 }
 
 /** Same look as the old <CircleMarker>: type color, dark 0.5 px stroke. */
-function drawDot(ctx: CanvasRenderingContext2D, d: Hit, type: FireType, sensor: Sensor) {
+function drawDot(ctx: CanvasRenderingContext2D, d: Hit, type: FireType | null, sensor: Sensor) {
   ctx.beginPath()
   ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2)
   ctx.globalAlpha = sensor === 'VIIRS' ? 0.95 : 0.75
-  ctx.fillStyle = FIRE_TYPES[type].color
+  ctx.fillStyle = typeMeta(type).color
   ctx.fill()
   ctx.globalAlpha = 0.9
   ctx.lineWidth = 0.5
@@ -69,30 +69,43 @@ function drawBubble(ctx: CanvasRenderingContext2D, b: Hit, type: FireType, label
 
 /**
  * Grid bubbles and dots on one canvas. Redraws only on `moveend` / `resize` / new data,
- * never per frame. Clicks are hit-tested here, so no Leaflet layer or React node exists per dot.
+ * never per frame. In between, a CSS transform makes the last bitmap follow pinch and zoom animations. Clicks are hit-tested here, so no Leaflet layer or React node exists per dot.
  * It lives in HOTSPOT_PANE: useGeoman turns that pane's pointer events off while a tool is active.
  */
 class HotspotCanvasLayer extends L.Layer {
   private map: L.Map | null = null
+  private pane: HTMLElement | null = null
   private canvas: HTMLCanvasElement | null = null
+  /** Canvas top-left in world px at the zoom of the last redraw: the base for the zoom transform. */
+  private origin: { world: L.Point; zoom: number } | null = null
   private data: MapData | null = null
   private hits: Hit[] = []
   private popup: L.Popup | null = null
   private popupId: number | null = null
   private dimmed = false
   private mobile = false
+  private readonly paneName: string
+
+  constructor(paneName: string) {
+    super()
+    this.paneName = paneName
+  }
 
   onAdd(map: L.Map): this {
-    const pane = map.getPane(HOTSPOT_PANE) ?? map.createPane(HOTSPOT_PANE)
+    const pane = map.getPane(this.paneName) ?? map.createPane(this.paneName)
     pane.style.zIndex = '450'
-    // leaflet-zoom-hide: hidden during the zoom animation, redrawn on the following moveend.
-    const canvas = L.DomUtil.create('canvas', 'leaflet-zoom-hide', pane)
-    canvas.style.transition = 'opacity 150ms'
-    canvas.style.opacity = this.dimmed ? DIM_OPACITY : ''
+    // Dimmed on the pane: an inline transition on the canvas would override Leaflet's zoom-animation transition.
+    pane.style.transition = 'opacity 150ms'
+    pane.style.opacity = this.dimmed ? DIM_OPACITY : ''
+    // leaflet-zoom-animated: transform origin 0 0, and Leaflet animates its transform during a zoom animation.
+    const canvas = L.DomUtil.create('canvas', 'leaflet-zoom-animated', pane)
     canvas.addEventListener('mousemove', this.onMouseMove)
+    this.pane = pane
     this.canvas = canvas
     this.map = map
     map.on('moveend resize', this.redraw)
+    map.on('zoom', this.onZoom)
+    map.on('zoomanim', this.onAnimZoom)
     map.on('click', this.onClick)
     this.redraw()
     return this
@@ -100,13 +113,18 @@ class HotspotCanvasLayer extends L.Layer {
 
   onRemove(map: L.Map): this {
     map.off('moveend resize', this.redraw)
+    map.off('zoom', this.onZoom)
+    map.off('zoomanim', this.onAnimZoom)
     map.off('click', this.onClick)
     this.closeDotPopup()
+    if (this.pane) this.pane.style.opacity = ''
     if (this.canvas) {
       this.canvas.removeEventListener('mousemove', this.onMouseMove)
       this.canvas.remove()
     }
+    this.pane = null
     this.canvas = null
+    this.origin = null
     this.map = null
     this.hits = []
     return this
@@ -125,7 +143,7 @@ class HotspotCanvasLayer extends L.Layer {
 
   setDimmed(dimmed: boolean) {
     this.dimmed = dimmed
-    if (this.canvas) this.canvas.style.opacity = dimmed ? DIM_OPACITY : ''
+    if (this.pane) this.pane.style.opacity = dimmed ? DIM_OPACITY : ''
   }
 
   setMobile(mobile: boolean) {
@@ -140,7 +158,10 @@ class HotspotCanvasLayer extends L.Layer {
     const width = size.x + 2 * pad.x
     const height = size.y + 2 * pad.y
     const dpr = window.devicePixelRatio || 1
-    L.DomUtil.setPosition(canvas, map.containerPointToLayerPoint(pad.multiplyBy(-1)))
+    const topLeft = map.containerPointToLayerPoint(pad.multiplyBy(-1))
+    // Also clears the scale left by a zoom transform.
+    L.DomUtil.setPosition(canvas, topLeft)
+    this.origin = { world: topLeft.add(map.getPixelOrigin()), zoom: map.getZoom() }
     if (canvas.width !== Math.round(width * dpr) || canvas.height !== Math.round(height * dpr)) {
       canvas.width = Math.round(width * dpr)
       canvas.height = Math.round(height * dpr)
@@ -185,6 +206,29 @@ class HotspotCanvasLayer extends L.Layer {
     for (const b of bubbles) if (b.target.kind === 'cell') drawBubble(ctx, b, b.target.type, b.target.label)
     // Bubbles are drawn last, so they win hit tests (searched from the end).
     this.hits = [...dots, ...bubbles]
+  }
+
+  // A touch pinch changes center and zoom without moving the map pane or animating, so `zoom` must move the bitmap.
+  private onZoom = () => {
+    if (this.map) this.updateTransform(this.map.getCenter(), this.map.getZoom())
+  }
+
+  private onAnimZoom = (e: L.ZoomAnimEvent) => {
+    this.updateTransform(e.center, e.zoom)
+  }
+
+  /** Scales and shifts the last bitmap to the view `center` / `zoom`, like Leaflet's own L.Renderer. */
+  private updateTransform(center: L.LatLng, zoom: number) {
+    const { map, canvas, origin } = this
+    if (!map || !canvas || !origin) return
+    const scale = map.getZoomScale(zoom, origin.zoom)
+    // The map's pixel origin for that view (Leaflet's private _getNewPixelOrigin); layer point (0, 0) is minus the pane offset.
+    const pixelOrigin = map
+      .project(center, zoom)
+      .subtract(map.getSize().divideBy(2))
+      .subtract(map.containerPointToLayerPoint([0, 0]))
+      .round()
+    L.DomUtil.setTransform(canvas, origin.world.multiplyBy(scale).subtract(pixelOrigin), scale)
   }
 
   private hitAt(pt: L.Point): Hit | null {
@@ -251,29 +295,29 @@ class HotspotCanvasLayer extends L.Layer {
  * Draws `data` on the map: grid bubbles (below SINGLE_DOT_ZOOM) or single dots. The layer is created
  * once per map and removed on unmount, so StrictMode's double mount leaves exactly one.
  */
-export function useHotspotLayer(data: MapData | null, dimmed: boolean, mobile: boolean) {
+export function useHotspotLayer(data: MapData | null, dimmed: boolean, mobile: boolean, pane: string = HOTSPOT_PANE) {
   const map = useMap()
   const layerRef = useRef<HotspotCanvasLayer | null>(null)
 
   useEffect(() => {
-    const layer = new HotspotCanvasLayer().addTo(map)
+    const layer = new HotspotCanvasLayer(pane).addTo(map)
     layerRef.current = layer
     return () => {
       layer.remove()
       layerRef.current = null
     }
-  }, [map])
+  }, [map, pane])
 
   // These depend on `map` too, so they re-apply to a layer re-created by the effect above.
   useEffect(() => {
     layerRef.current?.setData(data)
-  }, [map, data])
+  }, [map, pane, data])
 
   useEffect(() => {
     layerRef.current?.setDimmed(dimmed)
-  }, [map, dimmed])
+  }, [map, pane, dimmed])
 
   useEffect(() => {
     layerRef.current?.setMobile(mobile)
-  }, [map, mobile])
+  }, [map, pane, mobile])
 }

@@ -34,9 +34,12 @@ test('drawing a rectangle filters the dashboard and Clear restores it', async ({
   // clusters but not all of them.
   const map = page.locator('.leaflet-container');
   const box = await map.boundingBox();
-  const cx = box.x + box.width / 2;
+  // The stats panel covers the map's right side on desktop: draw in the visible part.
+  const statsPanel = await page.getByRole('complementary', { name: 'Statistics' }).boundingBox();
+  const visibleWidth = statsPanel ? statsPanel.x - box.x : box.width;
+  const cx = box.x + visibleWidth / 2;
   const cy = box.y + box.height / 2;
-  const dx = box.width * 0.15;
+  const dx = visibleWidth * 0.15;
   const dy = box.height * 0.15;
 
   await page.locator('[title="Draw Rectangle"]').click();

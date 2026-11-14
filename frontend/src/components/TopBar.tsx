@@ -1,7 +1,12 @@
+import { COMPARE_COLORS, type CompareSide, type CompareYears } from '../constants/compare'
 import { ALL_SENSORS, ALL_TYPES, FIRE_TYPES, SENSORS, YEARS } from '../constants/fire'
+
 import type { Area, DayNight, FireType, Filters, Sensor } from '../types/api'
 import { RegionSearch } from './RegionSearch'
-import { activeSensors, sensorAvailable } from '../utils/filters'
+
+import { defaultCompareYears } from '../utils/compare'
+import { activeSensors, sensorAvailable, yearPatch } from '../utils/filters'
+
 
 interface Props {
   filters: Filters
@@ -9,9 +14,21 @@ interface Props {
   onDownload: () => void
   downloading: boolean
   isDemo: boolean
+  compare: CompareYears | null
+  onCompareChange: (compare: CompareYears | null) => void
 }
 
-export function Brand({ year, sensors, isDemo }: { year: number; sensors: Sensor[]; isDemo: boolean }) {
+export function Brand({
+  year,
+  sensors,
+  isDemo,
+  compare = null,
+}: {
+  year: number
+  sensors: Sensor[]
+  isDemo: boolean
+  compare?: CompareYears | null
+}) {
   return (
     <div className="flex min-w-0 items-center gap-2.5">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 to-red-600 shadow-lg shadow-orange-500/20">
@@ -21,7 +38,7 @@ export function Brand({ year, sensors, isDemo }: { year: number; sensors: Sensor
         </div>
         <h1 className="whitespace-nowrap text-sm font-bold tracking-tight text-white">Flame Nebula</h1>
         <span className="hidden whitespace-nowrap rounded-full border border-orange-500/30 2xl:inline bg-orange-500/15 px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wider text-orange-300">
-          Italy · {year} · {sensors.join(' + ')}
+          Italy · {compare ? `${compare.a} vs ${compare.b}` : year} · {sensors.join(' + ')}
         </span>
         {isDemo && (
           <span
@@ -40,7 +57,16 @@ export function SearchField({ area, onAreaChange }: { area: Area | null; onAreaC
   return <RegionSearch area={area} onSelect={onAreaChange} />
 }
 
-export function FilterControls({ filters, onChange, onDownload, downloading, stacked = false }: Omit<Props, 'isDemo'> & { stacked?: boolean }) {
+export function FilterControls({
+  filters,
+  onChange,
+  onDownload,
+  downloading,
+  compare,
+  onCompareChange,
+  stacked = false,
+  hideYear = false,
+}: Omit<Props, 'isDemo'> & { stacked?: boolean; hideYear?: boolean }) {
   const typeValue = filters.types.length === ALL_TYPES.length ? 'all' : String(filters.types[0])
 
   const setType = (v: string) => {
@@ -51,10 +77,7 @@ export function FilterControls({ filters, onChange, onDownload, downloading, sta
 
   const sensors = activeSensors(filters)
 
-  const setYear = (year: number) => {
-    const kept = filters.sensors.filter((s) => sensorAvailable(s, year))
-    onChange({ year, month: null, date: null, sensors: kept.length ? kept : ['MODIS'] })
-  }
+  const setYear = (year: number) => onChange(yearPatch(filters, year))
 
   const toggleSensor = (s: Sensor) => {
     const next = filters.sensors.includes(s) ? filters.sensors.filter((x) => x !== s) : [...filters.sensors, s]
@@ -69,20 +92,62 @@ export function FilterControls({ filters, onChange, onDownload, downloading, sta
 
   return (
     <div className={stacked ? 'flex flex-col items-stretch gap-2.5' : 'flex flex-nowrap items-center gap-2 xl:gap-3'}>
-        <label className={`flex items-center gap-1.5 text-xs ${stacked ? '[&>select]:flex-1' : ''}`}>
-          <span className={stacked ? 'w-14 text-slate-400' : 'hidden text-slate-400 2xl:inline'}>Year</span>
-          <select
-            value={filters.year}
-            onChange={(e) => setYear(Number(e.target.value))}
-            className="rounded-lg border border-slate-700 bg-slate-800/90 px-2.5 py-1.5 font-mono text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-orange-500"
-          >
-            {YEARS.map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
-        </label>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={compare !== null}
+          onClick={() => onCompareChange(compare ? null : defaultCompareYears(filters.year))}
+          title="Compare two years side by side"
+          data-testid="compare-toggle"
+          className={`flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+            compare ? 'border-orange-500/60 bg-orange-500/15 text-orange-200' : 'border-slate-700 bg-slate-800/80 text-slate-200 hover:bg-slate-800'
+          }`}
+        >
+          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v18M5 7l-3 5 3 5M19 7l3 5-3 5" />
+          </svg>
+          Compare
+        </button>
+
+        {compare ? (
+          (['a', 'b'] as CompareSide[]).map((side) => (
+            <label key={side} className={`flex items-center gap-1.5 text-xs ${stacked ? '[&>select]:flex-1' : ''}`}>
+              <span className={stacked ? 'flex w-14 items-center gap-1.5 text-slate-400' : 'flex items-center'}>
+                <span className="h-2 w-2 rounded-full" style={{ background: COMPARE_COLORS[side] }} />
+                {stacked && `Year ${side.toUpperCase()}`}
+              </span>
+              <select
+                value={compare[side]}
+                onChange={(e) => onCompareChange({ ...compare, [side]: Number(e.target.value) })}
+                aria-label={`Compare year ${side.toUpperCase()}`}
+                data-testid={`compare-year-${side}`}
+                className="rounded-lg border bg-slate-800/90 px-2.5 py-1.5 font-mono text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                style={{ borderColor: COMPARE_COLORS[side] }}
+              >
+                {YEARS.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ))
+        ) : hideYear ? null : (
+          <label className={`flex items-center gap-1.5 text-xs ${stacked ? '[&>select]:flex-1' : ''}`}>
+            <span className={stacked ? 'w-14 text-slate-400' : 'hidden text-slate-400 2xl:inline'}>Year</span>
+            <select
+              value={filters.year}
+              onChange={(e) => setYear(Number(e.target.value))}
+              className="rounded-lg border border-slate-700 bg-slate-800/90 px-2.5 py-1.5 font-mono text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-orange-500"
+            >
+              {YEARS.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
 
         <label className={`flex items-center gap-1.5 text-xs ${stacked ? '[&>select]:flex-1' : ''}`}>
           <span className={stacked ? 'w-14 text-slate-400' : 'hidden text-slate-400 2xl:inline'}>Fire type</span>
@@ -168,7 +233,8 @@ export function FilterControls({ filters, onChange, onDownload, downloading, sta
         <button
           type="button"
           onClick={onDownload}
-          disabled={downloading}
+          disabled={downloading || compare !== null}
+          title={compare ? 'CSV export works on one year: turn compare off first' : undefined}
           className="flex items-center justify-center gap-1.5 rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-orange-500 active:bg-orange-700 disabled:opacity-60"
         >
           <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
@@ -184,8 +250,10 @@ export function TopBar({ isDemo, ...rest }: Props) {
   return (
     <header className="z-30 flex h-14 shrink-0 items-center justify-between gap-3 border-b border-slate-800 bg-slate-900/95 px-4">
       <div className="flex min-w-0 items-center gap-4">
-        <Brand year={rest.filters.year} sensors={activeSensors(rest.filters)} isDemo={isDemo} />
-        <SearchField area={rest.filters.area} onAreaChange={(area) => rest.onChange({ area })} />
+<Brand year={rest.filters.year} sensors={activeSensors(rest.filters)} isDemo={isDemo} compare={rest.compare} />
+          <div className={rest.compare ? 'hidden 2xl:block' : 'contents'}>
+            <SearchField area={rest.filters.area} onAreaChange={(area) => rest.onChange({ area })} />
+          </div>
       </div>
       <FilterControls {...rest} />
     </header>
