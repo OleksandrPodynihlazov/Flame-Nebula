@@ -10,9 +10,18 @@ import type {
   StatsResponse,
 } from '../types/api'
 import { SENSORS } from '../constants/fire'
+import { haversineKm, inPolygon } from '../utils/area'
 
-const MOCK_SIZE = 6689
-const MOCK_DELAY_MS = 300
+/** Positive integer from an env value, else null. */
+function envCount(raw: string | undefined): number | null {
+  const n = Number(raw)
+  return raw !== undefined && raw !== '' && Number.isInteger(n) && n > 0 ? n : null
+}
+
+const DEFAULT_MOCK_SIZE = 6689
+// VITE_MOCK_SIZE only on the dev server, so a production build always ships the same demo set.
+const MOCK_SIZE = (import.meta.env.DEV ? envCount(import.meta.env.VITE_MOCK_SIZE) : null) ?? DEFAULT_MOCK_SIZE
+const MOCK_DELAY_MS = envCount(import.meta.env.VITE_MOCK_DELAY_MS)
 const MONTH_WEIGHTS = [3, 3, 4, 5, 5, 8, 16, 22, 12, 9, 7, 6]
 const TYPE_WEIGHTS: [FireType, number][] = [[0, 967], [1, 1], [2, 30], [3, 2]]
 const CLUSTERS: { lat: number; lon: number; spread: number; weight: number }[] = [
@@ -120,24 +129,6 @@ function dataset(q: ApiQuery): HotspotFeature[] {
   return out
 }
 
-function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number) {
-  const toRad = (d: number) => (d * Math.PI) / 180
-  const dLat = toRad(lat2 - lat1)
-  const dLon = toRad(lon2 - lon1)
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2
-  return 6371 * 2 * Math.asin(Math.sqrt(a))
-}
-
-function inPolygon([lon, lat]: LonLat, poly: LonLat[]) {
-  let inside = false
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const [xi, yi] = poly[i]
-    const [xj, yj] = poly[j]
-    if (yi > lat !== yj > lat && lon < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) inside = !inside
-  }
-  return inside
-}
-
 function filter(q: ApiQuery) {
   const types = q.type ? new Set(q.type.split(',').map(Number)) : null
   const polygon: LonLat[] | null = q.polygon ? JSON.parse(q.polygon) : null
@@ -153,6 +144,7 @@ function filter(q: ApiQuery) {
 }
 
 function delay<T>(value: T): Promise<T> {
+  if (MOCK_DELAY_MS === null) return Promise.resolve(value)
   return new Promise((resolve) => setTimeout(() => resolve(value), MOCK_DELAY_MS))
 }
 

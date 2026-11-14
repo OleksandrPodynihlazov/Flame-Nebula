@@ -31,11 +31,11 @@ File: `data/processed/hotspots.csv`, UTF-8, comma, header row.
 | `acq_date` | `YYYY-MM-DD` | UTC |
 | `acq_time` | `HHMM` | UTC, 4 digits |
 | `sensor` | `MODIS` / `VIIRS` | From `instrument` |
-| `satellite` | text | As in raw file |
+| `satellite` | text | Archive spelling: `Terra` / `Aqua`, `N` / `N20` / `N21`. API `T` / `A` are stored as `Terra` / `Aqua` |
 | `daynight` | `D` / `N` | |
 | `frp` | float | MW |
 | `confidence` | integer 0–100 | MODIS: as is. VIIRS: mapping TBD |
-| `type` | integer 0–3 | As in raw file |
+| `type` | integer 0–3, or empty | As in raw file. Empty (NULL) for NRT/API rows: those files have no `type` |
 
 MVP: MODIS rows only; this is a cleaned copy of the raw file.
 
@@ -47,7 +47,7 @@ How to build: `docs/data-sources.md` → *Harmonize*. Method and evidence: `rese
 |---|---|---|
 | `coverage(satellite, day, status, note)` | table | `status` ∈ `ok`/`partial`/`missing` per satellite × UTC day. **Draw non-ok days as "no data", never as 0.** |
 | `static_mask(cell_lat, cell_lon, category, core, qualifying_years)` | table | Industrial sites / flares (`static`) and `volcano` cells, grid `floor(deg*100)`, built from S-NPP. |
-| `hotspots_flagged` | view | `hotspots` + `mask_category` + `is_burning` (= not masked and `type` ≠ 3). **Count burning activity with `WHERE is_burning`.** Map/CSV can show all rows with the flag. |
+| `hotspots_flagged` | view | `hotspots` + `mask_category` + `is_burning` (= not masked and `type` ≠ 3; NULL `type` counts as land). **Count burning activity with `WHERE is_burning`.** Map/CSV can show all rows with the flag. |
 | `calibration` | table | Per-month junction factors (J1 Terra→Aqua, J2 Aqua→S-NPP) for `count` and `frp`, with interquartile band. |
 | `calibration_chain(satellite, month, metric, factor, band_lo, band_hi)` | view | **Multiplier to S-NPP-equivalent units.** For any AOI and month: take the month's reference satellite, aggregate `is_burning` rows, multiply by `factor` (band: `band_lo`/`band_hi`). Aggregates only, never single points. |
 | `harmonized_monthly` | view | Italy-wide ready series: `month_start, satellite` (reference), `raw_count, raw_frp, count_snpp_eq, count_lo, count_hi, frp_snpp_eq, frp_lo, frp_hi, days_ok, days_partial, days_missing`. |
@@ -75,7 +75,7 @@ CREATE TABLE hotspots (
   version     TEXT,
   frp         DOUBLE PRECISION,              -- MW
   daynight    CHAR(1),           -- 'D' or 'N'
-  type        SMALLINT NOT NULL          -- 0-3, empty in NRT data
+  type        SMALLINT                   -- 0-3; NULL in NRT/API files (they have no type)
 );
 
 ```

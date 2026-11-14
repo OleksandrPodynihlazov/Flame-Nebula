@@ -1,18 +1,12 @@
 import "leaflet/dist/leaflet.css";
 import { useMemo, useState, type ReactNode } from "react";
 import type { ControlPosition, FitBoundsOptions } from "leaflet";
-import {
-  CircleMarker,
-  MapContainer,
-  Pane,
-  Popup,
-  TileLayer,
-  ZoomControl,
-  useMap,
-} from "react-leaflet";
-import { FIRE_TYPES, ITALY_BOUNDS, SENSORS } from "../constants/fire";
-import { HOTSPOT_PANE, useGeoman } from "../hooks/useGeoman";
+import { MapContainer, TileLayer, ZoomControl, useMap } from "react-leaflet";
+import { ITALY_BOUNDS } from "../constants/fire";
+import { useGeoman } from "../hooks/useGeoman";
+import { useHotspotLayer } from "../hooks/useHotspotLayer";
 import type { Area, HotspotCollection, Sensor } from "../types/api";
+import { createHotspotIndex, type HotspotIndex } from "../utils/clusters";
 import { MapLegend, SideLegend } from "./MapLegend";
 import { SelectionPanel } from "./SelectionPanel";
 
@@ -26,6 +20,19 @@ function DrawTools({
   position: ControlPosition;
 }) {
   useGeoman(area, onAreaChange, position);
+  return null;
+}
+
+function HotspotLayer({
+  index,
+  dimmed,
+  mobile,
+}: {
+  index: HotspotIndex;
+  dimmed: boolean;
+  mobile: boolean;
+}) {
+  useHotspotLayer(index, dimmed, mobile);
   return null;
 }
 
@@ -45,6 +52,8 @@ function ResetView({ options }: { options?: FitBoundsOptions }) {
 interface Props {
   data: HotspotCollection | null;
   loading: boolean;
+  /** `data` belongs to an older query: drawn dimmed until the response arrives. */
+  stale: boolean;
   label: string;
   sensors: Sensor[];
   area: Area | null;
@@ -59,6 +68,7 @@ interface Props {
 export function HotspotMap({
   data,
   loading,
+  stale,
   label,
   sensors,
   area,
@@ -69,13 +79,9 @@ export function HotspotMap({
   mobile = false,
   children,
 }: Props) {
-  const features = useMemo(
-    () =>
-      [...(data?.features ?? [])].sort(
-        (a, b) => SENSORS[b.properties.sensor].radius - SENSORS[a.properties.sensor].radius,
-      ),
-    [data],
-  );
+  const features = data?.features ?? [];
+  // Built once per hotspot data change; pan and zoom only query it.
+  const index = useMemo(() => createHotspotIndex(data?.features ?? []), [data]);
   const [legendOpen, setLegendOpen] = useState(!mobile);
   const fitOptions: FitBoundsOptions | undefined = mobile
     ? { paddingTopLeft: [0, 48], paddingBottomRight: [0, 96] }
@@ -103,64 +109,7 @@ export function HotspotMap({
           maxZoom={16}
         />
 
-        <Pane name={HOTSPOT_PANE} style={{ zIndex: 450 }}>
-          {features.map(({ properties: p }) => {
-            const meta = FIRE_TYPES[p.type];
-            return (
-              <CircleMarker
-                key={p.id}
-                center={[p.latitude, p.longitude]}
-                radius={SENSORS[p.sensor].radius}
-                pmIgnore
-                pathOptions={{
-                  fillColor: meta.color,
-                  color: "#020617",
-                  weight: 0.5,
-                  opacity: 0.9,
-                  fillOpacity: p.sensor === "VIIRS" ? 0.95 : 0.75,
-                }}
-              >
-                <Popup
-                  autoPanPaddingTopLeft={mobile ? [12, 56] : undefined}
-                  autoPanPaddingBottomRight={mobile ? [12, 140] : undefined}
-                >
-                  <div className="min-w-[190px] space-y-1.5 text-xs">
-                    <div
-                      className="border-b border-slate-700/80 pb-1 font-semibold"
-                      style={{ color: meta.color }}
-                    >
-                      Type {p.type}: {meta.label}
-                    </div>
-                    <dl className="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px]">
-                      <dt className="text-slate-400">Date (UTC)</dt>
-                      <dd className="text-right font-mono">
-                        {p.acq_date} {p.acq_time.slice(0, 2)}:
-                        {p.acq_time.slice(2)}
-                      </dd>
-                      <dt className="text-slate-400">Lat, lon</dt>
-                      <dd className="text-right font-mono">
-                        {p.latitude}, {p.longitude}
-                      </dd>
-                      <dt className="text-slate-400">Sensor</dt>
-                      <dd className="text-right">
-                        {p.sensor} ({p.satellite}) · {SENSORS[p.sensor].pixel}
-                      </dd>
-                      <dt className="text-slate-400">Pass · FRP</dt>
-                      <dd className="text-right font-mono">
-                        {p.daynight === "D" ? "Day" : "Night"} · {p.frp ?? "—"}{" "}
-                        MW
-                      </dd>
-                      <dt className="text-slate-400">Confidence</dt>
-                      <dd className="text-right font-mono">
-                        {p.confidence ?? "—"}%
-                      </dd>
-                    </dl>
-                  </div>
-                </Popup>
-              </CircleMarker>
-            );
-          })}
-        </Pane>
+        <HotspotLayer index={index} dimmed={stale} mobile={mobile} />
 
         <DrawTools
           area={area}
@@ -181,7 +130,7 @@ export function HotspotMap({
             aria-live="polite"
           >
             {label} ·{" "}
-            {loading
+            {stale
               ? "loading…"
               : `${features.length.toLocaleString()} hotspots`}
           </span>
@@ -207,7 +156,7 @@ export function HotspotMap({
         <SelectionPanel
           area={area}
           features={features}
-          loading={loading}
+          loading={stale}
           fileTag={fileTag}
           downloading={downloading}
           onDownloadCsv={onDownloadCsv}
