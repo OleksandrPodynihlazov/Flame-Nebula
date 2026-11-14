@@ -11,6 +11,8 @@ export type Area =
 export interface Filters {
   year: number
   month: Month | null
+  /** Selected day `YYYY-MM-DD` (UI only; sent as from = to = date). Wins over `month`. */
+  date: string | null
   area: Area | null
   types: FireType[]
   hideNoise: boolean
