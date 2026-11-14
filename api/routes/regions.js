@@ -1,7 +1,7 @@
 import { Router } from "express";
-import pool from "../db.js";
-import { BadRequest, isMissingTable } from "../lib/area.js";
-import { featureSql, listSql, parseRegionsQuery } from "../lib/regions-sql.js";
+import { pool } from "../db.js";
+import { httpError } from "../lib/query.js";
+import { featureSql, isMissingTable, listSql, parseRegionsQuery } from "../lib/regions-sql.js";
 
 const router = Router();
 
@@ -21,7 +21,7 @@ router.get("/regions", async (req, res) => {
 // One region as a GeoJSON Feature with its simplified outline, for the map.
 router.get("/regions/:id", async (req, res) => {
   const { id } = req.params;
-  if (!/^\d+$/.test(id) || Number(id) > 2147483647) throw new BadRequest("region id must be a positive integer");
+  if (!/^\d+$/.test(id) || Number(id) > 2147483647) throw httpError("region id must be a positive integer");
   let rows = [];
   try {
     ({ rows } = await pool.query(featureSql(Number(id))));

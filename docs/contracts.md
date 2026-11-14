@@ -31,11 +31,11 @@ File: `data/processed/hotspots.csv`, UTF-8, comma, header row.
 | `acq_date` | `YYYY-MM-DD` | UTC |
 | `acq_time` | `HHMM` | UTC, 4 digits |
 | `sensor` | `MODIS` / `VIIRS` | From `instrument` |
-| `satellite` | text | As in raw file |
+| `satellite` | text | Archive spelling: `Terra` / `Aqua`, `N` / `N20` / `N21`. API `T` / `A` are stored as `Terra` / `Aqua` |
 | `daynight` | `D` / `N` | |
 | `frp` | float | MW |
 | `confidence` | integer 0–100 | MODIS: as is. VIIRS: mapping TBD |
-| `type` | integer 0–3 | As in raw file |
+| `type` | integer 0–3, or empty | As in raw file. Empty (NULL) for NRT/API rows: those files have no `type` |
 
 MVP: MODIS rows only; this is a cleaned copy of the raw file.
 
@@ -47,7 +47,7 @@ How to build: `docs/data-sources.md` → *Harmonize*. Method and evidence: `rese
 |---|---|---|
 | `coverage(satellite, day, status, note)` | table | `status` ∈ `ok`/`partial`/`missing` per satellite × UTC day. **Draw non-ok days as "no data", never as 0.** |
 | `static_mask(cell_lat, cell_lon, category, core, qualifying_years)` | table | Industrial sites / flares (`static`) and `volcano` cells, grid `floor(deg*100)`, built from S-NPP. |
-| `hotspots_flagged` | view | `hotspots` + `mask_category` + `is_burning` (= not masked and `type` ≠ 3). **Count burning activity with `WHERE is_burning`.** Map/CSV can show all rows with the flag. |
+| `hotspots_flagged` | view | `hotspots` + `mask_category` + `is_burning` (= not masked and `type` ≠ 3; NULL `type` counts as land). **Count burning activity with `WHERE is_burning`.** Map/CSV can show all rows with the flag. |
 | `calibration` | table | Per-month junction factors (J1 Terra→Aqua, J2 Aqua→S-NPP) for `count` and `frp`, with interquartile band. |
 | `calibration_chain(satellite, month, metric, factor, band_lo, band_hi)` | view | **Multiplier to S-NPP-equivalent units.** For any AOI and month: take the month's reference satellite, aggregate `is_burning` rows, multiply by `factor` (band: `band_lo`/`band_hi`). Aggregates only, never single points. |
 | `harmonized_monthly` | view | Italy-wide ready series: `month_start, satellite` (reference), `raw_count, raw_frp, count_snpp_eq, count_lo, count_hi, frp_snpp_eq, frp_lo, frp_hi, days_ok, days_partial, days_missing`. |
@@ -76,7 +76,7 @@ CREATE TABLE hotspots (
   version     TEXT,
   frp         DOUBLE PRECISION,              -- MW
   daynight    CHAR(1),           -- 'D' or 'N'
-  type        SMALLINT NOT NULL          -- 0-3, empty in NRT data
+  type        SMALLINT                   -- 0-3; NULL in NRT/API files (they have no type)
 );
 
 ```
@@ -106,18 +106,17 @@ CREATE TABLE hotspot_regions (           -- one row per hotspot per level it has
   PRIMARY KEY (region_id, hotspot_id)
 );
 CREATE INDEX hotspots_point_gist ON hotspots USING gist (point(longitude, latitude));
--- plus extensions cube + earthdistance for the circle filter
 ```
 
-| Filter | SQL (hotspots aliased `h`) |
+| Filter | SQL on `hotspots` |
 |---|---|
-| Region | `JOIN hotspot_regions hr ON hr.hotspot_id = h.id AND hr.region_id = $1` |
-| Drawn polygon | `point(h.longitude, h.latitude) <@ $1::polygon` (exactly this form, so `hotspots_point_gist` is used) |
-| Circle | `earth_box(ll_to_earth($lat, $lon), $m) @> ll_to_earth(h.latitude, h.longitude) AND earth_distance(...) <= $m` |
+| Region | `EXISTS (SELECT 1 FROM hotspot_regions hr WHERE hr.hotspot_id = hotspots.id AND hr.region_id = $1)` |
+| Drawn polygon | `point(longitude, latitude) <@ $1::polygon` (exactly this form, so `hotspots_point_gist` is used) |
+| Circle | latitude bounding box, then great-circle distance (haversine) ≤ `radius_km` |
 
 - Levels mean different things per country. Italy: ADM1 = 5 macro-zones (`Isole` = Sicily + Sardinia), ADM2 = the 20 regions.
 - Region ids are **not stable** across `load_regions.py --rebuild`; clients get them from `/api/regions`.
-- Shared code: `api/lib/area.js` builds these fragments; every data endpoint uses it.
+- Shared code: `api/lib/query.js` (`parseFilters`, `buildWhere`) builds these conditions; every data endpoint uses it via `api/lib/filters.js`.
 
 ## [3] api/ endpoints
 
@@ -129,12 +128,13 @@ Shared query params (area + filters):
 |---|---|---|
 | `from`, `to` | `2008-01-01`, `2008-12-31` | Date range, inclusive |
 | `lat`, `lon`, `radius_km` | `41.9`, `12.5`, `50` | Circle area |
-| `polygon` | `[[12.1,41.8],[12.9,41.8],[12.5,42.2]]` | Polygon area, `[lon, lat]` pairs, 3–200 points (a closing point equal to the first is optional) |
+| `polygon` | `[[12.1,41.8],[12.9,41.8],[12.5,42.2]]` | Polygon area, `[lon, lat]` pairs, 3–200 points, coordinates rounded to 5 decimals (a closing point equal to the first is optional) |
 | `region` | `812` | Named area: a region `id` from `GET /api/regions` |
 | `daynight` | `D` / `N` | Optional |
 | `type` | `0` | Optional, comma list |
+| `sensor` | `MODIS` or `MODIS,VIIRS` | Optional, comma list. Matches `instrument` in [2] / `sensor` in [1] |
 
-At most **one area** per request: `region`, `polygon` or circle. More than one → 400 `Send one area: region, polygon or circle`.
+`region` cannot be combined with `polygon` or a circle → 400 `Send one area: region, polygon or circle`. If `polygon` and a circle are both sent, the polygon wins (the frontend never sends both).
 Unknown `region` id → 400. No area given → whole dataset.
 
 | Method + path | Returns |
@@ -158,10 +158,11 @@ Requests: all endpoints accept every shared param from the table above, with the
 |---|---|---|
 | `from`, `to` | `2008-01-01`, `2008-12-31` | Always sent. Month selected → that month's range |
 | `lat`, `lon`, `radius_km` | `41.9`, `12.5`, `50` | Only when a circle is picked |
-| `polygon` | `[[12.1,41.8],[12.9,41.8],[12.5,42.2]]` | Only when a polygon is drawn; never sent with a circle or region. Simplify freehand drawings to ≤ 200 points; forbid self-intersecting shapes in the drawing tool |
+| `polygon` | `[[12.1,41.8],[12.9,41.8],[12.5,42.2]]` | Only when a polygon is drawn; never sent with a circle or region. Simplify freehand drawings to ≤ 200 points **and round coordinates to 5 decimals** (≈ 1 m): 200 full-precision points make a 9 KB URL, and the gateway answers HTML `414` instead of JSON (≈ 5.6 KB at 5 decimals is fine). Forbid self-intersecting shapes in the drawing tool |
 | `region` | `812` | Only when a region is picked from `/api/regions`; never sent with a circle or polygon. Show the credit "Boundaries: geoBoundaries" (CC BY) on the map |
 | `type` | `0` or `0,2` | Absent → all types |
 | `daynight` | `D` / `N` | Absent → both |
+| `sensor` | `MODIS`, `VIIRS` or `MODIS,VIIRS` | Always sent. Absent → all sensors. Counts are raw sums, not harmonized (method TBD) |
 
 Responses:
 

@@ -80,9 +80,8 @@ jobs:
           test "$code" = "401"
 
   e2e:
-    needs: smoke
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 12
     defaults:
       run:
         working-directory: e2e
@@ -99,7 +98,22 @@ jobs:
         run: npm ci
 
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps --only-shell chromium
+
+      - name: Wait for this commit to be live
+        env:
+          SHA: ${{ github.sha }}
+        run: |
+          for _ in $(seq 1 72); do
+            if body="$(curl -fsS --max-time 10 "$APP_URL/api/health" 2>/dev/null)" \
+               && echo "$body" | grep -q "\"version\":\"$SHA\""; then
+              echo "ok: $body"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "timed out after 6 min waiting for $APP_URL/api/health to report version $SHA (last body: ${body:-none})" >&2
+          exit 1
 
       - name: Run Playwright against production
         env:

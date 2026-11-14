@@ -1,5 +1,5 @@
 // SQL for /api/regions (docs/contracts.md [3]). Values are always bound params.
-import { BadRequest } from "./area.js";
+import { httpError } from "./query.js";
 import { normName } from "./names.js";
 
 export const SEARCH_LIMIT = 20;
@@ -15,15 +15,15 @@ export function searchPattern(q) {
 export function parseRegionsQuery(query) {
   const hasQ = query.q !== undefined;
   const hasParent = query.parent !== undefined;
-  if (hasQ && hasParent) throw new BadRequest("Send q or parent, not both");
+  if (hasQ && hasParent) throw httpError("Send q or parent, not both");
   if (hasQ) {
     const q = typeof query.q === "string" ? query.q.trim() : "";
-    if (q.length < 2 || q.length > 100) throw new BadRequest("q must be 2 to 100 characters");
+    if (q.length < 2 || q.length > 100) throw httpError("q must be 2 to 100 characters");
     return { q };
   }
   if (hasParent) {
     if (typeof query.parent !== "string" || !/^\d+$/.test(query.parent) || Number(query.parent) > 2147483647) {
-      throw new BadRequest("parent must be a positive integer id");
+      throw httpError("parent must be a positive integer id");
     }
     return { parent: Number(query.parent) };
   }
@@ -47,4 +47,20 @@ export function listSql({ q, parent } = {}) {
 
 export function featureSql(id) {
   return { text: `SELECT ${FIELDS}, r.outline::json AS geometry ${FROM} WHERE r.id = $1`, values: [id] };
+}
+
+export function isMissingTable(err) {
+  return err?.code === "42P01"; // undefined_table: ingest/load_regions.py has not run on this DB yet
+}
+
+// An unknown region id is a bad parameter (400), not an empty result. `filters` come from parseFilters.
+export async function checkRegion(filters, db) {
+  if (!filters.region) return;
+  let rows = [];
+  try {
+    ({ rows } = await db.query({ text: "SELECT 1 FROM regions WHERE id = $1", values: [filters.region] }));
+  } catch (err) {
+    if (!isMissingTable(err)) throw err;
+  }
+  if (!rows.length) throw httpError(`unknown region: ${filters.region}`);
 }

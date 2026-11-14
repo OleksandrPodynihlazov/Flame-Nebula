@@ -2,9 +2,6 @@
 -- Idempotent: ingest/load_regions.py applies it on every run, after `hotspots` exists.
 -- Design: docs/superpowers/specs/2026-11-14-region-filter-design.md §2.
 
-CREATE EXTENSION IF NOT EXISTS cube;
-CREATE EXTENSION IF NOT EXISTS earthdistance;
-
 CREATE TABLE IF NOT EXISTS regions (
   id         INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   level      SMALLINT NOT NULL,          -- 0 = country, 1, 2 (meaning varies by country)

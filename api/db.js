@@ -1,10 +1,13 @@
 import pg from "pg";
 
-// One pool for the app. Connects lazily, on the first query.
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 5 });
+pg.types.setTypeParser(1082, (value) => value);       // DATE → "YYYY-MM-DD"
+pg.types.setTypeParser(20, (value) => Number(value)); // BIGINT / COUNT(*) → число
 
-pool.on("error", (err) => {
-  console.error(`db pool error: ${err.message}`);
+export const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL,
+  connectionTimeoutMillis: 2000,
 });
 
-export default pool;
+pool.on("error", (err) => {
+  console.error(`postgres pool error: ${err.message}`);
+});

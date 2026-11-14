@@ -11,7 +11,10 @@ export type Area =
 export interface Filters {
   year: number
   month: Month | null
+  date: string | null
   area: Area | null
+  /** At least one. Sensors with no data in `year` are dropped from requests. */
+  sensors: Sensor[]
   types: FireType[]
   hideNoise: boolean
   daynight: DayNight | null
@@ -26,6 +29,8 @@ export interface ApiQuery {
   polygon?: string
   daynight?: DayNight
   type?: string
+  /** Comma list, e.g. `MODIS,VIIRS`. */
+  sensor?: string
 }
 
 export interface HotspotProperties {
@@ -70,11 +75,4 @@ export interface CalendarResponse {
 
 export interface ApiError {
   error: string
-}
-
-export interface MonthlyCalendar {
-  year: number
-  months: number[]
-  total: number
-  peakMonth: { month: Month; count: number } | null
 }

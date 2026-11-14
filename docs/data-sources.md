@@ -21,13 +21,14 @@ curl -fL -o data/raw/modis_2008_Italy.csv \
 
 ## Load into Postgres
 
-Raw archive CSV → `hotspots` table (schema: `db/init/hotspots-init.sql`). Script: `ingest/load_hotspots.py`, stdlib only.
+Raw archive or API CSV → `hotspots` table (schema: `db/init/hotspots-init.sql`). Script: `ingest/load_hotspots.py`, stdlib only.
 Run from the repo root. Same commands on a laptop and on the VPS.
 
 ```sh
 docker compose up -d db
 python3 ingest/firms_archive_fetch.py --years 2000-2025          # → data/raw/firms_archive/, ~1 min, no key
 python3 ingest/load_hotspots.py --create-table data/raw/firms_archive/*.csv
+python3 ingest/load_hotspots.py data/raw/firms_api/*.csv        # API files (merged ones, not chunks/), optional
 ```
 
 Expect `total: 131700 inserted …; 0 file(s) failed` (all MODIS Italy, ~9 s). A second run prints `0 inserted … 131700 unchanged`.
@@ -38,7 +39,7 @@ Expect `total: 131700 inserted …; 0 file(s) failed` (all MODIS Italy, ~9 s). A
 | Is it safe to run again? | Yes. One detection = `(satellite, acq_date, acq_time, latitude, longitude)` (unique index `hotspots_natural_key`, created by the loader). Same row → `unchanged`. Same detection with new values (FIRMS reprocessing) → `updated`. Nothing is duplicated. |
 | Can it recreate or wipe the table? | No. `--create-table` creates the table **only if it is missing**. An existing table, its rows and any later `ALTER`s are never touched (tested). The loader never runs `DROP`/`TRUNCATE`. |
 | What if a file fails? | That file writes nothing (one transaction per file), the others still load, and the exit code is 1. |
-| NRT / API files? | Not yet. They have no `type`, and `hotspots.type` is `NOT NULL` for now. |
+| NRT / API files? | Yes. Columns are matched by name; `type` is missing in NRT files and stored as NULL, a missing `instrument` is derived from the brightness column, and API `T`/`A` become `Terra`/`Aqua` so archive and API rows share one key. An NRT row never overwrites a row that has a `type`: load order does not matter, the archive wins. A DB created before `type` became nullable needs once: `ALTER TABLE hotspots ALTER COLUMN type DROP NOT NULL;` (the loader prints this hint if it is missing). |
 
 **On the VPS.** `data/` is gitignored, so the CSVs are not deployed: run the fetch command there once. `data/` survives deploys
 (`git checkout` leaves ignored files alone), and so does the `pgdata` volume. Loading is a one-time manual step, not part of

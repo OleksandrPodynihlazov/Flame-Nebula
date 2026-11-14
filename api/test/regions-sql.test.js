@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { BadRequest } from "../lib/area.js";
-import { searchPattern, listSql, featureSql, parseRegionsQuery, SEARCH_LIMIT } from "../lib/regions-sql.js";
+import {
+  searchPattern, listSql, featureSql, parseRegionsQuery, SEARCH_LIMIT, checkRegion, isMissingTable,
+} from "../lib/regions-sql.js";
 
 test("searchPattern escapes wildcards", () => {
   assert.equal(searchPattern("50%_a\\"), "50\\%\\_a\\\\");
@@ -40,10 +41,30 @@ test("parseRegionsQuery", () => {
   assert.deepEqual(parseRegionsQuery({}), {});
   assert.deepEqual(parseRegionsQuery({ q: " si " }), { q: "si" });
   assert.deepEqual(parseRegionsQuery({ parent: "12" }), { parent: 12 });
-  const bad = (q, re) => assert.throws(() => parseRegionsQuery(q), (e) => e instanceof BadRequest && re.test(e.message));
+  const bad = (q, re) => assert.throws(() => parseRegionsQuery(q), (e) => e.status === 400 && re.test(e.message));
   bad({ q: "a" }, /2 to 100/);
   bad({ q: "x".repeat(101) }, /2 to 100/);
   bad({ parent: "abc" }, /parent/);
   bad({ q: "si", parent: "1" }, /q or parent/);
   bad({ q: ["si", "ci"] }, /2 to 100/);
+});
+
+test("checkRegion: only a region filter is checked, and an unknown id is a 400", async () => {
+  const unknown = { query: async () => ({ rows: [] }) };
+  const found = { query: async () => ({ rows: [{ id: 5 }] }) };
+  const noTable = { query: async () => { throw Object.assign(new Error("no table"), { code: "42P01" }); } };
+  const broken = { query: async () => { throw Object.assign(new Error("db down"), { code: "57P01" }); } };
+  const fails = (e) => e.status === 400 && e.message === "unknown region: 5";
+
+  await assert.rejects(checkRegion({ region: 5 }, unknown), fails);
+  await assert.rejects(checkRegion({ region: 5 }, noTable), fails); // regions not loaded yet = unknown
+  await assert.rejects(checkRegion({ region: 5 }, broken), /db down/); // other DB errors stay errors
+  await checkRegion({ region: 5 }, found);
+  await checkRegion({ region: null }, { query: async () => { throw new Error("must not query"); } });
+});
+
+test("isMissingTable", () => {
+  assert.equal(isMissingTable({ code: "42P01" }), true);
+  assert.equal(isMissingTable({ code: "23505" }), false);
+  assert.equal(isMissingTable(undefined), false);
 });

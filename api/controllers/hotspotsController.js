@@ -1,0 +1,16 @@
+import { requestFilters } from "../lib/filters.js";
+import { getHotspots, getHotspotsCsv } from "../services/hotspotsService.js";
+
+export async function hotspots(req, res) {
+  res.json(await getHotspots(await requestFilters(req.query)));
+}
+
+export async function hotspotsCsv(req, res) {
+  const filters = await requestFilters(req.query);
+  const body = await getHotspotsCsv(filters);
+  const from = filters.from ?? "all";
+  const to = filters.to ?? "all";
+  res.type("text/csv; charset=utf-8");
+  res.set("Content-Disposition", `attachment; filename="hotspots_${from}_${to}.csv"`);
+  res.send(body);
+}

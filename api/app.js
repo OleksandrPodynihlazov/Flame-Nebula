@@ -1,5 +1,8 @@
 import express from "express";
 import healthRouter from "./routes/health.js";
+import hotspotsRouter from "./routes/hotspots.js";
+import statsRouter from "./routes/stats.js";
+import calendarRouter from "./routes/calendar.js";
 import regionsRouter from "./routes/regions.js";
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -7,6 +10,9 @@ const PORT = Number(process.env.PORT) || 3000;
 const app = express();
 app.use(express.json());
 app.use("/api", healthRouter);
+app.use("/api", hotspotsRouter);
+app.use("/api", statsRouter);
+app.use("/api", calendarRouter);
 app.use("/api", regionsRouter);
 
 app.use((req, res) => {

@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Load raw FIRMS archive CSVs (data/raw/firms_archive/*.csv) into the `hotspots` table.
+"""Load raw FIRMS CSVs (archive: data/raw/firms_archive/, API: data/raw/firms_api/) into `hotspots`.
 
 Stdlib only. It talks to Postgres through `psql`, by default the one inside the compose `db`
 container. The DB publishes no port (see docker-compose.yml), so there is nothing to connect to
 from the host directly.
 
     python3 ingest/load_hotspots.py data/raw/firms_archive/*.csv
+    python3 ingest/load_hotspots.py data/raw/firms_api/*.csv     # merged files, not chunks/
 
     # another DB / psql (anything that accepts psql flags at the end):
     HOTSPOTS_PSQL='psql postgresql://user:pass@host:5432/db' python3 ingest/load_hotspots.py FILES...
@@ -14,13 +15,21 @@ Guarantees:
   * Raw: values are stored as FIRMS wrote them, with no filtering (decision I2, research/07 §12).
     The only mapping is by column NAME into Vlad's schema (db/init/hotspots-init.sql):
     VIIRS `bright_ti4` -> `brightness`, and `bright_t31`/`bright_ti5` are dropped (no column).
+  * Archive and API files: columns are matched by name, so a file is accepted if it has the
+    archive columns of one sensor, where `type`, `instrument` and the second brightness column
+    may be missing (API/NRT files have no `type`). Missing `type` -> NULL; missing `instrument`
+    -> derived from the brightness column (`brightness` = MODIS, `bright_ti4` = VIIRS).
+  * One satellite spelling per platform, so the same detection from the archive and the API is
+    one row: API `T`/`A` -> `Terra`/`Aqua`; VIIRS `N`/`N20`/`N21` as they are.
   * Idempotent: one detection = (satellite, acq_date, acq_time, latitude, longitude), enforced by
     a unique index the loader creates if missing. Re-loading a file inserts nothing. If FIRMS
     reprocessed a row (same detection, e.g. new `version`/`type`), it is updated in place.
+    A row without `type` (NRT) never overwrites a row that has one (standard product), so loading
+    API files after the archive cannot downgrade data; the archive replaces NRT rows.
     Duplicates inside one file are loaded once, and the last one wins.
   * Atomic per file: a file is fully loaded or not at all. Other files still load.
-  * For now archive files only. NRT/API files have no `type`, and the schema's `type` is
-    NOT NULL until Vlad's change lands.
+  * Needs `hotspots.type` nullable. A DB created before that change needs, once:
+    ALTER TABLE hotspots ALTER COLUMN type DROP NOT NULL;
 """
 
 import argparse
@@ -41,7 +50,16 @@ DB_COLUMNS = ("latitude", "longitude", "brightness", "scan", "track", "acq_date"
 KEY = ("satellite", "acq_date", "acq_time", "latitude", "longitude")
 REPO = Path(__file__).resolve().parents[1]
 DEFAULT_SCHEMA = REPO / "db" / "init" / "hotspots-init.sql"
-SATELLITES = {"Terra", "Aqua", "N"}  # archive spelling; NRT T/A/N20/N21 come with NRT support
+# File spelling -> stored spelling (the archive one, which harmonize/ filters on), per instrument.
+SATELLITES = {
+    "MODIS": {"Terra": "Terra", "Aqua": "Aqua", "T": "Terra", "A": "Aqua"},
+    "VIIRS": {"N": "N", "N20": "N20", "N21": "N21"},
+}
+# Per instrument: its archive columns, and which of them API/NRT files may lack.
+SENSOR_COLUMNS = {
+    "MODIS": (ARCHIVE_HEADERS["modis"], {"type", "instrument", "bright_t31"}),
+    "VIIRS": (ARCHIVE_HEADERS["viirs-snpp"], {"type", "instrument", "bright_ti5"}),
+}
 
 # psql inside the compose db container; credentials come from the container's own env.
 DEFAULT_PSQL = ["docker", "compose", "exec", "-T", "db", "sh", "-c",
@@ -76,14 +94,25 @@ class LoadResult:
         return self.rows - self.distinct
 
 
+def _instrument(columns):
+    return "VIIRS" if "bright_ti4" in columns else "MODIS"
+
+
 def check_header(header):
+    """Accept an archive or API/NRT header of one sensor (by column name); return it normalised."""
     header = [h.strip().lower() for h in header]
-    if tuple(header) in {tuple(h) for h in ARCHIVE_HEADERS.values()}:
-        return header
-    if "latitude" in header and "type" not in header:
-        raise LoadError("looks like NRT/API data (no `type` column). NRT loading waits for the schema "
-                        "change that makes hotspots.type nullable")
-    raise LoadError(f"not a FIRMS archive CSV, header starts {','.join(header)[:60]!r}")
+    cols = set(header)
+    if "latitude" not in cols:
+        raise LoadError(f"not a FIRMS CSV, header starts {','.join(header)[:60]!r}")
+    if len(cols) != len(header):
+        raise LoadError(f"duplicate column names in header {','.join(header)!r}")
+    known, optional = SENSOR_COLUMNS[_instrument(cols)]
+    missing = [c for c in known if c not in cols and c not in optional]
+    unexpected = [c for c in header if c not in known]
+    if missing or unexpected:
+        raise LoadError(f"not a FIRMS {_instrument(cols)} archive/API CSV: "
+                        f"missing {missing}, unexpected {unexpected}")
+    return header
 
 
 def map_row(header, row):
@@ -91,9 +120,15 @@ def map_row(header, row):
     if len(row) != len(header):
         raise LoadError(f"{len(row)} fields, header has {len(header)}")
     f = dict(zip(header, row))
-    if f["satellite"] not in SATELLITES:
-        raise LoadError(f"unknown satellite {f['satellite']!r}, expected one of {sorted(SATELLITES)}")
-    f["brightness"] = f.get("brightness", f.get("bright_ti4"))
+    instrument = _instrument(f)
+    satellite = SATELLITES[instrument].get(f["satellite"])
+    if satellite is None:
+        raise LoadError(f"unknown {instrument} satellite {f['satellite']!r}, "
+                        f"expected one of {sorted(SATELLITES[instrument])}")
+    f["satellite"] = satellite
+    f["brightness"] = f["bright_ti4"] if instrument == "VIIRS" else f["brightness"]
+    f.setdefault("instrument", instrument)
+    f.setdefault("type", "")  # API/NRT: no type column -> empty CSV field -> NULL
     return [f[c] for c in DB_COLUMNS]
 
 
@@ -120,6 +155,7 @@ WITH src AS (
   INSERT INTO hotspots ({cols}) SELECT {cols} FROM src
   ON CONFLICT ({key}) DO UPDATE SET {", ".join(f"{c} = EXCLUDED.{c}" for c in rest)}
   WHERE ({", ".join(f"hotspots.{c}" for c in rest)}) IS DISTINCT FROM ({", ".join(f"EXCLUDED.{c}" for c in rest)})
+    AND (EXCLUDED.type IS NOT NULL OR hotspots.type IS NULL)  -- NRT never replaces a typed row
   RETURNING (xmax = 0) AS inserted
 )
 SELECT 'RESULT', (SELECT count(*) FROM stg), (SELECT count(*) FROM src),
@@ -154,7 +190,11 @@ def load_file(path, psql_cmd):
                           capture_output=True, text=True)
     if proc.returncode != 0:
         msg = (proc.stderr or proc.stdout).strip().splitlines()
-        raise LoadError(" / ".join(msg[-3:]) or f"psql exited with {proc.returncode}")
+        text = " / ".join(msg[-3:]) or f"psql exited with {proc.returncode}"
+        if 'column "type"' in text and "not-null" in text:
+            text += (" -- this DB predates nullable `type`; run once: "
+                     "ALTER TABLE hotspots ALTER COLUMN type DROP NOT NULL;")
+        raise LoadError(text)
     for line in proc.stdout.splitlines():
         if line.startswith("RESULT|"):
             _, n, distinct, ins, upd = line.split("|")
@@ -183,7 +223,7 @@ def ensure_table(psql_cmd, schema_path):
 
 def main(argv=None, psql_cmd=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("files", nargs="+", help="raw FIRMS archive CSV files")
+    ap.add_argument("files", nargs="+", help="raw FIRMS archive or API CSV files")
     ap.add_argument("--create-table", action="store_true",
                     help=f"create `hotspots` from {DEFAULT_SCHEMA.relative_to(REPO)} if it does not exist "
                          "(an existing table is never touched)")
