@@ -1,0 +1,57 @@
+<?xml version='1.0' encoding="UTF-8" ?>
+<wfs:FeatureCollection
+   xmlns:ms="http://mapserver.gis.umn.edu/mapserver"
+   xmlns:gml="http://www.opengis.net/gml"
+   xmlns:wfs="http://www.opengis.net/wfs"
+   xmlns:ogc="http://www.opengis.net/ogc"
+   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <gml:featureMember>
+      <ms:modis.ba.poly gml:id="modis.ba.poly.100">
+        <ms:msGeometry>
+          <gml:Polygon srsName="EPSG:4326">
+            <gml:exterior>
+              <gml:LinearRing>
+                <gml:posList srsDimension="2">40.10 8.50 40.10 8.60 40.20 8.60 40.20 8.50 40.10 8.50 </gml:posList>
+              </gml:LinearRing>
+            </gml:exterior>
+          </gml:Polygon>
+        </ms:msGeometry>
+        <ms:id>100</ms:id>
+        <ms:FIREDATE>2021-07-24 00:00:00</ms:FIREDATE>
+        <ms:FINALDATE>2021-07-29 00:00:00</ms:FINALDATE>
+        <ms:COUNTRY>IT</ms:COUNTRY>
+        <ms:AREA_HA>13278</ms:AREA_HA>
+      </ms:modis.ba.poly>
+    </gml:featureMember>
+    <gml:featureMember>
+      <ms:modis.ba.poly gml:id="modis.ba.poly.200">
+        <ms:msGeometry>
+          <gml:MultiSurface srsName="EPSG:4326">
+            <gml:surfaceMember>
+              <gml:Polygon>
+                <gml:exterior>
+                  <gml:LinearRing>
+                    <gml:posList srsDimension="2">41.00 9.00 41.00 9.05 41.05 9.05 41.00 9.00 </gml:posList>
+                  </gml:LinearRing>
+                </gml:exterior>
+              </gml:Polygon>
+            </gml:surfaceMember>
+            <gml:surfaceMember>
+              <gml:Polygon>
+                <gml:exterior>
+                  <gml:LinearRing>
+                    <gml:posList srsDimension="2">41.20 9.20 41.20 9.25 41.25 9.25 41.20 9.20 </gml:posList>
+                  </gml:LinearRing>
+                </gml:exterior>
+              </gml:Polygon>
+            </gml:surfaceMember>
+          </gml:MultiSurface>
+        </ms:msGeometry>
+        <ms:id>200</ms:id>
+        <ms:FIREDATE>2017-08-10 00:00:00</ms:FIREDATE>
+        <ms:FINALDATE>2017-08-10 00:00:00</ms:FINALDATE>
+        <ms:COUNTRY>IT</ms:COUNTRY>
+        <ms:AREA_HA>45</ms:AREA_HA>
+      </ms:modis.ba.poly>
+    </gml:featureMember>
+</wfs:FeatureCollection>
