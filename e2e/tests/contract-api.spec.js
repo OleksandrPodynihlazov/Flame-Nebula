@@ -95,6 +95,16 @@ test.describe('query validation', () => {
     ['from=not-a-date', { from: 'not-a-date', to: '2008-12-31' }],
     ['malformed polygon JSON', { polygon: '[[12.1,41.8],[12.9,41.8' }],
     ['polygon with < 3 points', { polygon: '[[12.1,41.8],[12.9,41.8]]' }],
+    ['polygon with 201 points', {
+      // 5 decimals, as the frontend sends them: full-precision floats would hit nginx's 8 KB URL limit (HTML 414)
+      polygon: JSON.stringify(Array.from({ length: 201 }, (_, i) => [
+        Math.round((12 + Math.cos(i) / 10) * 1e5) / 1e5, Math.round((41 + Math.sin(i) / 10) * 1e5) / 1e5,
+      ])),
+    }],
+    ['region and polygon together', { region: 1, polygon: '[[12.1,41.8],[12.9,41.8],[12.5,42.2]]' }],
+    ['region and circle together', { region: 1, lat: 41.9, lon: 12.5, radius_km: 50 }],
+    ['unknown region', { region: 2147483647 }],
+    ['region not an id', { region: 'sicily' }],
   ];
 
   for (const [name, params] of badParams) {
@@ -106,6 +116,16 @@ test.describe('query validation', () => {
   test('area far outside Italy -> 200 with total 0', async ({ request }) => {
     const body = await getJson(request, '/api/stats', { lat: 0, lon: 0, radius_km: 10 });
     expect(body.total).toBe(0);
+  });
+
+  test('region filter count is within the unfiltered total', async ({ request }) => {
+    const { regions } = await getJson(request, '/api/regions', { q: 'sicil' });
+    const sicilia = regions.find((r) => r.name === 'Sicilia' && r.country === 'ITA');
+    test.skip(!sicilia, 'regions not loaded in this DB');
+    const all = await getJson(request, '/api/stats');
+    const one = await getJson(request, '/api/stats', { region: sicilia.id });
+    expect(one.total).toBeGreaterThan(0);
+    expect(one.total).toBeLessThanOrEqual(all.total);
   });
 
   test('date range outside data -> 200 with total 0', async ({ request }) => {

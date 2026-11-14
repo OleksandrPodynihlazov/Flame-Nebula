@@ -1,12 +1,12 @@
-import { parseFilters } from "../lib/query.js";
+import { requestFilters } from "../lib/filters.js";
 import { getHotspots, getHotspotsCsv } from "../services/hotspotsService.js";
 
 export async function hotspots(req, res) {
-  res.json(await getHotspots(parseFilters(req.query)));
+  res.json(await getHotspots(await requestFilters(req.query)));
 }
 
 export async function hotspotsCsv(req, res) {
-  const filters = parseFilters(req.query);
+  const filters = await requestFilters(req.query);
   const body = await getHotspotsCsv(filters);
   const from = filters.from ?? "all";
   const to = filters.to ?? "all";
