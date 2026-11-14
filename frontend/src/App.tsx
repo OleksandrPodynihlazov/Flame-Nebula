@@ -8,7 +8,7 @@ import { DEFAULT_FILTERS } from './constants/fire'
 import { useDashboardData } from './hooks/useDashboardData'
 import type { Filters } from './types/api'
 import { buildGrid } from './utils/calendar'
-import { selectionLabel } from './utils/filters'
+import { activeSensors, selectionLabel } from './utils/filters'
 
 export default function App() {
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS)
@@ -17,12 +17,13 @@ export default function App() {
 
   const grid = useMemo(() => (calendar.data ? buildGrid(filters.year, calendar.data) : null), [calendar.data, filters.year])
   const update = (patch: Partial<Filters>) => setFilters((f) => ({ ...f, ...patch }))
+  const sensors = activeSensors(filters)
 
   const onDownload = async () => {
     setDownloading(true)
     try {
       const tag = filters.date ?? (filters.month !== null ? `${filters.year}-${String(filters.month + 1).padStart(2, '0')}` : filters.year)
-      await downloadCsv(selectionQuery, `firms_italy_modis_${tag}.csv`)
+      await downloadCsv(selectionQuery, `firms_italy_${sensors.join('_').toLowerCase()}_${tag}.csv`)
     } finally {
       setDownloading(false)
     }
@@ -35,7 +36,7 @@ export default function App() {
       <TopBar filters={filters} onChange={update} onDownload={onDownload} downloading={downloading} isDemo={isDemo} />
 
       <main className="flex flex-1 flex-col overflow-hidden lg:flex-row">
-        <HotspotMap data={hotspots.data} loading={hotspots.loading} label={selectionLabel(filters)} />
+        <HotspotMap data={hotspots.data} loading={hotspots.loading} label={selectionLabel(filters)} sensors={sensors} />
 
         <section className="flex flex-1 flex-col gap-4 overflow-y-auto bg-slate-950 p-4 lg:h-full lg:w-[55%] lg:p-5">
           {error && (
@@ -44,11 +45,12 @@ export default function App() {
             </p>
           )}
 
-          <StatCards stats={stats.data} grid={grid} scope={selectionLabel(filters)} loading={stats.loading} />
+          <StatCards stats={stats.data} grid={grid} scope={selectionLabel(filters)} loading={stats.loading} sensors={sensors} />
 
           <BurnCalendar
             grid={grid}
             filters={filters}
+            sensors={sensors}
             loading={calendar.loading}
             onSelectMonth={(month) => update({ month, date: null })}
             onSelectDate={(date) => update({ month: (Number(date.slice(5, 7)) - 1) as Filters['month'], date })}

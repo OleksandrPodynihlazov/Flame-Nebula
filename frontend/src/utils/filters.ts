@@ -1,5 +1,5 @@
-import { FIRE_TYPES, MONTHS, MONTHS_FULL } from '../constants/fire'
-import type { ApiQuery, FireType, Filters, Month } from '../types/api'
+import { FIRE_TYPES, MONTHS, MONTHS_FULL, SENSORS } from '../constants/fire'
+import type { ApiQuery, FireType, Filters, Month, Sensor } from '../types/api'
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
@@ -16,9 +16,18 @@ export function activeTypes(f: Filters): FireType[] {
   return f.hideNoise ? f.types.filter((t) => !FIRE_TYPES[t].noise) : f.types
 }
 
-/** Filters shared by every request: types, day/night, area (contracts.md [3]). */
+export function sensorAvailable(s: Sensor, year: number): boolean {
+  return year >= SENSORS[s].from && year <= SENSORS[s].to
+}
+
+/** Selected sensors that have data in the selected year. */
+export function activeSensors(f: Filters): Sensor[] {
+  return f.sensors.filter((s) => sensorAvailable(s, f.year))
+}
+
+/** Filters shared by every request: sensor, types, day/night, area (contracts.md [3]). */
 function baseQuery(f: Filters, from: string, to: string): ApiQuery {
-  const q: ApiQuery = { from, to, type: activeTypes(f).join(',') }
+  const q: ApiQuery = { from, to, sensor: activeSensors(f).join(','), type: activeTypes(f).join(',') }
   if (f.daynight) q.daynight = f.daynight
   if (f.area?.kind === 'circle') Object.assign(q, { lat: f.area.lat, lon: f.area.lon, radius_km: f.area.radiusKm })
   if (f.area?.kind === 'polygon') q.polygon = JSON.stringify(f.area.points)

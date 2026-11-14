@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { MONTHS_FULL } from '../constants/fire'
-import type { StatsResponse } from '../types/api'
+import type { Sensor, StatsResponse } from '../types/api'
 import type { CalendarGrid } from '../utils/calendar'
 
 interface Props {
@@ -8,6 +8,7 @@ interface Props {
   grid: CalendarGrid | null
   scope: string
   loading: boolean
+  sensors: Sensor[]
 }
 
 function Card({ title, badge, children }: { title: string; badge?: string; children: ReactNode }) {
@@ -22,7 +23,7 @@ function Card({ title, badge, children }: { title: string; badge?: string; child
   )
 }
 
-export function StatCards({ stats, grid, scope, loading }: Props) {
+export function StatCards({ stats, grid, scope, loading, sensors }: Props) {
   const total = stats?.total ?? 0
   const day = stats?.by_daynight.D ?? 0
   const night = stats?.by_daynight.N ?? 0
@@ -33,7 +34,7 @@ export function StatCards({ stats, grid, scope, loading }: Props) {
     <div className={`grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-3 ${loading ? 'opacity-60' : ''}`} aria-busy={loading}>
       <Card title="Detected hotspots" badge={scope}>
         <span className="font-mono text-2xl font-bold text-white">{total.toLocaleString()}</span>
-        <span className="text-xs text-slate-400">MODIS detections</span>
+        <span className="text-xs text-slate-400">{sensors.join(' + ')} detections</span>
       </Card>
 
       <Card title="Peak fire month" badge={grid ? 'Year' : undefined}>

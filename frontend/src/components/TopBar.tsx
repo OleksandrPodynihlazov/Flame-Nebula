@@ -1,5 +1,6 @@
-import { ALL_TYPES, FIRE_TYPES } from '../constants/fire'
-import type { DayNight, FireType, Filters } from '../types/api'
+import { ALL_SENSORS, ALL_TYPES, FIRE_TYPES, SENSORS, YEARS } from '../constants/fire'
+import type { DayNight, FireType, Filters, Sensor } from '../types/api'
+import { activeSensors, sensorAvailable } from '../utils/filters'
 
 interface Props {
   filters: Filters
@@ -19,6 +20,19 @@ export function TopBar({ filters, onChange, onDownload, downloading, isDemo }: P
     onChange({ types: [t], hideNoise: FIRE_TYPES[t].noise ? false : filters.hideNoise })
   }
 
+  const sensors = activeSensors(filters)
+
+  const setYear = (year: number) => {
+    // Keep only sensors that have data that year; fall back to MODIS (covers every year).
+    const kept = filters.sensors.filter((s) => sensorAvailable(s, year))
+    onChange({ year, month: null, date: null, sensors: kept.length ? kept : ['MODIS'] })
+  }
+
+  const toggleSensor = (s: Sensor) => {
+    const next = filters.sensors.includes(s) ? filters.sensors.filter((x) => x !== s) : [...filters.sensors, s]
+    if (next.some((x) => sensorAvailable(x, filters.year))) onChange({ sensors: next })
+  }
+
   const toggleNoise = () => {
     const hideNoise = !filters.hideNoise
     const onlyNoise = filters.types.every((t) => FIRE_TYPES[t].noise)
@@ -35,7 +49,7 @@ export function TopBar({ filters, onChange, onDownload, downloading, isDemo }: P
         </div>
         <h1 className="text-sm font-bold tracking-tight text-white">Flame Nebula</h1>
         <span className="rounded-full border border-orange-500/30 bg-orange-500/15 px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wider text-orange-300">
-          Italy · {filters.year} · MODIS
+          Italy · {filters.year} · {sensors.join(' + ')}
         </span>
         {isDemo && (
           <span
@@ -48,6 +62,21 @@ export function TopBar({ filters, onChange, onDownload, downloading, isDemo }: P
       </div>
 
       <div className="flex flex-wrap items-center gap-2 lg:gap-3">
+        <label className="flex items-center gap-1.5 text-xs">
+          <span className="hidden text-slate-400 xl:inline">Year</span>
+          <select
+            value={filters.year}
+            onChange={(e) => setYear(Number(e.target.value))}
+            className="rounded-lg border border-slate-700 bg-slate-800/90 px-2.5 py-1.5 font-mono text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-orange-500"
+          >
+            {YEARS.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
+        </label>
+
         <label className="flex items-center gap-1.5 text-xs">
           <span className="hidden text-slate-400 xl:inline">Fire type</span>
           <select
@@ -91,18 +120,41 @@ export function TopBar({ filters, onChange, onDownload, downloading, isDemo }: P
           <span className="font-medium text-slate-200">Hide noise</span>
         </button>
 
-        <div className="hidden items-center gap-2.5 rounded-lg border border-slate-800 bg-slate-950/60 px-2.5 py-1 text-xs sm:flex">
-          <label className="flex items-center gap-1.5 font-medium text-slate-200">
-            <input type="checkbox" checked readOnly disabled className="accent-orange-500" />
-            MODIS
-          </label>
-          <span className="text-slate-700">|</span>
-          <label className="flex cursor-not-allowed items-center gap-1.5 text-slate-500" title="VIIRS and harmonization come after the MVP">
-            <input type="checkbox" disabled className="opacity-50" />
-            VIIRS
-            <span className="rounded bg-slate-800 px-1.5 text-[9px] uppercase tracking-wider text-slate-400">Soon</span>
-          </label>
-        </div>
+        <fieldset className="flex items-center gap-2.5 rounded-lg border border-slate-800 bg-slate-950/60 px-2.5 py-1 text-xs">
+          <legend className="sr-only">Sensors</legend>
+          {ALL_SENSORS.map((s, i) => {
+            const available = sensorAvailable(s, filters.year)
+            const checked = available && filters.sensors.includes(s)
+            const isLast = checked && sensors.length === 1
+            const meta = SENSORS[s]
+            const title = !available
+              ? `${s} has data for ${meta.from}–${meta.to} only`
+              : isLast
+                ? 'At least one sensor must stay selected'
+                : `${s} · ${meta.pixel} pixels`
+            return (
+              <span key={s} className="contents">
+                {i > 0 && <span className="text-slate-700">|</span>}
+                <label
+                  title={title}
+                  className={`flex items-center gap-1.5 font-medium ${available ? 'cursor-pointer text-slate-200' : 'cursor-not-allowed text-slate-500'}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={!available || isLast}
+                    onChange={() => toggleSensor(s)}
+                    className="accent-orange-500"
+                  />
+                  {s}
+                  {!available && (
+                    <span className="rounded bg-slate-800 px-1.5 text-[9px] tracking-wider text-slate-400">{meta.from}+</span>
+                  )}
+                </label>
+              </span>
+            )
+          })}
+        </fieldset>
 
         <button
           type="button"

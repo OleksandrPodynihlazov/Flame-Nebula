@@ -1,8 +1,8 @@
 import 'leaflet/dist/leaflet.css'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { CircleMarker, MapContainer, Popup, TileLayer, useMap } from 'react-leaflet'
-import { FIRE_TYPES, ITALY_CENTER } from '../constants/fire'
-import type { HotspotCollection } from '../types/api'
+import { FIRE_TYPES, ITALY_CENTER, SENSORS } from '../constants/fire'
+import type { HotspotCollection, Sensor } from '../types/api'
 import { MapLegend } from './MapLegend'
 
 const DEFAULT_ZOOM = typeof window !== 'undefined' && window.innerWidth < 1024 ? 5 : 6
@@ -24,10 +24,15 @@ interface Props {
   data: HotspotCollection | null
   loading: boolean
   label: string
+  sensors: Sensor[]
 }
 
-export function HotspotMap({ data, loading, label }: Props) {
-  const features = data?.features ?? []
+export function HotspotMap({ data, loading, label, sensors }: Props) {
+  // Draw big MODIS dots first so the smaller VIIRS dots stay visible on top.
+  const features = useMemo(
+    () => [...(data?.features ?? [])].sort((a, b) => SENSORS[b.properties.sensor].radius - SENSORS[a.properties.sensor].radius),
+    [data],
+  )
   const [legendOpen, setLegendOpen] = useState(true)
 
   return (
@@ -45,8 +50,14 @@ export function HotspotMap({ data, loading, label }: Props) {
             <CircleMarker
               key={p.id}
               center={[p.latitude, p.longitude]}
-              radius={p.type === 0 ? 4.5 : 5.5}
-              pathOptions={{ fillColor: meta.color, color: '#020617', weight: 1, opacity: 0.9, fillOpacity: 0.85 }}
+              radius={SENSORS[p.sensor].radius}
+              pathOptions={{
+                fillColor: meta.color,
+                color: '#020617',
+                weight: p.sensor === 'VIIRS' ? 0.5 : 1,
+                opacity: 0.9,
+                fillOpacity: p.sensor === 'VIIRS' ? 0.95 : 0.75,
+              }}
             >
               <Popup>
                 <div className="min-w-[190px] space-y-1.5 text-xs">
@@ -64,7 +75,7 @@ export function HotspotMap({ data, loading, label }: Props) {
                     </dd>
                     <dt className="text-slate-400">Sensor</dt>
                     <dd className="text-right">
-                      {p.sensor} ({p.satellite})
+                      {p.sensor} ({p.satellite}) · {SENSORS[p.sensor].pixel}
                     </dd>
                     <dt className="text-slate-400">Pass · FRP</dt>
                     <dd className="text-right font-mono">
@@ -88,7 +99,7 @@ export function HotspotMap({ data, loading, label }: Props) {
         </div>
       </MapContainer>
 
-      <MapLegend open={legendOpen} onToggle={() => setLegendOpen((o) => !o)} />
+      <MapLegend open={legendOpen} onToggle={() => setLegendOpen((o) => !o)} sensors={sensors} />
     </section>
   )
 }

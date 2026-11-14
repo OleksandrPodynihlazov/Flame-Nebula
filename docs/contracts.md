@@ -81,6 +81,7 @@ Shared query params (area + filters):
 | `polygon` | `[[12.1,41.8],[12.9,41.8],[12.5,42.2]]` | Polygon area, `[lon, lat]` pairs (overrides circle) |
 | `daynight` | `D` / `N` | Optional |
 | `type` | `0` | Optional, comma list |
+| `sensor` | `MODIS` or `MODIS,VIIRS` | Optional, comma list. Matches `instrument` in [2] / `sensor` in [1] |
 
 No area given → whole dataset (Italy).
 
@@ -106,6 +107,7 @@ Requests: all endpoints accept every shared param from the table above, with the
 | `polygon` | `[[12.1,41.8],[12.9,41.8],[12.5,42.2]]` | Only when a polygon is drawn; never sent with a circle |
 | `type` | `0` or `0,2` | Absent → all types |
 | `daynight` | `D` / `N` | Absent → both |
+| `sensor` | `MODIS`, `VIIRS` or `MODIS,VIIRS` | Always sent. Absent → all sensors. Counts are raw sums, not harmonized (method TBD) |
 
 Responses:
 
