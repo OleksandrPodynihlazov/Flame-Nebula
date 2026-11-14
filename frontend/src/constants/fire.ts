@@ -11,11 +11,13 @@ export const ALL_TYPES: FireType[] = [0, 1, 2, 3]
 
 export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const
 
+export const MVP_YEAR = 2008
+
 export const DEFAULT_FILTERS: Filters = {
-  region: 'italy',
-  sensor: 'modis',
-  year: 2008,
+  year: MVP_YEAR,
   month: null,
+  area: null,
   types: ALL_TYPES,
   hideNoise: false,
+  daynight: null,
 }
