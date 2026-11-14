@@ -60,8 +60,24 @@ class PG:
         cls.sql(None, stdin=SCHEMA.read_text())
 
     @classmethod
-    def insert_hotspots(cls, rows):
-        """rows: dicts with any hotspots columns; sensible defaults for the rest."""
+    def reset_hotspots_only(cls):
+        """Re-create just the hotspots table (after a DROP TABLE hotspots CASCADE in a test)."""
+        cls.sql(None, stdin=SCHEMA.read_text())
+
+    @classmethod
+    def insert_hotspots(cls, rows, country=None):
+        """rows: dicts with any hotspots columns; sensible defaults for the rest.
+        country: ISO3 written to hotspot_country for these rows (None = leave them without a country)."""
+        before = int(cls.sql("SELECT coalesce(max(id), 0) FROM hotspots"))
+        cls._copy_hotspots(rows)
+        if country is not None:
+            import country as ctry
+            ctry.ensure_table(cls.psql())
+            cls.sql(f"INSERT INTO hotspot_country (hotspot_id, country, how) "
+                    f"SELECT id, '{country}', 'f' FROM hotspots WHERE id > {before}")
+
+    @classmethod
+    def _copy_hotspots(cls, rows):
         base = dict(latitude=41.0, longitude=12.0, brightness=310, scan=1, track=1, acq_date="2015-07-01",
                     acq_time=1230, satellite="Aqua", instrument="MODIS", confidence="80", version="6.2",
                     frp=10.0, daynight="D", type=0)

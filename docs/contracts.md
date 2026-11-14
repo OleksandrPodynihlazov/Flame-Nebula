@@ -48,13 +48,15 @@ How to build: `docs/data-sources.md` → *Harmonize*. Method and evidence: `rese
 | `coverage(satellite, day, status, note)` | table | `status` ∈ `ok`/`partial`/`missing` per satellite × UTC day. **Draw non-ok days as "no data", never as 0.** |
 | `static_mask(cell_lat, cell_lon, category, core, qualifying_years)` | table | Industrial sites / flares (`static`) and `volcano` cells, grid `floor(deg*100)`, built from S-NPP. |
 | `hotspots_flagged` | view | `hotspots` + `mask_category` + `is_burning` (= not masked and `type` ≠ 3; NULL `type` counts as land). **Count burning activity with `WHERE is_burning`.** Map/CSV can show all rows with the flag. |
-| `calibration` | table | Per-month junction factors (J1 Terra→Aqua, J2 Aqua→S-NPP) for `count` and `frp`, with interquartile band. |
-| `calibration_chain(satellite, month, metric, factor, band_lo, band_hi)` | view | **Multiplier to S-NPP-equivalent units.** For any AOI and month: take the month's reference satellite, aggregate `is_burning` rows, multiply by `factor` (band: `band_lo`/`band_hi`). Aggregates only, never single points. |
-| `harmonized_monthly` | view | Italy-wide ready series: `month_start, satellite` (reference), `raw_count, raw_frp, count_snpp_eq, count_lo, count_hi, frp_snpp_eq, frp_lo, frp_hi, days_ok, days_partial, days_missing`. |
+| `hotspot_country(hotspot_id, country, how)` | table | ISO3 of every point (`how`: `f` archive file name, `r` level-0 region, `g` geometry). `country` NULL = outside the Europe scope: left out of every series. |
+| `calibration` | table | Junction factors J1 Terra→Aqua, J2 Aqua→S-NPP, J3 S-NPP→NOAA-20, **per country** (ISO3, `EUR` = pooled) × month (0 = all months) × metric (`count`, `frp`), with interquartile band. |
+| `calibration_chain(satellite, country, month, metric, factor, band_lo, band_hi, source)` | view | **Multiplier to S-NPP-equivalent units.** For any area and month: take the month's reference satellite, count its `is_burning` rows **per country** (`hotspot_country`), multiply each by that country's `factor`, add up. `source`: `country-month`, `country-all`, `eur-month`, `eur-all` (fallback used), `unit`. Aggregates only, never single points. |
+| `harmonized_monthly` | view | Ready series per `country` and `EUR` (= sum of countries): `country, month_start, satellite` (reference), `raw_count, raw_frp, count_snpp_eq, count_lo, count_hi, frp_snpp_eq, frp_lo, frp_hi, days_ok, days_partial, days_missing`. |
 | `fire_patterns(cell_lat, cell_lon, month, years_burned, years_observed, probability, median_count)` | table | **Recurring fires, for "what to expect this month".** Cell = `floor(deg*10)` (0.1°), `month` 1–12, S-NPP only, `is_burning` rows. `probability = years_burned / years_observed`; `median_count` = detections per burned year. Sparse: no row = 0 for that month. Never mix with MODIS (design: `docs/superpowers/specs/2026-11-14-fire-patterns-design.md`). |
 
-Reference satellite of a month = the newest one covering the **whole** month: Terra 2000-11 → 2002-07, Aqua 2002-08 → 2012-01,
-S-NPP 2012-02 →. Never sum satellites. Hotspot counts from the other satellites stay available for the map and CSV.
+Reference satellite of a month = the most preferred one covering the **whole** month (S-NPP, then NOAA-20, Aqua,
+Terra; list in `harmonize/platforms.py`): Terra 2000-11 → 2002-07, Aqua 2002-08 → 2012-01, S-NPP 2012-02 → 2026-10,
+NOAA-20 2026-11 →. Never sum satellites. Hotspot counts from the other satellites stay available for the map and CSV.
 
 ## [1b] harmonize/confidence → fire confidence per hotspot
 
