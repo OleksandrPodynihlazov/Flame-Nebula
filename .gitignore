@@ -1,0 +1,21 @@
+# data — never commit
+data/
+
+# env
+.env
+
+# python
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# node
+node_modules/
+dist/
+build/
+
+# os / editors
+.DS_Store
+.idea/
+.vscode/
