@@ -9,8 +9,17 @@ const CSV_COLUMNS = [
   'id', 'latitude', 'longitude', 'acq_date', 'acq_time', 'sensor',
   'satellite', 'daynight', 'frp', 'confidence', 'type',
 ];
-const ITALY_BBOX = { lonMin: 6, lonMax: 19, latMin: 35, latMax: 48 };
 const YEAR_2008 = { from: '2008-01-01', to: '2008-12-31' };
+const ROME_CIRCLE = { lat: 41.9, lon: 12.5, radius_km: 300 };
+// Same Earth radius as the API's haversine filter (api/lib/query.js).
+const EARTH_RADIUS_KM = 6371;
+
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const rad = (deg) => (deg * Math.PI) / 180;
+  const a = Math.sin(rad(lat2 - lat1) / 2) ** 2
+    + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(rad(lon2 - lon1) / 2) ** 2;
+  return 2 * EARTH_RADIUS_KM * Math.asin(Math.sqrt(a));
+}
 
 async function getJson(request, path, params) {
   const res = await request.get(path, { params });
@@ -60,18 +69,17 @@ test.describe('GET /api/calendar', () => {
 });
 
 test.describe('GET /api/hotspots', () => {
-  test('returns a GeoJSON FeatureCollection of points in Italy', async ({ request }) => {
-    const body = await getJson(request, '/api/hotspots', YEAR_2008);
+  test('returns a GeoJSON FeatureCollection of points inside the requested circle', async ({ request }) => {
+    const body = await getJson(request, '/api/hotspots', { ...YEAR_2008, ...ROME_CIRCLE });
     expect(body.type).toBe('FeatureCollection');
     expect(Array.isArray(body.features)).toBe(true);
     for (const feature of body.features) {
       expect(feature.type).toBe('Feature');
       expect(feature.geometry.type).toBe('Point');
       const [lon, lat] = feature.geometry.coordinates;
-      expect(lon).toBeGreaterThanOrEqual(ITALY_BBOX.lonMin);
-      expect(lon).toBeLessThanOrEqual(ITALY_BBOX.lonMax);
-      expect(lat).toBeGreaterThanOrEqual(ITALY_BBOX.latMin);
-      expect(lat).toBeLessThanOrEqual(ITALY_BBOX.latMax);
+      // Small tolerance for float rounding of the returned coordinates.
+      expect(haversineKm(ROME_CIRCLE.lat, ROME_CIRCLE.lon, lat, lon))
+        .toBeLessThanOrEqual(ROME_CIRCLE.radius_km * 1.001);
     }
   });
 
