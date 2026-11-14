@@ -80,6 +80,9 @@ jobs:
           test "$code" = "401"
 
   e2e:
+    # After deploy, not beside it: infra/deploy.sh may recreate the gateway after the API already reports the
+    # new version, and tests run in that window got 502s.
+    needs: deploy
     runs-on: ubuntu-latest
     timeout-minutes: 12
     defaults:
@@ -115,9 +118,17 @@ jobs:
         if: steps.pw-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps --only-shell chromium
 
-      - name: Install Chromium system deps (browser restored from cache)
+      # The runner image already has Chromium's libraries; install-deps on a cache hit only added fonts, and the
+      # tests check text and status, not pixels. Fall back to apt only when the cached browser does not start.
+      - name: Check cached Chromium launches (install system deps only if not)
         if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium-headless-shell
+        run: |
+          if node -e "require('@playwright/test').chromium.launch().then(b => b.close())"; then
+            echo "cached Chromium launches -> skipped install-deps"
+          else
+            echo "missing system libs -> installed deps"
+            npx playwright install-deps chromium-headless-shell
+          fi
 
       - name: Wait for this commit to be live
         env:
