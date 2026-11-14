@@ -18,8 +18,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
     volumes:
       - pgdata:/var/lib/postgresql/data
-      # db teammate: mount schema/load scripts here, they run on first start of an empty volume:
-      # - ./db/init:/docker-entrypoint-initdb.d:ro
+      # Runs only on first start of an EMPTY volume (CI, new laptops). An existing DB needs the change applied by hand.
+      - ./db/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
