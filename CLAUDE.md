@@ -21,8 +21,10 @@ FIRMS CSV ─▶ harmonize/ ─▶ data/processed/*.csv ─▶ db/ (Postgres + a
 | `web/` | React, plain JavaScript | Map, area picker, calendar, stats, CSV download |
 | `data/` | — | `raw/` and `processed/`, both gitignored |
 | `docs/` | Markdown | Specs everyone follows |
+| `e2e/` | Playwright, plain JavaScript | DevOps: tests against the live site and the PR stack |
+| `infra/`, `.github/` | Docker Compose, nginx, bash, GitHub Actions | DevOps: compose stubs, nginx, deploy script, CI/deploy workflows |
 
-Run everything with `docker compose up` from the repo root. Secrets and ports go in `.env` (copy `.env.example`); `.env` is never committed.
+Run everything with `docker compose up --build` from the repo root, then open http://localhost:8090 (setup in `docs/deploy.md`). Secrets and ports go in `.env` (copy `.env.example`); `.env` is never committed.
 
 ## Docs — read before you touch the matching area
 
@@ -30,6 +32,7 @@ Run everything with `docker compose up` from the repo root. Secrets and ports go
 - `docs/data-sources.md` — before reading FIRMS data: download links, column meanings, `type` codes, Terra/Aqua and day/night.
 - `docs/challenge.md` — before adding a feature: challenge asks and our Must/Should/Could list. Build Must first.
 - `docs/workflow.md` — before branching, committing, or opening a PR.
+- `docs/deploy.md` — before changing `docker-compose.yml`, a Dockerfile, ports, or anything under `infra/` or `.github/`.
 
 ## Conventions
 
@@ -40,6 +43,7 @@ Run everything with `docker compose up` from the repo root. Secrets and ports go
 - **Coordinates:** WGS84 decimal degrees, order `latitude, longitude` in CSV and JSON fields; GeoJSON uses `[longitude, latitude]` as its spec requires.
 - **Raw data:** never commit files from `data/`. Document how to fetch a file in `docs/data-sources.md` instead.
 - **Python deps:** add to `harmonize/requirements.txt` with a pinned version (`pandas==2.2.3`).
+- **New endpoint or UI feature:** unfix or add its test in `e2e/tests/` in the same PR.
 - **Commits and PRs carry human authors only** — no AI attribution trailers or footers.
 
 ## Not decided yet — ask the owner, do not invent

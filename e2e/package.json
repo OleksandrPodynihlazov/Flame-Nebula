@@ -1,0 +1,13 @@
+{
+  "name": "flame-nebula-e2e",
+  "private": true,
+  "type": "commonjs",
+  "description": "Playwright end-to-end tests for the live site and the PR stack",
+  "scripts": {
+    "test": "playwright test",
+    "test:local": "playwright test --grep-invert @prod"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1"
+  }
+}
