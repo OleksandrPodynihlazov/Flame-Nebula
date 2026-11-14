@@ -155,6 +155,7 @@ After loading the data, run in this order. Each step rebuilds its own tables/vie
 safe. `--until` = the last day with data (yesterday).
 
 ```sh
+python3 harmonize/canonical.py       # view hotspots_canonical: confidence_level / platform for both sensors
 python3 harmonize/coverage_table.py --until <yesterday>   # coverage: satellite × day ok/partial/missing (research/07 §6)
 python3 harmonize/static_mask.py      # static_mask + view hotspots_flagged
 python3 harmonize/calibrate.py        # per-country factors + calibration_chain, harmonized_monthly; prints EUR factors
