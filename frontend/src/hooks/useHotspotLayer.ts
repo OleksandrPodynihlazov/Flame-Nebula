@@ -4,7 +4,7 @@ import { flushSync } from 'react-dom'
 import { createRoot } from 'react-dom/client'
 import { useMap } from 'react-leaflet'
 import { HotspotPopup } from '../components/HotspotPopup'
-import { FIRE_TYPES, SENSORS } from '../constants/fire'
+import { FIRE_TYPES, SENSORS, typeMeta } from '../constants/fire'
 import type { FireType, HotspotProperties, Sensor } from '../types/api'
 import { abbreviateCount, bubbleRadius } from '../utils/clusters'
 import { cellBounds } from '../utils/viewport'
@@ -31,11 +31,11 @@ interface Hit {
 }
 
 /** Same look as the old <CircleMarker>: type color, dark 0.5 px stroke. */
-function drawDot(ctx: CanvasRenderingContext2D, d: Hit, type: FireType, sensor: Sensor) {
+function drawDot(ctx: CanvasRenderingContext2D, d: Hit, type: FireType | null, sensor: Sensor) {
   ctx.beginPath()
   ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2)
   ctx.globalAlpha = sensor === 'VIIRS' ? 0.95 : 0.75
-  ctx.fillStyle = FIRE_TYPES[type].color
+  ctx.fillStyle = typeMeta(type).color
   ctx.fill()
   ctx.globalAlpha = 0.9
   ctx.lineWidth = 0.5

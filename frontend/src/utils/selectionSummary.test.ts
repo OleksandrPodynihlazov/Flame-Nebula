@@ -4,7 +4,7 @@ import { circleRing, selectionGeoJson } from './selectionExport'
 import { areaKm2, formatAreaKm2, selectionSummary } from './selectionSummary'
 
 let nextId = 1
-function dot(acq_date: string, opts: { frp?: number | null; type?: FireType; daynight?: DayNight } = {}): HotspotFeature {
+function dot(acq_date: string, opts: { frp?: number | null; type?: FireType | null; daynight?: DayNight } = {}): HotspotFeature {
   const id = nextId++
   return {
     type: 'Feature',
@@ -20,7 +20,7 @@ function dot(acq_date: string, opts: { frp?: number | null; type?: FireType; day
       daynight: opts.daynight ?? 'D',
       frp: opts.frp === undefined ? 10 : opts.frp,
       confidence: 80,
-      type: opts.type ?? 0,
+      type: opts.type === undefined ? 0 : opts.type,
     },
   }
 }
@@ -52,6 +52,12 @@ describe('formatAreaKm2', () => {
 })
 
 describe('selectionSummary', () => {
+  it('counts unclassified hotspots in the total but not by type', () => {
+    const s = selectionSummary(BOX, [dot('2008-07-01', { type: null }), dot('2008-07-02', { type: 0 })])
+    expect(s.count).toBe(2)
+    expect(s.byType).toEqual({ 0: 1, 1: 0, 2: 0, 3: 0 })
+  })
+
   it('handles no hotspots', () => {
     const s = selectionSummary(BOX, [])
     expect(s.count).toBe(0)

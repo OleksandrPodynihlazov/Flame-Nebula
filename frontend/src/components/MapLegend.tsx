@@ -1,4 +1,4 @@
-import { ALL_TYPES, FIRE_TYPES, SENSORS } from '../constants/fire'
+import { ALL_TYPES, FIRE_TYPES, SENSORS, UNCLASSIFIED } from '../constants/fire'
 import type { Sensor } from '../types/api'
 
 function LegendList({ sensors }: { sensors: Sensor[] }) {
@@ -14,6 +14,13 @@ function LegendList({ sensors }: { sensors: Sensor[] }) {
             </span>
           </li>
         ))}
+        <li className="flex items-center gap-2">
+          <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: UNCLASSIFIED.color }} />
+          <span className="text-slate-200">
+            <strong className="font-mono text-slate-400">–</strong> {UNCLASSIFIED.label}
+            <span className="text-slate-500"> · NRT</span>
+          </span>
+        </li>
       </ul>
       <ul className="space-y-1.5 border-t border-slate-800/80 pt-2 text-[11px]">
         {sensors.map((s) => (
