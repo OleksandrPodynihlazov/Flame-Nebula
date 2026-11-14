@@ -3,7 +3,8 @@
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const NUMBER_RE = /^[+-]?(\d+\.?\d*|\.\d+)$/;
-const TYPE_LIST_RE = /^\d{1,3}(,\d{1,3})*$/;
+const TYPE_LIST_RE = /^[0-3](,[0-3])*$/;
+const SENSORS = ["MODIS", "VIIRS"];
 // 200 points keeps the GET url under nginx's default 8 KB header limit (docs/contracts.md [3]).
 export const MAX_POLYGON_VERTICES = 200;
 export const ONE_AREA = "Send one area: region, polygon or circle";
@@ -69,11 +70,13 @@ function parsePolygon(raw) {
   return ring;
 }
 
-// Returns { from, to, circle, polygon, region, daynight, types }. Missing params are undefined / null.
+// Returns { from, to, circle, polygon, region, daynight, types, sensors }. Missing params are undefined / null.
 // A polygon overrides a circle (the frontend never sends both). A region (id from /api/regions) cannot be
 // combined with a polygon or a circle: that is a 400.
 export function parseFilters(query) {
-  const f = { from: undefined, to: undefined, circle: null, polygon: null, region: null, daynight: null, types: null };
+  const f = {
+    from: undefined, to: undefined, circle: null, polygon: null, region: null, daynight: null, types: null, sensors: null,
+  };
 
   const from = single(query, "from");
   const to = single(query, "to");
@@ -121,8 +124,18 @@ export function parseFilters(query) {
 
   const type = single(query, "type");
   if (type !== undefined) {
-    if (!TYPE_LIST_RE.test(type)) throw httpError("type must be a comma list of numbers, e.g. 0,2");
+    if (!TYPE_LIST_RE.test(type)) throw httpError("type must be a comma list of 0, 1, 2, 3, e.g. 0,2");
     f.types = type.split(",").map(Number);
+  }
+
+  // sensor (contract [3]) = instrument column in the DB. The frontend always sends it.
+  const sensor = single(query, "sensor");
+  if (sensor !== undefined) {
+    const sensors = sensor.split(",");
+    if (!sensors.every((s) => SENSORS.includes(s))) {
+      throw httpError(`sensor must be a comma list of ${SENSORS.join(", ")}`);
+    }
+    f.sensors = sensors;
   }
 
   return f;
@@ -141,6 +154,7 @@ export function buildWhere(f) {
   if (f.to) conds.push(`acq_date <= ${add(f.to)}`);
   if (f.daynight) conds.push(`daynight = ${add(f.daynight)}`);
   if (f.types) conds.push(`type = ANY(${add(f.types)}::smallint[])`);
+  if (f.sensors) conds.push(`instrument = ANY(${add(f.sensors)}::text[])`);
 
   if (f.circle) {
     const { lat, lon, radiusKm } = f.circle;
@@ -150,11 +164,18 @@ export function buildWhere(f) {
     const c = add(lat);
     const d = add(lon);
     const r = add(radiusKm);
+    // Longitude box too, but only while it stays inside ±180 (no wrap at the antimeridian).
+    const dLon = dLat / Math.max(Math.cos((lat * Math.PI) / 180), 0.01);
+    const lonBox =
+      lon - dLon >= -180 && lon + dLon <= 180
+        ? ` AND longitude BETWEEN ${add(lon - dLon)} AND ${add(lon + dLon)}`
+        : "";
     // Bounding box first (cheap, indexed), then exact great-circle distance.
+    // LEAST(1, ...) keeps asin() in range when float rounding gives 1.0000000001.
     conds.push(
-      `latitude BETWEEN ${latLo} AND ${latHi}` +
-        ` AND 2 * 6371 * asin(sqrt(power(sin(radians(latitude - ${c}) / 2), 2)` +
-        ` + cos(radians(${c})) * cos(radians(latitude)) * power(sin(radians(longitude - ${d}) / 2), 2))) <= ${r}`
+      `latitude BETWEEN ${latLo} AND ${latHi}${lonBox}` +
+        ` AND 2 * 6371 * asin(sqrt(LEAST(1, power(sin(radians(latitude - ${c}) / 2), 2)` +
+        ` + cos(radians(${c})) * cos(radians(latitude)) * power(sin(radians(longitude - ${d}) / 2), 2)))) <= ${r}`
     );
   }
 

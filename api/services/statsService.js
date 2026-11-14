@@ -17,7 +17,8 @@ export async function getStats(filters) {
   const result = { total: 0, by_type: {}, by_daynight: {} };
   for (const { type, daynight, count } of rows) {
     result.total += count;
-    result.by_type[type] = (result.by_type[type] ?? 0) + count;
+    // type is NULL for FIRMS API rows (contract [2]): counted in total, not in by_type.
+    if (type !== null) result.by_type[type] = (result.by_type[type] ?? 0) + count;
     if (daynight) result.by_daynight[daynight] = (result.by_daynight[daynight] ?? 0) + count;
   }
   return result;

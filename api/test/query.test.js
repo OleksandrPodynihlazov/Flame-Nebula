@@ -53,3 +53,20 @@ test("buildWhere: polygon keeps the exact form that uses the GiST index", () => 
   const { where } = buildWhere(parseFilters({ polygon: "[[1,1],[2,1],[2,2]]" }));
   assert.match(where, /point\(longitude, latitude\) <@ \$1::polygon/);
 });
+
+test("sensor: a comma list of MODIS and VIIRS, bound as instrument = ANY($n)", () => {
+  assert.equal(parseFilters({}).sensors, null);
+  assert.deepEqual(parseFilters({ sensor: "MODIS,VIIRS" }).sensors, ["MODIS", "VIIRS"]);
+  bad({ sensor: "modis" }, /sensor/);
+  bad({ sensor: "MODIS,,VIIRS" }, /sensor/);
+  bad({ sensor: "GOES" }, /sensor/);
+  const { where, params } = buildWhere(parseFilters({ from: "2008-01-01", sensor: "VIIRS" }));
+  assert.match(where, /instrument = ANY\(\$2::text\[\]\)/);
+  assert.deepEqual(params, ["2008-01-01", ["VIIRS"]]);
+});
+
+test("type: only 0-3", () => {
+  assert.deepEqual(parseFilters({ type: "0,2" }).types, [0, 2]);
+  bad({ type: "7" }, /type/);
+  bad({ type: "0;DROP TABLE hotspots" }, /type/);
+});

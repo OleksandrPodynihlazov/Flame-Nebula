@@ -103,6 +103,8 @@ test.describe('query validation', () => {
     ['from=not-a-date', { from: 'not-a-date', to: '2008-12-31' }],
     ['malformed polygon JSON', { polygon: '[[12.1,41.8],[12.9,41.8' }],
     ['polygon with < 3 points', { polygon: '[[12.1,41.8],[12.9,41.8]]' }],
+    ['type=7', { type: '7' }],
+    ['sensor=GOES', { sensor: 'GOES' }],
     ['polygon with 201 points', {
       // 5 decimals, as the frontend sends them: full-precision floats would hit nginx's 8 KB URL limit (HTML 414)
       polygon: JSON.stringify(Array.from({ length: 201 }, (_, i) => [
