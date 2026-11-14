@@ -97,8 +97,27 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Read Playwright version
+        id: pw
+        run: |
+          v="$(node -p "require('./package-lock.json').packages['node_modules/playwright-core']?.version ?? ''")"
+          test -n "$v" || { echo "playwright-core version not found in package-lock.json" >&2; exit 1; }
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+
       - name: Install Chromium
+        if: steps.pw-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps --only-shell chromium
+
+      - name: Install Chromium system deps (browser restored from cache)
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium-headless-shell
 
       - name: Wait for this commit to be live
         env:

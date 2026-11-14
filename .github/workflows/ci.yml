@@ -33,9 +33,36 @@ jobs:
           cache: npm
           cache-dependency-path: e2e/package-lock.json
 
-      - name: Build and start stack (e2e deps and Chromium install in background)
+      - name: Read Playwright version
+        id: pw
         run: |
-          ( cd e2e && npm ci && npx playwright install --with-deps --only-shell chromium ) > /tmp/e2e-install.log 2>&1 &
+          v="$(node -p "require('./e2e/package-lock.json').packages['node_modules/playwright-core']?.version ?? ''")"
+          test -n "$v" || { echo "playwright-core version not found in e2e/package-lock.json" >&2; exit 1; }
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+
+      - name: Build and start stack (e2e deps and Chromium install in background)
+        env:
+          PW_CACHE_HIT: ${{ steps.pw-cache.outputs.cache-hit }}
+        run: |
+          (
+            set -e
+            start=$SECONDS
+            cd e2e
+            npm ci
+            if [ "$PW_CACHE_HIT" = "true" ]; then
+              npx playwright install-deps chromium-headless-shell
+            else
+              npx playwright install --with-deps --only-shell chromium
+            fi
+            echo "e2e install took $((SECONDS - start))s (browser cache hit: ${PW_CACHE_HIT:-false})"
+          ) > /tmp/e2e-install.log 2>&1 &
           pw=$!
           docker compose build
           APP_VERSION=ci docker compose up -d
