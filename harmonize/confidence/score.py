@@ -4,7 +4,9 @@ from dataclasses import dataclass
 
 from confidence import config
 
-SUPPORT_LEVELS = ("L3", "L5", "L6", "L8")   # independent support that vetoes an L4 urban/water override
+SUPPORT_LEVELS = ("L3", "L5", "L6", "L8")   # independent support that vetoes an L4 water override
+# Urban land cover is always excluded: fires in cities are outside the research scope (user decision 2026-11-14),
+# even when independent evidence confirms that something burned there.
 
 
 @dataclass
@@ -28,8 +30,10 @@ def _class(score, sig, rsn):
         if r.startswith("volcano"):
             return "non_fire:volcano"
         return "non_fire:offshore" if r == "offshore" else "non_fire:static"
-    if sig["L4"] < 0 and rsn["L4"] in ("urban", "water") and not any(sig[l] > 0 for l in SUPPORT_LEVELS):
-        return "non_fire:urban" if rsn["L4"] == "urban" else "non_fire:offshore"
+    if sig["L4"] < 0 and rsn["L4"] == "urban":
+        return "non_fire:urban"
+    if sig["L4"] < 0 and rsn["L4"] == "water" and not any(sig[l] > 0 for l in SUPPORT_LEVELS):
+        return "non_fire:offshore"
     for name, threshold in config.CLASS_THRESHOLDS:
         if score >= threshold:
             return name

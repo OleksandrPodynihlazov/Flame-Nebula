@@ -106,7 +106,8 @@ def _markdown(d):
         "",
         "Score = 50 + Σ(weight × signal), clamped 0–100. Missing evidence never lowers the score. "
         "Classes: confirmed ≥80, likely 60–79, unverified 40–59, doubtful <40; `non_fire:*` when a level shows "
-        "the heat is a volcano, a persistent industrial source, offshore, or urban/water without independent support.",
+        "the heat is a volcano, a persistent industrial source, offshore, water without independent support, or in a "
+        "city (urban land cover; fires in cities are outside the scope of this study and are always excluded).",
         "",
         "## Non-fire breakdown",
         "",

@@ -41,14 +41,23 @@ class ScoreTest(unittest.TestCase):
         s["L4"] = {K: (-1, "bare")}
         self.assertEqual(score.combine(s)[K].score, 40)
 
-    def test_score_urban_override_only_without_support(self):
+    def test_score_urban_always_out_of_scope(self):
+        # Fires in cities are outside the research scope: urban land cover excludes the hotspot even when
+        # independent evidence says it really burned.
         s = na_all()
         s["L4"] = {K: (-1, "urban")}
         self.assertEqual(score.combine(s)[K].cls, "non_fire:urban")
         s["L6"] = {K: (1, "effis:1:100ha")}
+        s["L3"] = {K: (1, "xsensor:snpp")}
         r = score.combine(s)[K]
-        self.assertEqual(r.cls, "likely")
-        self.assertEqual(r.score, 65)
+        self.assertEqual(r.cls, "non_fire:urban")
+        self.assertEqual(r.score, 80)   # the score still records the evidence
+
+    def test_score_water_override_only_without_support(self):
+        s = na_all()
+        s["L4"] = {K: (-1, "water")}
+        s["L6"] = {K: (1, "effis:1:100ha")}
+        self.assertEqual(score.combine(s)[K].cls, "likely")
 
     def test_score_water_is_offshore(self):
         s = na_all()

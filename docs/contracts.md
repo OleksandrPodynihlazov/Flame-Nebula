@@ -61,7 +61,7 @@ File `data/processed/hotspot_confidence.csv` and table `hotspot_confidence` (DDL
 | `event_id` | text | Fire event the hotspot belongs to (`fire_events.csv`) |
 | `l0` … `l8` | smallint −1/0/1 | Per-level signal: refutes / no information / supports |
 | `score` | smallint 0–100 | 50 + Σ weight × signal. 50 = no evidence either way |
-| `class` | text | `confirmed` ≥80 · `likely` 60–79 · `unverified` 40–59 · `doubtful` <40 · `non_fire:volcano/static/offshore/urban` |
+| `class` | text | `confirmed` ≥80 · `likely` 60–79 · `unverified` 40–59 · `doubtful` <40 · `non_fire:volcano/static/offshore/urban`. `non_fire:urban` = city land cover, always excluded (fires in cities are out of scope), whatever the score |
 | `reasons` | text | `L1:static;L3:xsensor:snpp;L6:effis:123:450ha` — human-readable evidence |
 | `worldview_url` | text | NASA Worldview link: detection day vs 10 days earlier, swipe compare |
 

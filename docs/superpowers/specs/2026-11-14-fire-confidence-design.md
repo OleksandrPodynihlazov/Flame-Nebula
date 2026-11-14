@@ -87,7 +87,8 @@ run for a row (era, service down, not in subset) emits 0 with reason `n/a:<why>`
 
 **Score:** `score = clamp(50 + Σ weight·signal, 0, 100)`. Default with no evidence = 50.
 **Class**, in order:
-1. `non_fire:<volcano|static|offshore|urban>` if L1 refutes, or L4 says urban/water **and** nothing in L3/L5/L6/L8 supports;
+1. `non_fire:<volcano|static|offshore|urban>` if L1 refutes; or L4 says **urban** (always — fires in cities are
+   out of scope, user decision 2026-11-14); or L4 says water **and** nothing in L3/L5/L6/L8 supports;
 2. otherwise `confirmed` ≥ 80, `likely` 60–79, `unverified` 40–59, `doubtful` < 40.
 
 Weights live in one config module, so they can be tuned without touching the levels.
