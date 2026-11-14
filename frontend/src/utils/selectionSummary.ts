@@ -47,7 +47,7 @@ export function selectionSummary(area: Area, features: readonly HotspotFeature[]
   let lastDate: string | null = null
 
   for (const { properties: p } of features) {
-    byType[p.type]++
+    if (p.type !== null) byType[p.type]++
     byDaynight[p.daynight]++
     if (p.frp !== null) {
       frpSum += p.frp

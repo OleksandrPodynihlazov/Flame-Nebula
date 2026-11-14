@@ -78,3 +78,16 @@ body {
     top: 46px;
   }
 }
+
+@media (max-width: 1023px) {
+  .compare-mode .leaflet-bottom {
+    bottom: 160px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .leaflet-bottom.leaflet-right {
+    right: var(--panel-inset, 0px);
+    transition: right 200ms;
+  }
+}

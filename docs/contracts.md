@@ -171,8 +171,8 @@ Unknown `region` id → 400. No area given → all loaded data (currently Europe
 | Method + path | Returns |
 |---|---|
 | `GET /api/hotspots` | GeoJSON `FeatureCollection` of points; properties = CSV columns |
-| `GET /api/stats` | `{ "total": 6689, "by_type": { "0": 6473, ... }, "by_daynight": { "D": 5821, "N": 868 } }` |
-| `GET /api/calendar` | `{ "days": [ { "date": "2008-08-14", "count": 42 }, ... ] }` |
+| `GET /api/stats` | `{ "total": 6689, "frp_sum": 184532.7, "by_type": { "0": 6473, ... }, "by_daynight": { "D": 5821, "N": 868 } }`. `frp_sum`: summed FRP (MW), 1 decimal; rows with no FRP add 0 |
+| `GET /api/calendar` | `{ "days": [ { "date": "2008-08-14", "count": 42, "frp": 1290.4 }, ... ] }`. `frp`: summed FRP (MW) of the day, 1 decimal |
 | `GET /api/hotspots/grid` | Hotspots counted per grid cell, for the zoomed-out map. See below |
 | `GET /api/hotspots.csv` | CSV download, same columns as [1] |
 | `GET /api/regions` | `{ "regions": [ { "id": 812, "name": "Sicilia", "level": 2, "country": "ITA", "parent_id": 77, "path": "Italy › Isole" } ] }`. No params → countries (level 0, `path` `""`); `?parent=<id>` → its children; `?q=<text>` → name search, 2–100 chars, case- and accent-insensitive, prefix matches first, max 20. `q` with `parent` → 400. Sorted by name. Not loaded yet → `"regions": []` |
@@ -221,7 +221,7 @@ Responses:
 |---|---|
 | `GET /api/hotspots` | `FeatureCollection`, coordinates `[lon, lat]`. `properties` use the [1] column names and types (not [2]): `sensor`, `acq_time` as 4-digit string, `confidence` as integer. Only `frp` and `confidence` may be `null`. No match → `"features": []` |
 | `GET /api/hotspots/grid` | Shape as above. No match → `"cells": []` |
-| `GET /api/stats` | Shape as above. No match → `{ "total": 0, "by_type": {}, "by_daynight": {} }` |
+| `GET /api/stats` | Shape as above. No match → `{ "total": 0, "frp_sum": 0, "by_type": {}, "by_daynight": {} }` |
 | `GET /api/calendar` | Days sorted by `date` ascending; days with count 0 omitted. No match → `{ "days": [] }` |
 | `GET /api/hotspots.csv` | `Content-Type: text/csv`, `Content-Disposition: attachment; filename="hotspots_<from>_<to>.csv"` |
 

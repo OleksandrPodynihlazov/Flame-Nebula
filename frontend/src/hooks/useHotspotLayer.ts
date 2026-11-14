@@ -4,7 +4,7 @@ import { flushSync } from 'react-dom'
 import { createRoot } from 'react-dom/client'
 import { useMap } from 'react-leaflet'
 import { HotspotPopup } from '../components/HotspotPopup'
-import { FIRE_TYPES, SENSORS } from '../constants/fire'
+import { FIRE_TYPES, SENSORS, typeMeta } from '../constants/fire'
 import type { FireType, HotspotProperties, Sensor } from '../types/api'
 import { abbreviateCount, bubbleRadius } from '../utils/clusters'
 import { cellBounds } from '../utils/viewport'
@@ -31,11 +31,11 @@ interface Hit {
 }
 
 /** Same look as the old <CircleMarker>: type color, dark 0.5 px stroke. */
-function drawDot(ctx: CanvasRenderingContext2D, d: Hit, type: FireType, sensor: Sensor) {
+function drawDot(ctx: CanvasRenderingContext2D, d: Hit, type: FireType | null, sensor: Sensor) {
   ctx.beginPath()
   ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2)
   ctx.globalAlpha = sensor === 'VIIRS' ? 0.95 : 0.75
-  ctx.fillStyle = FIRE_TYPES[type].color
+  ctx.fillStyle = typeMeta(type).color
   ctx.fill()
   ctx.globalAlpha = 0.9
   ctx.lineWidth = 0.5
@@ -84,9 +84,15 @@ class HotspotCanvasLayer extends L.Layer {
   private popupId: number | null = null
   private dimmed = false
   private mobile = false
+  private readonly paneName: string
+
+  constructor(paneName: string) {
+    super()
+    this.paneName = paneName
+  }
 
   onAdd(map: L.Map): this {
-    const pane = map.getPane(HOTSPOT_PANE) ?? map.createPane(HOTSPOT_PANE)
+    const pane = map.getPane(this.paneName) ?? map.createPane(this.paneName)
     pane.style.zIndex = '450'
     // Dimmed on the pane: an inline transition on the canvas would override Leaflet's zoom-animation transition.
     pane.style.transition = 'opacity 150ms'
@@ -289,29 +295,29 @@ class HotspotCanvasLayer extends L.Layer {
  * Draws `data` on the map: grid bubbles (below SINGLE_DOT_ZOOM) or single dots. The layer is created
  * once per map and removed on unmount, so StrictMode's double mount leaves exactly one.
  */
-export function useHotspotLayer(data: MapData | null, dimmed: boolean, mobile: boolean) {
+export function useHotspotLayer(data: MapData | null, dimmed: boolean, mobile: boolean, pane: string = HOTSPOT_PANE) {
   const map = useMap()
   const layerRef = useRef<HotspotCanvasLayer | null>(null)
 
   useEffect(() => {
-    const layer = new HotspotCanvasLayer().addTo(map)
+    const layer = new HotspotCanvasLayer(pane).addTo(map)
     layerRef.current = layer
     return () => {
       layer.remove()
       layerRef.current = null
     }
-  }, [map])
+  }, [map, pane])
 
   // These depend on `map` too, so they re-apply to a layer re-created by the effect above.
   useEffect(() => {
     layerRef.current?.setData(data)
-  }, [map, data])
+  }, [map, pane, data])
 
   useEffect(() => {
     layerRef.current?.setDimmed(dimmed)
-  }, [map, dimmed])
+  }, [map, pane, dimmed])
 
   useEffect(() => {
     layerRef.current?.setMobile(mobile)
-  }, [map, mobile])
+  }, [map, pane, mobile])
 }

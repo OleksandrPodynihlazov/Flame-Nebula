@@ -54,3 +54,17 @@ export function selectionLabel(f: Filters, long = false): string {
   if (f.month !== null) return `${names[f.month]} ${f.year}`
   return `Full year ${f.year}`
 }
+
+export function yearPatch(f: Filters, year: number): Partial<Filters> {
+  const kept = f.sensors.filter((s) => sensorAvailable(s, year))
+  return { year, month: null, date: null, sensors: kept.length ? kept : ['MODIS'] }
+}
+
+export function toggleMonthPatch(f: Filters, month: Month): Partial<Filters> {
+  return f.month === month && f.date === null ? { month: null, date: null } : { month, date: null }
+}
+
+export function toggleDatePatch(f: Filters, date: string): Partial<Filters> {
+  if (f.date === date) return { date: null }
+  return { month: (Number(date.slice(5, 7)) - 1) as Month, date }
+}

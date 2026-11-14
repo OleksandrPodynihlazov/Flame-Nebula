@@ -139,7 +139,7 @@ function filter(q: ApiQuery) {
   return dataset(q).filter(({ properties: p, geometry }) => {
     if (p.acq_date < q.from || p.acq_date > q.to) return false
     if (q.bbox && (p.latitude < south || p.latitude > north || p.longitude < west || p.longitude > east)) return false
-    if (types && !types.has(p.type)) return false
+    if (types && (p.type === null || !types.has(p.type))) return false
     if (q.daynight && p.daynight !== q.daynight) return false
     if (polygon) return inPolygon(geometry.coordinates, polygon)
     if (circle) return haversineKm(q.lat!, q.lon!, p.latitude, p.longitude) <= q.radius_km!
@@ -166,7 +166,7 @@ export function mockGrid(q: ApiQuery): Promise<GridResponse> {
     g.lat += p.latitude
     g.lon += p.longitude
     g.count++
-    g.types[p.type]++
+    if (p.type !== null) g.types[p.type]++
     groups.set(key, g)
   }
   const cells: GridCell[] = [...groups.values()].map((g) => {
@@ -178,18 +178,27 @@ export function mockGrid(q: ApiQuery): Promise<GridResponse> {
 }
 
 export function mockStats(q: ApiQuery): Promise<StatsResponse> {
-  const res: StatsResponse = { total: 0, by_type: {}, by_daynight: {} }
+  const res: StatsResponse = { total: 0, frp_sum: 0, by_type: {}, by_daynight: {} }
   for (const { properties: p } of filter(q)) {
     res.total++
-    res.by_type[`${p.type}`] = (res.by_type[`${p.type}`] ?? 0) + 1
+    res.frp_sum += p.frp ?? 0
+    if (p.type !== null) res.by_type[`${p.type}`] = (res.by_type[`${p.type}`] ?? 0) + 1
     res.by_daynight[p.daynight] = (res.by_daynight[p.daynight] ?? 0) + 1
   }
+  res.frp_sum = Math.round(res.frp_sum * 10) / 10
   return delay(res)
 }
 
 export function mockCalendar(q: ApiQuery): Promise<CalendarResponse> {
-  const counts = new Map<string, number>()
-  for (const { properties: p } of filter(q)) counts.set(p.acq_date, (counts.get(p.acq_date) ?? 0) + 1)
-  const days = [...counts].sort(([a], [b]) => a.localeCompare(b)).map(([date, count]) => ({ date, count }))
+  const byDay = new Map<string, { count: number; frp: number }>()
+  for (const { properties: p } of filter(q)) {
+    const d = byDay.get(p.acq_date) ?? { count: 0, frp: 0 }
+    d.count++
+    d.frp += p.frp ?? 0
+    byDay.set(p.acq_date, d)
+  }
+  const days = [...byDay]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, d]) => ({ date, count: d.count, frp: Math.round(d.frp * 10) / 10 }))
   return delay({ days })
 }

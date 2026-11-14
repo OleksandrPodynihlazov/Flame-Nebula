@@ -1,16 +1,16 @@
-import { FIRE_TYPES, SENSORS } from "../constants/fire";
+import { SENSORS, typeMeta } from "../constants/fire";
 import type { HotspotProperties } from "../types/api";
 
 /** Body of the popup that opens when a single hotspot dot is clicked. */
 export function HotspotPopup({ p }: { p: HotspotProperties }) {
-  const meta = FIRE_TYPES[p.type];
+  const meta = typeMeta(p.type);
   return (
     <div className="min-w-[190px] space-y-1.5 text-xs">
       <div
         className="border-b border-slate-700/80 pb-1 font-semibold"
         style={{ color: meta.color }}
       >
-        Type {p.type}: {meta.label}
+        {p.type === null ? meta.label : `Type ${p.type}: ${meta.label}`}
       </div>
       <dl className="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px]">
         <dt className="text-slate-400">Date (UTC)</dt>

@@ -138,7 +138,7 @@ export function SelectionPanel({ area, features: loaded, loading, error, fileTag
       aria-label="Selected area"
       data-testid="selection-panel"
       aria-busy={loading}
-      className="absolute top-14 right-14 left-12 z-20 flex max-h-[calc(100%-4.5rem)] flex-col overflow-hidden rounded-xl border border-slate-700/80 bg-slate-900/90 shadow-xl backdrop-blur-md lg:right-3 lg:left-auto lg:w-64"
+      className="absolute top-14 right-14 left-12 z-20 flex max-h-[calc(100%-4.5rem)] flex-col overflow-hidden rounded-xl border border-slate-700/80 bg-slate-900/90 shadow-xl backdrop-blur-md lg:right-[calc(var(--panel-inset,0px)+0.75rem)] lg:left-auto lg:w-64"
     >
       <div className="flex items-stretch lg:hidden">
         <button
