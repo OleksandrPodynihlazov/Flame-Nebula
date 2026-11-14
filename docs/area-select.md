@@ -6,7 +6,7 @@ Covers challenge.md Should #1 (location picker) and Could #2 (CSV with filters).
 
 ## What the user does
 
-1. Picks a tool on the map: **polygon** (click corners, click first corner to close), **rectangle** (drag), or **circle** (drag from center).
+1. Picks a tool on the map: **polygon** (click corners, click first corner to close), **rectangle** (click one corner, then the opposite corner), or **circle** (click the center, then the edge).
 2. The shape appears. The whole dashboard (stat cards, calendar, map dots, CSV) switches to that area.
 3. A floating **Selection card** opens in a map corner with the numbers below and export buttons.
 4. **Clear** removes the shape and returns to all of Italy.
@@ -71,7 +71,7 @@ Pin exact versions in `frontend/package.json`.
 ## Tests
 
 - Unit (pure functions): summary math — empty, all FRP null, ties, single point.
-- e2e (`e2e/tests/area-select.spec.js`): draw a rectangle by mouse drag on the map → card shows area > 0 → total hotspots on the stat card drops → Clear restores the full count. Runs against mocks (`VITE_USE_MOCKS=true` is the Dockerfile default, so mocks make no `/api` request). When the real API ships, add a check that `/api/hotspots` requests contain `polygon=`.
+- e2e (`e2e/tests/area-select.spec.js`): draw a rectangle (two clicks) on the map → card shows area > 0 → total hotspots on the stat card drops → Clear restores the full count. Runs against mocks (`VITE_USE_MOCKS=true` is the Dockerfile default, so mocks make no `/api` request). When the real API ships, add a check that `/api/hotspots` requests contain `polygon=`.
 
 ## Done when
 
