@@ -20,6 +20,10 @@ The e2e job then runs the Playwright suite in `e2e/` against the public URL. Its
 
 PRs into `main` run **CI** (`.github/workflows/ci.yml`): build the whole stack, wait for health, then run the e2e suite without `@prod` tests.
 
+Changes that touch only Markdown or `docs/` skip CI and Deploy.
+Frontend checks run only when `frontend/` changes.
+For a manual deploy, use **Run workflow** on the Deploy workflow in the Actions tab.
+
 Do not edit files on the VPS: its checkout is reset on every deploy.
 
 ## Logs
@@ -43,7 +47,7 @@ CI must be green before merge.
 
 ### web: built from `frontend/`
 
-`web` now builds from `frontend/` (`frontend/Dockerfile`: Node build stage, then nginx on port 80 with SPA fallback). CI also runs a separate `frontend` job: `npm ci`, `npm run lint`, `npm run build` in `frontend/`.
+`web` now builds from `frontend/` (`frontend/Dockerfile`: Node build stage, then nginx on port 80 with SPA fallback). The **Frontend** workflow (`.github/workflows/frontend.yml`) runs `npm ci`, `npm run lint`, `npm run build` in `frontend/`.
 
 The stub stays in `infra/stubs/web`. To fall back to it, change the `web` `build:` `context:` in `docker-compose.yml` from `./frontend` back to `./infra/stubs/web`.
 
