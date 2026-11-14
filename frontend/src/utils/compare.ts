@@ -26,3 +26,17 @@ export function formatPct(p: number | null): string {
   if (p === null) return '—'
   return `${p > 0 ? '+' : ''}${p}%`
 }
+
+const compact = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
+
+export function formatMW(mw: number): string {
+  return `${compact.format(mw)} MW`
+}
+
+export function peakIndex(values: readonly number[]): number | null {
+  let best: number | null = null
+  values.forEach((v, i) => {
+    if (v > 0 && (best === null || v > values[best])) best = i
+  })
+  return best
+}

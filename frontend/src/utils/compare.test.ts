@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_FILTERS, YEARS } from '../constants/fire'
-import { defaultCompareYears, filtersForYear, formatPct, pctChange } from './compare'
+import { defaultCompareYears, filtersForYear, formatMW, formatPct, pctChange, peakIndex } from './compare'
 
 describe('defaultCompareYears', () => {
   it('compares the year with the latest one', () => {
@@ -48,5 +48,22 @@ describe('pctChange', () => {
     expect(formatPct(25)).toBe('+25%')
     expect(formatPct(-3)).toBe('-3%')
     expect(formatPct(null)).toBe('—')
+  })
+})
+
+describe('formatMW', () => {
+  it('abbreviates large sums', () => {
+    expect(formatMW(184532.7)).toBe('184.5K MW')
+    expect(formatMW(950)).toBe('950 MW')
+  })
+})
+
+describe('peakIndex', () => {
+  it('finds the largest positive value', () => {
+    expect(peakIndex([1, 5, 3])).toBe(1)
+  })
+
+  it('has no peak when everything is zero', () => {
+    expect(peakIndex([0, 0])).toBeNull()
   })
 })

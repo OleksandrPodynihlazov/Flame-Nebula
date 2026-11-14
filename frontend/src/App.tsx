@@ -4,6 +4,7 @@ import { BurnCalendar } from './components/BurnCalendar'
 import { CompareBars } from './components/compare/CompareBars'
 import { CompareMiniStats, CompareStats, type CompareSideData } from './components/compare/CompareStats'
 import { HotspotMap } from './components/HotspotMap'
+import { MobileCalendar } from './components/MobileCalendar'
 import { MobileSheet } from './components/MobileSheet'
 import { MiniStats, StatCards } from './components/StatCards'
 import { Brand, FilterControls, SearchField, TopBar } from './components/TopBar'
@@ -13,16 +14,18 @@ import { useDashboardData } from './hooks/useDashboardData'
 import { useIsDesktop } from './hooks/useMediaQuery'
 import type { Area, Filters, HotspotFeature } from './types/api'
 import { buildGrid } from './utils/calendar'
-import { filtersForYear } from './utils/compare'
-import { activeSensors, selectionLabel } from './utils/filters'
+import { filtersForYear, formatMW } from './utils/compare'
+import { activeSensors, selectionLabel, toggleDatePatch, toggleMonthPatch, yearPatch } from './utils/filters'
 
 const NO_FEATURES: readonly HotspotFeature[] = []
+const PANEL_WIDTH = 600
 
 export default function App() {
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS)
   const [downloading, setDownloading] = useState(false)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const [panelOpen, setPanelOpen] = useState(true)
   const [compare, setCompare] = useState<CompareYears | null>(null)
   const isDesktop = useIsDesktop()
 
@@ -66,8 +69,8 @@ export default function App() {
       filters={filters}
       sensors={sensors}
       loading={calendar.loading}
-      onSelectMonth={(month) => update({ month, date: null })}
-      onSelectDate={(date) => update({ month: (Number(date.slice(5, 7)) - 1) as Filters['month'], date })}
+      onSelectMonth={(month) => update(toggleMonthPatch(filters, month))}
+      onSelectDate={(date) => update(toggleDatePatch(filters, date))}
       onClear={() => update({ month: null, date: null })}
     />
   )
@@ -78,7 +81,6 @@ export default function App() {
     stats: stats.data,
     grid,
     loading: stats.loading,
-    sensors: activeSensors(filtersA),
   }
   const sideB: CompareSideData | null = compare && {
     side: 'b',
@@ -86,18 +88,18 @@ export default function App() {
     stats: second.stats.data,
     grid: gridB,
     loading: second.stats.loading,
-    sensors: activeSensors(filtersB),
   }
 
   const compareChart = compare && (
     <CompareBars
-      title={`Hotspots per month · ${compare.a} vs ${compare.b}`}
-      subtitle="Raw detections per month (UTC). Same area and filters on both sides."
+      title={`Fire radiative power per month · ${compare.a} vs ${compare.b}`}
+      subtitle="Summed FRP (MW) per month (UTC). Same area and filters on both sides."
+      format={formatMW}
       categories={MONTHS}
       loading={calendar.loading || second.calendar.loading}
       series={[
-        { label: String(compare.a), color: COMPARE_COLORS.a, values: grid?.monthTotals ?? [] },
-        { label: String(compare.b), color: COMPARE_COLORS.b, values: gridB?.monthTotals ?? [] },
+        { label: String(compare.a), color: COMPARE_COLORS.a, values: grid?.monthFrp ?? [] },
+        { label: String(compare.b), color: COMPARE_COLORS.b, values: gridB?.monthFrp ?? [] },
       ]}
     />
   )
@@ -151,7 +153,7 @@ export default function App() {
               </button>
               {filtersOpen && (
                 <div className="w-64 rounded-xl border border-slate-700/80 bg-slate-900/95 p-3 shadow-xl backdrop-blur-md">
-                  <FilterControls {...controls} stacked />
+                  <FilterControls {...controls} stacked hideYear />
                 </div>
               )}
             </div>
@@ -170,7 +172,16 @@ export default function App() {
                 </div>
               }
             >
-              {compareChart || calendarView}
+              {compareChart || (
+                <MobileCalendar
+                  grid={grid}
+                  filters={filters}
+                  loading={calendar.loading}
+                  onYear={(year) => update(yearPatch(filters, year))}
+                  onMonth={(month) => update(month === null ? { month: null, date: null } : toggleMonthPatch(filters, month))}
+                  onDate={(date) => update(toggleDatePatch(filters, date))}
+                />
+              )}
             </MobileSheet>
           </HotspotMap>
         </main>
@@ -178,22 +189,42 @@ export default function App() {
     )
   }
 
+  const panelWidth = Math.min(PANEL_WIDTH, Math.round(window.innerWidth * 0.48))
+
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-slate-950 font-sans text-slate-100 antialiased">
       <TopBar {...controls} isDemo={isDemo} />
 
-      <main className="flex flex-1 flex-row overflow-hidden">
-        <HotspotMap {...mapProps} />
+      <main className="relative flex-1 overflow-hidden">
+        <HotspotMap {...mapProps} rightInset={panelOpen ? panelWidth : 0} />
 
-        <section className="flex h-full w-[55%] flex-col gap-4 overflow-y-auto bg-slate-950 p-5">
-          {errorBanner}
-          {sideA && sideB ? (
-            <CompareStats a={sideA} b={sideB} />
-          ) : (
-            <StatCards stats={stats.data} grid={grid} scope={selectionLabel(filters)} loading={stats.loading} sensors={sensors} />
-          )}
-          {compareChart || calendarView}
-        </section>
+        <aside
+          className={`absolute inset-y-0 right-0 z-[1100] flex transition-transform duration-200 ${panelOpen ? '' : 'translate-x-full'}`}
+          style={{ width: panelWidth }}
+          aria-label="Statistics"
+        >
+          <button
+            type="button"
+            onClick={() => setPanelOpen((o) => !o)}
+            aria-expanded={panelOpen}
+            aria-label={panelOpen ? 'Hide statistics' : 'Show statistics'}
+            data-testid="panel-toggle"
+            className="absolute top-1/2 -left-7 flex h-16 w-7 -translate-y-1/2 items-center justify-center rounded-l-lg border border-r-0 border-slate-700/80 bg-slate-900/95 text-slate-300 shadow-xl backdrop-blur-md hover:text-white"
+          >
+            <svg className={`h-4 w-4 transition-transform ${panelOpen ? '' : 'rotate-180'}`} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m9 6 6 6-6 6" />
+            </svg>
+          </button>
+          <section className="flex h-full w-full flex-col gap-4 overflow-y-auto border-l border-slate-800 bg-slate-950/95 p-5 backdrop-blur-md">
+            {errorBanner}
+            {sideA && sideB ? (
+              <CompareStats a={sideA} b={sideB} />
+            ) : (
+              <StatCards stats={stats.data} grid={grid} scope={selectionLabel(filters)} loading={stats.loading} sensors={sensors} />
+            )}
+            {compareChart || calendarView}
+          </section>
+        </aside>
       </main>
     </div>
   )

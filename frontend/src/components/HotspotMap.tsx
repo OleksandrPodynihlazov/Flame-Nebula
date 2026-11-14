@@ -1,5 +1,5 @@
 import "leaflet/dist/leaflet.css";
-import { useState, type ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import type { ControlPosition, FitBoundsOptions } from "leaflet";
 import { MapContainer, TileLayer, ZoomControl, useMap } from "react-leaflet";
 import { COMPARE_COLORS } from "../constants/compare";
@@ -138,6 +138,8 @@ interface Props {
   mobile?: boolean;
   /** Set: two years side by side with a draggable divider instead of one year. */
   compare?: CompareView | null;
+  /** Px of the map's right edge covered by a panel: kept out of fits and overlays. */
+  rightInset?: number;
   children?: ReactNode;
 }
 
@@ -155,20 +157,22 @@ export function HotspotMap({
   onDownloadCsv,
   mobile = false,
   compare = null,
+  rightInset = 0,
   children,
 }: Props) {
   const [legendOpen, setLegendOpen] = useState(!mobile);
   const fitOptions: FitBoundsOptions | undefined = mobile
     ? { paddingTopLeft: [0, 48], paddingBottomRight: [0, 96] }
-    : undefined;
+    : { paddingTopLeft: [24, 24], paddingBottomRight: [rightInset + 24, 24] };
 
   return (
     <section
       className={
         mobile
           ? `relative min-h-0 flex-1 ${compare ? "compare-mode" : ""}`
-          : "relative h-full w-[45%] shrink-0 border-r border-slate-800"
+          : "relative h-full w-full"
       }
+      style={{ "--panel-inset": `${rightInset}px` } as CSSProperties}
     >
       <MapContainer
         bounds={ITALY_BOUNDS}
@@ -195,6 +199,7 @@ export function HotspotMap({
               right={<CompareLabel {...compare.b} />}
               leftColor={COMPARE_COLORS.a}
               rightColor={COMPARE_COLORS.b}
+              rightInset={rightInset}
             />
           </>
         ) : (

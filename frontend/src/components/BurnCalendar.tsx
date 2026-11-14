@@ -14,7 +14,7 @@ interface Props {
 }
 
 const DAYS = Array.from({ length: 31 }, (_, i) => i + 1)
-const COLS = 'grid-cols-[28px_repeat(31,minmax(0,1fr))_38px] sm:grid-cols-[38px_repeat(31,minmax(14px,1fr))_52px]'
+const COLS = 'grid-cols-[28px_repeat(31,minmax(0,1fr))_38px] sm:grid-cols-[34px_repeat(31,minmax(0,1fr))_48px]'
 
 export function BurnCalendar({ grid, filters, sensors, loading, onSelectMonth, onSelectDate, onClear }: Props) {
   const hasSelection = filters.month !== null || filters.date !== null

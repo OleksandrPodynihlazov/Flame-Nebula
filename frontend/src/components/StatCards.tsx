@@ -11,7 +11,7 @@ interface Props {
   sensors: Sensor[]
 }
 
-function Card({ title, badge, children, wide }: { title: string; badge?: string; children: ReactNode; wide?: boolean }) {
+export function Card({ title, badge, children, wide }: { title: string; badge?: string; children: ReactNode; wide?: boolean }) {
   return (
     <div className={`flex flex-col justify-between rounded-xl border border-slate-800 bg-slate-900/70 p-3 sm:p-3.5 ${wide ? 'col-span-2 xl:col-span-1' : ''}`}>
       <div className="flex items-center justify-between gap-2">
