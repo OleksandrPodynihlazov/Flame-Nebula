@@ -15,7 +15,10 @@ export const MONTHS_FULL = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ] as const
 
-export const ITALY_CENTER: [number, number] = [41.87, 12.57]
+export const ITALY_BOUNDS: [[number, number], [number, number]] = [
+  [36.6, 6.6],
+  [47.1, 18.6],
+]
 
 export const MVP_YEAR = 2008
 

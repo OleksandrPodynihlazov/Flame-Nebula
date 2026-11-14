@@ -13,17 +13,17 @@ interface Props {
 }
 
 const DAYS = Array.from({ length: 31 }, (_, i) => i + 1)
-const COLS = 'grid-cols-[38px_repeat(31,minmax(14px,1fr))_52px]'
+const COLS = 'grid-cols-[28px_repeat(31,minmax(0,1fr))_38px] sm:grid-cols-[38px_repeat(31,minmax(14px,1fr))_52px]'
 
 export function BurnCalendar({ grid, filters, loading, onSelectMonth, onSelectDate, onClear }: Props) {
   const hasSelection = filters.month !== null || filters.date !== null
 
   return (
-    <div className="flex flex-col gap-3.5 rounded-xl border border-slate-800 bg-slate-900/70 p-4">
+    <div className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-900/70 p-3 sm:gap-3.5 sm:p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-sm font-semibold text-white">Burning activity calendar · {filters.year}</h2>
-          <p className="text-xs text-slate-400">Hotspots per day (UTC). Click a day or a month to filter the map.</p>
+          <p className="text-xs text-slate-400">Hotspots per day (UTC). Tap a day or a month to filter the map.</p>
         </div>
         <button
           type="button"
@@ -35,9 +35,9 @@ export function BurnCalendar({ grid, filters, loading, onSelectMonth, onSelectDa
         </button>
       </div>
 
-      <div className={`overflow-x-auto pb-1 ${loading ? 'opacity-60' : ''}`} aria-busy={loading}>
-        <div className="flex min-w-[640px] flex-col gap-[3px]" role="grid" aria-label={`Hotspots per day, ${filters.year}`}>
-          <div className={`grid ${COLS} gap-[3px] pb-1 text-[10px] font-semibold text-slate-500`} role="row">
+      <div className={`pb-1 ${loading ? 'opacity-60' : ''}`} aria-busy={loading}>
+        <div className="flex flex-col gap-0.5 sm:gap-[3px]" role="grid" aria-label={`Hotspots per day, ${filters.year}`}>
+          <div className={`grid ${COLS} gap-0.5 pb-1 text-[9px] font-semibold text-slate-500 sm:gap-[3px] sm:text-[10px]`} role="row">
             <span role="columnheader" />
             {DAYS.map((d) => (
               <span key={d} role="columnheader" className="text-center">
@@ -54,12 +54,12 @@ export function BurnCalendar({ grid, filters, loading, onSelectMonth, onSelectDa
             const row = grid?.counts[m] ?? Array<number | null>(31).fill(0)
             const monthSelected = filters.month === m && filters.date === null
             return (
-              <div key={name} className={`grid ${COLS} items-center gap-[3px]`} role="row">
+              <div key={name} className={`grid ${COLS} items-center gap-0.5 sm:gap-[3px]`} role="row">
                 <button
                   type="button"
                   onClick={() => onSelectMonth(m)}
                   title={`Show all of ${MONTHS_FULL[m]}`}
-                  className={`rounded px-1 py-0.5 text-left font-mono text-[11px] font-semibold transition-colors ${
+                  className={`rounded px-0.5 py-0.5 text-left font-mono text-[10px] font-semibold sm:px-1 sm:text-[11px] transition-colors ${
                     monthSelected ? 'bg-orange-500/20 text-orange-300 ring-1 ring-orange-400' : 'text-slate-300 hover:bg-slate-800'
                   }`}
                 >
@@ -81,7 +81,7 @@ export function BurnCalendar({ grid, filters, loading, onSelectMonth, onSelectDa
                       aria-selected={selected}
                       title={label}
                       onClick={() => onSelectDate(date)}
-                      className={`h-5 rounded-[3px] transition-transform hover:scale-125 hover:ring-1 hover:ring-white/70 ${
+                      className={`h-4 rounded-[2px] transition-transform sm:h-5 sm:rounded-[3px] sm:hover:scale-125 hover:ring-1 hover:ring-white/70 ${
                         selected ? 'z-10 scale-125 ring-2 ring-white' : inMonth ? 'ring-1 ring-orange-400/60' : ''
                       }`}
                       style={{ background: RAMP[rampIndex(count, grid?.maxDay ?? 0)] }}
@@ -92,7 +92,7 @@ export function BurnCalendar({ grid, filters, loading, onSelectMonth, onSelectDa
                 <button
                   type="button"
                   onClick={() => onSelectMonth(m)}
-                  className={`h-5 rounded border border-slate-800 bg-slate-900/90 pr-1.5 text-right font-mono text-[11px] font-semibold text-slate-200 hover:bg-slate-800 ${
+                  className={`h-4 rounded border border-slate-800 bg-slate-900/90 pr-1 text-right font-mono text-[9px] sm:h-5 sm:pr-1.5 sm:text-[11px] font-semibold text-slate-200 hover:bg-slate-800 ${
                     monthSelected ? 'ring-1 ring-white' : ''
                   }`}
                 >
