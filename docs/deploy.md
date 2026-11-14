@@ -14,7 +14,9 @@ Every merge to `main` runs the **Deploy** workflow (`.github/workflows/deploy.ym
 merge to main ─▶ Deploy workflow ─▶ ssh VPS ─▶ infra/deploy.sh <sha> ─▶ /api/health reports <sha> ─▶ smoke job   (e2e job runs in parallel)
 ```
 
-`infra/deploy.sh` checks out the commit, runs `docker compose up -d --build`, and waits up to 90 s for `/api/health` to return that commit's sha as `version`. If it never does, the job fails and saves container logs to `deploy-failure.log` in the repo dir on the VPS (CI output is public, so logs are not printed). The smoke job then checks the public URL.
+`infra/deploy.sh` checks out the commit, runs `docker compose up -d --build`, then `infra/sync-gateway.sh`, and waits up to 90 s for `/api/health` to return that commit's sha as `version`. If it never does, the job fails and saves container logs to `deploy-failure.log` in the repo dir on the VPS (CI output is public, so logs are not printed). The smoke job then checks the public URL.
+
+`gateway.conf` and `htpasswd` are bind-mounted as single files. A checkout or edit replaces the file, but the running container keeps the old copy and `compose up` does not recreate it. `infra/sync-gateway.sh` compares checksums on the host and in the container, and force-recreates `gateway` if they differ. After changing `htpasswd` on the VPS by hand, run `bash infra/sync-gateway.sh`.
 
 The e2e job starts alongside deploy: it installs Chromium, polls `/api/health` (up to 6 min) until it reports this commit's sha, then runs the Playwright suite in `e2e/` against the public URL. Its HTML report is a downloadable artifact on the Actions run.
 
