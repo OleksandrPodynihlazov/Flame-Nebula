@@ -32,7 +32,9 @@ export function StatCards({ stats, grid, scope, loading }: Props) {
   return (
     <div className={`grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-3 ${loading ? 'opacity-60' : ''}`} aria-busy={loading}>
       <Card title="Detected hotspots" badge={scope}>
-        <span className="font-mono text-2xl font-bold text-white">{total.toLocaleString()}</span>
+        <span className="font-mono text-2xl font-bold text-white" data-testid="stat-total">
+          {total.toLocaleString()}
+        </span>
         <span className="text-xs text-slate-400">MODIS detections</span>
       </Card>
 

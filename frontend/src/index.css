@@ -52,3 +52,20 @@ body {
 .leaflet-bar a:hover {
   background: #1e293b !important;
 }
+
+/* Geoman draw toolbar: light icons on the dark Leaflet bar, orange for the active tool. */
+.leaflet-pm-toolbar .control-icon {
+  filter: invert(0.9);
+}
+.leaflet-pm-toolbar .button-container.active > a.leaflet-buttons-control-button {
+  background: #c2410c !important;
+  box-shadow: none;
+}
+.leaflet-pm-toolbar .leaflet-pm-actions-container a.leaflet-pm-action {
+  background: #1e293b !important;
+  color: #e2e8f0 !important;
+  border-color: #334155 !important;
+}
+.leaflet-pm-toolbar .leaflet-pm-actions-container a.leaflet-pm-action:hover {
+  background: #334155 !important;
+}

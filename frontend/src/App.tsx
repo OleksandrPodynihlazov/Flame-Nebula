@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { downloadCsv } from './api/client'
 import { BurnCalendar } from './components/BurnCalendar'
 import { HotspotMap } from './components/HotspotMap'
@@ -6,7 +6,7 @@ import { StatCards } from './components/StatCards'
 import { TopBar } from './components/TopBar'
 import { DEFAULT_FILTERS } from './constants/fire'
 import { useDashboardData } from './hooks/useDashboardData'
-import type { Filters } from './types/api'
+import type { Area, Filters } from './types/api'
 import { buildGrid } from './utils/calendar'
 import { selectionLabel } from './utils/filters'
 
@@ -17,12 +17,13 @@ export default function App() {
 
   const grid = useMemo(() => (calendar.data ? buildGrid(filters.year, calendar.data) : null), [calendar.data, filters.year])
   const update = (patch: Partial<Filters>) => setFilters((f) => ({ ...f, ...patch }))
+  const setArea = useCallback((area: Area | null) => setFilters((f) => ({ ...f, area })), [])
+  const fileTag = filters.date ?? (filters.month !== null ? `${filters.year}-${String(filters.month + 1).padStart(2, '0')}` : String(filters.year))
 
   const onDownload = async () => {
     setDownloading(true)
     try {
-      const tag = filters.date ?? (filters.month !== null ? `${filters.year}-${String(filters.month + 1).padStart(2, '0')}` : filters.year)
-      await downloadCsv(selectionQuery, `firms_italy_modis_${tag}.csv`)
+      await downloadCsv(selectionQuery, `firms_italy_modis_${fileTag}.csv`)
     } finally {
       setDownloading(false)
     }
@@ -35,7 +36,16 @@ export default function App() {
       <TopBar filters={filters} onChange={update} onDownload={onDownload} downloading={downloading} isDemo={isDemo} />
 
       <main className="flex flex-1 flex-col overflow-hidden lg:flex-row">
-        <HotspotMap data={hotspots.data} loading={hotspots.loading} label={selectionLabel(filters)} />
+        <HotspotMap
+          data={hotspots.data}
+          loading={hotspots.loading}
+          label={selectionLabel(filters)}
+          area={filters.area}
+          onAreaChange={setArea}
+          fileTag={fileTag}
+          downloading={downloading}
+          onDownloadCsv={onDownload}
+        />
 
         <section className="flex flex-1 flex-col gap-4 overflow-y-auto bg-slate-950 p-4 lg:h-full lg:w-[55%] lg:p-5">
           {error && (
