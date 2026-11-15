@@ -67,7 +67,7 @@ export function RegionSearch({ area, onSelect }: Props) {
     setError(null)
     fetchRegion(r.id, ctrl.signal)
       .then((f) => {
-        onSelect({ kind: 'region', id: r.id, name: r.name, path: r.path, geometry: f.geometry })
+        onSelect({ kind: 'region', id: r.id, name: r.name, path: r.path, geometry: f.geometry, country: r.country })
         setEditing(false)
         setText('')
       })

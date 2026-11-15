@@ -12,6 +12,9 @@ import type {
   FireType,
   GridCell,
   GridResponse,
+  HarmonizedMonth,
+  HarmonizedQuery,
+  HarmonizedResponse,
   HotspotCollection,
   HotspotFeature,
   LonLat,
@@ -445,6 +448,39 @@ export function mockPatternSummary(q: PatternQuery): Promise<PatternSummaryRespo
     }
   })
   return delay({ months }, 'pattern-summary')
+}
+
+// Demo series in the shape of /api/harmonized: a seasonal curve whose raw counts jump when the reference
+// satellite becomes S-NPP (2012-02), while the S-NPP-equivalent count stays on one scale.
+const MOCK_SEASON = [0.2, 0.35, 0.9, 0.8, 0.5, 0.9, 1.8, 2.2, 1.3, 0.8, 0.3, 0.15]
+const MOCK_FACTOR: Record<string, number> = { Terra: 8.8, Aqua: 8, N: 1 }
+
+export function harmonizedMonths(country: string): HarmonizedMonth[] {
+  const scale = country === 'EUR' ? 20000 : 4000
+  const out: HarmonizedMonth[] = []
+  for (let y = 2000; y <= 2025; y++) {
+    for (let m = y === 2000 ? 11 : 1; m <= 12; m++) {
+      const satellite = y < 2002 || (y === 2002 && m <= 7) ? 'Terra' : y < 2012 || (y === 2012 && m === 1) ? 'Aqua' : 'N'
+      const wave = 1 + 0.35 * Math.sin(y * 1.7) + (y === 2007 || y === 2017 || y === 2021 ? 0.6 : 0)
+      const count = Math.round(scale * MOCK_SEASON[m - 1] * wave * 10) / 10
+      const factor = MOCK_FACTOR[satellite]
+      const band = factor === 1 ? 0 : 0.07
+      out.push({
+        month: `${y}-${String(m).padStart(2, '0')}`,
+        satellite,
+        raw: Math.round(count / factor),
+        count,
+        lo: Math.round(count * (1 - band) * 10) / 10,
+        hi: Math.round(count * (1 + band) * 10) / 10,
+        days_missing: 0,
+      })
+    }
+  }
+  return out
+}
+
+export function mockHarmonized(q: HarmonizedQuery): Promise<HarmonizedResponse> {
+  return delay({ country: q.country, months: harmonizedMonths(q.country) }, 'harmonized')
 }
 
 /** Same numbers as the API, computed from the filtered dots (the browser summary the endpoint replaced). */

@@ -13,7 +13,7 @@ export type Area =
   | { kind: 'circle'; lat: number; lon: number; radiusKm: number }
   | { kind: 'polygon'; points: LonLat[] }
   /** Named region picked in the search bar; sent as `region=<id>`, outline only drawn and measured. */
-  | { kind: 'region'; id: number; name: string; path: string; geometry: RegionGeometry }
+  | { kind: 'region'; id: number; name: string; path: string; geometry: RegionGeometry; country?: string }
 
 /** One row of `GET /api/regions`. */
 export interface Region {
@@ -82,6 +82,29 @@ export interface PatternMonth {
 
 export interface PatternSummaryResponse {
   months: PatternMonth[]
+}
+
+/** One month of `GET /api/harmonized`: the month's reference satellite, its raw detections and the same in S-NPP units. */
+export interface HarmonizedMonth {
+  /** `YYYY-MM` */
+  month: string
+  satellite: string
+  raw: number
+  /** S-NPP-equivalent detections; `lo`..`hi` = uncertainty band of the factor. */
+  count: number
+  lo: number
+  hi: number
+  days_missing: number
+}
+
+export interface HarmonizedResponse {
+  country: string
+  months: HarmonizedMonth[]
+}
+
+/** Query for /api/harmonized: ISO3 country code, or `EUR` for all of Europe. */
+export interface HarmonizedQuery {
+  country: string
 }
 
 /** Query for /api/patterns(/summary): the area only, plus the month (1–12) for /api/patterns. */

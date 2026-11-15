@@ -5,6 +5,7 @@ import { downloadCsv } from './api/client'
 import { downloadToast } from './utils/downloadToast'
 import { BurnCalendar } from './components/BurnCalendar'
 import { EmptyState } from './components/EmptyState'
+import { HarmonizedHistory } from './components/HarmonizedHistory'
 import { ErrorAlert } from './components/ErrorAlert'
 import { CompareBars } from './components/compare/CompareBars'
 import { CompareMiniStats, CompareStats, type CompareSideData } from './components/compare/CompareStats'
@@ -18,12 +19,14 @@ import { Brand, FilterControls, SearchField, TopBar } from './components/TopBar'
 import { COMPARE_COLORS, type CompareYears } from './constants/compare'
 import { DEFAULT_FILTERS, MONTHS, MONTHS_FULL } from './constants/fire'
 import { useDashboardData } from './hooks/useDashboardData'
+import { useHarmonized } from './hooks/useHarmonized'
 import { useIsDesktop } from './hooks/useMediaQuery'
 import { usePatternCells, usePatternSummary } from './hooks/usePatternData'
 import type { Area, Filters, MapView } from './types/api'
 import { gridForYear } from './utils/calendar'
 import { filtersForYear, formatMW } from './utils/compare'
 import { activeSensors, clearedFilters, selectionLabel, toggleDatePatch, toggleDayPatch, toggleMonthPatch, yearPatch } from './utils/filters'
+import { harmonizedScope } from './utils/harmonized'
 import { PATTERN_DEFAULT_MONTH, YEAR_BANDS, patternStats, yearBands } from './utils/patterns'
 
 const PANEL_WIDTH = 600
@@ -55,6 +58,8 @@ export default function App() {
   const second = useDashboardData(filtersB, compare !== null && !isPatterns)
 
   const grid = useMemo(() => gridForYear(filtersA.year, calendar.data), [calendar.data, filtersA.year])
+  const scope = useMemo(() => harmonizedScope(filters.area), [filters.area])
+  const harmonized = useHarmonized(scope.query.country, !isPatterns && compare === null)
   const gridB = useMemo(
     () => (compare ? gridForYear(filtersB.year, second.calendar.data) : null),
     [compare, second.calendar.data, filtersB.year],
@@ -105,6 +110,10 @@ export default function App() {
       onSelectDate={(date) => update(toggleDayPatch(filters, date))}
       onClear={() => update({ month: null, date: null })}
     />
+  )
+
+  const history = (
+    <HarmonizedHistory label={scope.label} months={harmonized.data?.months ?? null} loading={harmonized.loading} year={filters.year} />
   )
 
   const sideA: CompareSideData | null = compare && {
@@ -247,6 +256,7 @@ export default function App() {
                       onMonth={(month) => update(month === null ? { month: null, date: null } : toggleMonthPatch(filters, month))}
                       onDate={(date) => update(toggleDatePatch(filters, date))}
                     />
+                    {history}
                   </div>
                 )
               )}
@@ -297,6 +307,7 @@ export default function App() {
                 )}
                 {emptyState}
                 {compareChart || calendarView}
+                {!compare && history}
               </>
             )}
           </section>

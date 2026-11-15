@@ -3,6 +3,8 @@ import type {
   ApiQuery,
   CalendarResponse,
   GridResponse,
+  HarmonizedQuery,
+  HarmonizedResponse,
   HotspotCollection,
   PatternQuery,
   PatternsResponse,
@@ -17,6 +19,7 @@ import { HttpError } from './errors'
 import {
   mockCalendar,
   mockGrid,
+  mockHarmonized,
   mockHotspots,
   mockPatternSummary,
   mockPatterns,
@@ -28,7 +31,7 @@ import {
 
 export const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true'
 
-export function toSearchParams(q: ApiQuery | PatternQuery): URLSearchParams {
+export function toSearchParams(q: ApiQuery | PatternQuery | HarmonizedQuery): URLSearchParams {
   const p = new URLSearchParams()
   for (const [k, v] of Object.entries(q)) if (v !== undefined && v !== '') p.set(k, String(v))
   return p
@@ -44,7 +47,7 @@ async function errorMessage(res: Response): Promise<string> {
   return `HTTP ${res.status}`
 }
 
-async function getJson<T, Q extends ApiQuery | PatternQuery = ApiQuery>(
+async function getJson<T, Q extends ApiQuery | PatternQuery | HarmonizedQuery = ApiQuery>(
   path: string,
   q: Q,
   mock: (q: Q) => Promise<T>,
@@ -67,6 +70,9 @@ export const fetchPatterns = (q: PatternQuery, signal?: AbortSignal) =>
 
 export const fetchPatternSummary = (q: PatternQuery, signal?: AbortSignal) =>
   getJson<PatternSummaryResponse, PatternQuery>('patterns/summary', q, mockPatternSummary, signal)
+
+export const fetchHarmonized = (q: HarmonizedQuery, signal?: AbortSignal) =>
+  getJson<HarmonizedResponse, HarmonizedQuery>('harmonized', q, mockHarmonized, signal)
 
 export const fetchStats = (q: ApiQuery, signal?: AbortSignal) => getJson<StatsResponse>('stats', q, mockStats, signal)
 
