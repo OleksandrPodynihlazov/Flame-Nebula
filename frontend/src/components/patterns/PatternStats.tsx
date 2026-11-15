@@ -2,6 +2,7 @@ import { cn } from '@/lib/utils'
 import { COMPARE_COLORS, type CompareSide } from '../../constants/compare'
 import { MONTHS_FULL } from '../../constants/fire'
 import { formatProbability, type PatternStatsData } from '../../utils/patterns'
+import { AnimatedNumber } from '../AnimatedNumber'
 import { Delta, FIGURE, Metric, Readout } from '../StatCards'
 
 export interface PatternSideStats {
@@ -29,9 +30,11 @@ export function PatternStats({ a, b = null }: { a: PatternSideStats; b?: Pattern
             <p className="mb-2 text-xs font-semibold text-foreground">{b ? MONTHS_FULL[d.month - 1] : `Patterns · ${MONTHS_FULL[d.month - 1]}`}</p>
             <Readout className="grid-cols-[1fr_1.3fr_1fr]">
               <Metric label="Recurring cells">
-                <span className={cn(FIGURE, 'text-3xl leading-none')} data-testid="pattern-likely">
-                  {d.stats ? d.stats.cells.toLocaleString('en-US') : '—'}
-                </span>
+                {d.stats ? (
+                  <AnimatedNumber className={cn(FIGURE, 'text-3xl leading-none')} testId="pattern-likely" value={d.stats.cells} />
+                ) : (
+                  <span className={cn(FIGURE, 'text-3xl leading-none')} data-testid="pattern-likely">—</span>
+                )}
                 {other && <Delta from={other.stats?.cells} to={d.stats?.cells} />}
               </Metric>
               <Metric label="Most regular cell">
@@ -43,7 +46,7 @@ export function PatternStats({ a, b = null }: { a: PatternSideStats; b?: Pattern
                 )}
               </Metric>
               <Metric label="Every year">
-                <span className={cn(FIGURE, 'text-xl leading-none')}>{d.stats ? d.stats.everyYear.toLocaleString('en-US') : '—'}</span>
+                {d.stats ? <AnimatedNumber className={cn(FIGURE, 'text-xl leading-none')} value={d.stats.everyYear} /> : <span className={cn(FIGURE, 'text-xl leading-none')}>—</span>}
                 {other && <Delta from={other.stats?.everyYear} to={d.stats?.everyYear} />}
               </Metric>
             </Readout>
@@ -71,11 +74,17 @@ export function PatternMiniStats({ a, b = null }: { a: PatternSideStats; b?: Pat
             {b && <span aria-hidden="true" className="size-2.5 rounded-full" style={{ background: COMPARE_COLORS[d.side] }} />}
             {MONTHS_FULL[d.month - 1].slice(0, 3)}
           </span>
-          <span className="truncate text-sm font-semibold tracking-tight text-foreground tabular-nums" data-testid="pattern-likely">
-            {d.stats ? d.stats.cells.toLocaleString() : '—'}
-          </span>
+          {d.stats ? (
+            <AnimatedNumber className="truncate text-sm font-semibold tracking-tight text-foreground" testId="pattern-likely" value={d.stats.cells} />
+          ) : (
+            <span className="truncate text-sm font-semibold tracking-tight text-foreground tabular-nums" data-testid="pattern-likely">—</span>
+          )}
           <span className="truncate text-sm font-semibold tracking-tight text-foreground tabular-nums">{d.stats?.top ? formatProbability(d.stats.top.probability) : '—'}</span>
-          <span className="truncate text-sm font-semibold tracking-tight text-foreground tabular-nums">{d.stats ? d.stats.everyYear.toLocaleString() : '—'}</span>
+          {d.stats ? (
+            <AnimatedNumber className="truncate text-sm font-semibold tracking-tight text-foreground" value={d.stats.everyYear} />
+          ) : (
+            <span className="truncate text-sm font-semibold tracking-tight text-foreground tabular-nums">—</span>
+          )}
         </div>
       ))}
     </div>

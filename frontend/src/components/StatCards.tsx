@@ -5,6 +5,7 @@ import { MONTHS_FULL } from '../constants/fire'
 import type { StatsResponse } from '../types/api'
 import type { CalendarGrid } from '../utils/calendar'
 import { pctChange } from '../utils/compare'
+import { AnimatedNumber } from './AnimatedNumber'
 
 interface Props {
   stats: StatsResponse | null
@@ -73,9 +74,9 @@ function DayNightBar({ dayPct }: { dayPct: number }) {
 function DayNight({ day, night }: { day: number; night: number }) {
   return (
     <>
-      <span className={FIGURE}>{day.toLocaleString('en-US')}</span>
+      <AnimatedNumber className={FIGURE} value={day} />
       <span className="text-muted-foreground">/</span>
-      <span className={FIGURE}>{night.toLocaleString('en-US')}</span>
+      <AnimatedNumber className={FIGURE} value={night} />
     </>
   )
 }
@@ -101,9 +102,7 @@ export function StatCards({ stats, grid, scope, loading }: Props) {
           {first ? (
             <Skeleton className="h-[30px] w-20" />
           ) : (
-            <span className={cn(FIGURE, 'text-3xl leading-none')} data-testid="stat-total">
-              {stats ? total.toLocaleString('en-US') : none}
-            </span>
+            stats ? <AnimatedNumber className={cn(FIGURE, 'text-3xl leading-none')} testId="stat-total" value={total} /> : <span className={cn(FIGURE, 'text-3xl leading-none')} data-testid="stat-total">{none}</span>
           )}
         </Metric>
         <Metric label="Peak month">
@@ -140,9 +139,7 @@ export function MiniStats({ stats, grid, loading }: Omit<Props, 'scope' | 'senso
           {first ? (
             <Skeleton className="h-4 w-12" />
           ) : (
-            <span className={cn(FIGURE, 'text-base leading-none')} data-testid="stat-total">
-              {stats ? total.toLocaleString('en-US') : none}
-            </span>
+            stats ? <AnimatedNumber className={cn(FIGURE, 'text-base leading-none')} testId="stat-total" value={total} /> : <span className={cn(FIGURE, 'text-base leading-none')} data-testid="stat-total">{none}</span>
           )}
         </Metric>
         <Metric label="Peak month" className="px-3">
