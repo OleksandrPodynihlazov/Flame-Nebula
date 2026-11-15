@@ -361,6 +361,8 @@ export function FilterControls({
       <Separator />
       <FilterFields filters={filters} onChange={onChange} />
       <CsvButton onDownload={onDownload} downloading={downloading} compare={compare} className="h-11 w-full lg:h-9" />
+      {/* Touch has no hover tooltip, so the reason for the disabled button is written out. */}
+      {compare !== null && <p className="text-xs text-muted-foreground">CSV export works on one year. Turn compare off first.</p>}
     </div>
   )
 }

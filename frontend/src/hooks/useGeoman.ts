@@ -18,6 +18,23 @@ const round = (n: number, digits: number) => Number(n.toFixed(digits))
 
 type Shape = L.Polygon | L.Circle
 
+/** Draw tools of the toolbar; geoman's own names for them. */
+export type DrawShape = 'Rectangle' | 'Polygon' | 'Circle'
+
+function asDrawShape(shape: string): DrawShape | null {
+  return shape === 'Rectangle' || shape === 'Polygon' || shape === 'Circle' ? shape : null
+}
+
+/** Geoman's toolbar buttons are `<a role="button">` without text; their wrapper carries the title. Name each button after it. */
+function nameToolbarButtons(map: L.Map) {
+  for (const holder of map.getContainer().querySelectorAll<HTMLElement>('.leaflet-pm-toolbar .button-container[title]')) {
+    const button = holder.querySelector<HTMLElement>(':scope > a')
+    if (!button) continue
+    button.setAttribute('aria-label', holder.title)
+    if (!button.hasAttribute('role')) button.setAttribute('role', 'button')
+  }
+}
+
 function outerRing(latlngs: unknown): L.LatLng[] {
   if (!Array.isArray(latlngs) || latlngs.length === 0) return []
   const items: unknown[] = latlngs
@@ -84,14 +101,21 @@ function disableActiveModes(map: L.Map): boolean {
  * Geoman draw tools (polygon, rectangle, circle, edit, drag, remove) bound to `filters.area`.
  * `area` is the source of truth: the map shape follows it; drawing a shape or ending an edit reports a new one.
  */
-export function useGeoman(area: Area | null, onAreaChange: (area: Area | null) => void, position: L.ControlPosition) {
+export function useGeoman(
+  area: Area | null,
+  onAreaChange: (area: Area | null) => void,
+  position: L.ControlPosition,
+  onDrawShapeChange?: (shape: DrawShape | null) => void,
+) {
   const map = useMap()
   const shapeRef = useRef<Shape | null>(null)
   const onChangeRef = useRef(onAreaChange)
+  const onDrawShapeRef = useRef(onDrawShapeChange)
 
   useEffect(() => {
     onChangeRef.current = onAreaChange
-  }, [onAreaChange])
+    onDrawShapeRef.current = onDrawShapeChange
+  }, [onAreaChange, onDrawShapeChange])
 
   useEffect(() => {
     const onCreate = (e: { layer: L.Layer }) => {
@@ -120,6 +144,11 @@ export function useGeoman(area: Area | null, onAreaChange: (area: Area | null) =
       }
     }
 
+    // The active draw tool, for the on-map hint; null once it is off (finished, cancelled or switched).
+    const onDrawToggle = (e: { enabled: boolean; shape: string }) => {
+      onDrawShapeRef.current?.(e.enabled ? asDrawShape(e.shape) : null)
+    }
+
     // Esc leaves whichever tool is active; otherwise Tab lands on geoman's hidden "Cancel" link.
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || e.defaultPrevented) return
@@ -144,7 +173,9 @@ export function useGeoman(area: Area | null, onAreaChange: (area: Area | null) =
       removalMode: true,
       rotateMode: false,
     })
+    nameToolbarButtons(map)
     map.on('pm:create', onCreate)
+    map.on('pm:globaldrawmodetoggled', onDrawToggle)
     map.on('pm:remove', onRemove)
     map.on(MODE_EVENTS, onModeToggle)
     document.addEventListener('keydown', onKeyDown)
@@ -152,9 +183,11 @@ export function useGeoman(area: Area | null, onAreaChange: (area: Area | null) =
     return () => {
       map.off('pm:create', onCreate)
       map.off('pm:remove', onRemove)
+      map.off('pm:globaldrawmodetoggled', onDrawToggle)
       map.off(MODE_EVENTS, onModeToggle)
       document.removeEventListener('keydown', onKeyDown)
       disableActiveModes(map)
+      onDrawShapeRef.current?.(null)
       map.pm.removeControls()
       drop(shapeRef)
       onModeToggle()

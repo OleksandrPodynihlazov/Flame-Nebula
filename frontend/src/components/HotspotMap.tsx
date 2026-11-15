@@ -8,11 +8,14 @@ import L, { type ControlPosition, type FitBoundsOptions } from "leaflet";
 import { MapContainer, TileLayer, ZoomControl, useMap } from "react-leaflet";
 import { COMPARE_COLORS } from "../constants/compare";
 import { ITALY_BOUNDS, MONTHS_FULL } from "../constants/fire";
-import { HOTSPOT_PANE, HOTSPOT_PANE_B, useGeoman } from "../hooks/useGeoman";
+import { HOTSPOT_PANE, HOTSPOT_PANE_B, useGeoman, type DrawShape } from "../hooks/useGeoman";
+import { useHints } from "../hooks/useHints";
 import { useHotspotLayer } from "../hooks/useHotspotLayer";
 import { usePatternLayer } from "../hooks/usePatternLayer";
 import { useViewportData } from "../hooks/useViewportData";
 import type { ApiQuery, Area, MapView, PatternCell, SelectionSummaryResponse, Sensor } from "../types/api";
+import { CoachMarks } from "./CoachMarks";
+import { DrawHint } from "./DrawHint";
 import { FLOAT_PANEL } from "./floating";
 import { MapLayersButton } from "./MapLayersButton";
 import { MapLegend, MobileLegend } from "./MapLegend";
@@ -24,12 +27,14 @@ function DrawTools({
   area,
   onAreaChange,
   position,
+  onDrawShapeChange,
 }: {
   area: Area | null;
   onAreaChange: (area: Area | null) => void;
   position: ControlPosition;
+  onDrawShapeChange: (shape: DrawShape | null) => void;
 }) {
-  useGeoman(area, onAreaChange, position);
+  useGeoman(area, onAreaChange, position, onDrawShapeChange);
   return null;
 }
 
@@ -298,6 +303,12 @@ export function HotspotMap({
   const showPatterns = view === "patterns" && patterns !== null;
   const comparing = showPatterns ? patterns.b !== null : compare !== null;
   const [legendOpen, setLegendOpen] = useState(false);
+  const [drawShape, setDrawShape] = useState<DrawShape | null>(null);
+  const hints = useHints();
+  const showTips = () => {
+    setLegendOpen(false);
+    hints.restart();
+  };
   const fitOptions: FitBoundsOptions | undefined = mobile
     ? { paddingTopLeft: [0, 48], paddingBottomRight: [0, 96] }
     : { paddingTopLeft: [24, 24], paddingBottomRight: [rightInset + 24, 24] };
@@ -377,6 +388,7 @@ export function HotspotMap({
           area={area}
           onAreaChange={onAreaChange}
           position={mobile ? "topright" : "topleft"}
+          onDrawShapeChange={setDrawShape}
         />
 
         <RegionOutline area={area} fitOptions={fitOptions} />
@@ -385,11 +397,11 @@ export function HotspotMap({
       {mobile ? (
         <div className="absolute top-16 left-3 z-[1000] flex flex-col items-start gap-2">
           {onViewChange && <MapLayersButton view={view} onChange={onViewChange} menuSide="right" />}
-          <MobileLegend sensors={sensors} patterns={showPatterns} />
+          <MobileLegend sensors={sensors} patterns={showPatterns} onShowTips={hints.restart} />
         </div>
       ) : (
         <>
-          <MapLegend open={legendOpen} onToggle={() => setLegendOpen((o) => !o)} sensors={sensors} patterns={showPatterns} />
+          <MapLegend open={legendOpen} onToggle={() => setLegendOpen((o) => !o)} sensors={sensors} patterns={showPatterns} onShowTips={showTips} />
           {onViewChange && (
             <div className="absolute right-[calc(var(--panel-inset,0px)+10px)] bottom-9 z-[1000]">
               <MapLayersButton view={view} onChange={onViewChange} menuSide="left" />
@@ -413,6 +425,8 @@ export function HotspotMap({
       )}
 
       {children}
+      <DrawHint shape={drawShape} />
+      {hints.step !== null && <CoachMarks step={hints.step} mobile={mobile} onNext={hints.next} onDismiss={hints.dismiss} />}
     </section>
   );
 }

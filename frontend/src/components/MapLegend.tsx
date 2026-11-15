@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react'
-import { ChevronDown, ChevronUp, Info } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
+import { ChevronDown, ChevronUp, Info, Lightbulb } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Separator } from '@/components/ui/separator'
@@ -90,10 +90,24 @@ function LegendBody({ sensors, patterns }: { sensors: Sensor[]; patterns: boolea
 interface LegendProps {
   sensors: Sensor[]
   patterns?: boolean
+  /** Opens the first-visit guide again. */
+  onShowTips: () => void
+}
+
+function ShowTips({ onClick }: { onClick: () => void }) {
+  return (
+    <>
+      <Separator className="my-2.5" />
+      <Button type="button" variant="ghost" size="xs" onClick={onClick} className="-ml-1.5 text-muted-foreground max-lg:h-9">
+        <Lightbulb data-icon="inline-start" aria-hidden="true" />
+        Show tips
+      </Button>
+    </>
+  )
 }
 
 /** Desktop: collapsible card, bottom left. */
-export function MapLegend({ open, onToggle, sensors, patterns = false }: LegendProps & { open: boolean; onToggle: () => void }) {
+export function MapLegend({ open, onToggle, sensors, patterns = false, onShowTips }: LegendProps & { open: boolean; onToggle: () => void }) {
   const Chevron = open ? ChevronDown : ChevronUp
   return (
     <div className={cn(FLOAT_PANEL, 'absolute bottom-[10px] left-[10px] z-20 max-w-[240px] overflow-hidden')}>
@@ -109,6 +123,7 @@ export function MapLegend({ open, onToggle, sensors, patterns = false }: LegendP
       {open && (
         <div className="border-t border-border px-3 pt-2.5 pb-3">
           <LegendBody sensors={sensors} patterns={patterns} />
+          <ShowTips onClick={onShowTips} />
         </div>
       )}
     </div>
@@ -116,9 +131,10 @@ export function MapLegend({ open, onToggle, sensors, patterns = false }: LegendP
 }
 
 /** Phone: a button in the map's control column; the legend opens as a popover card, so nothing stays on the map while closed. */
-export function MobileLegend({ sensors, patterns = false }: LegendProps) {
+export function MobileLegend({ sensors, patterns = false, onShowTips }: LegendProps) {
+  const [open, setOpen] = useState(false)
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button type="button" variant="secondary" size="icon-lg" aria-label="Show legend" data-testid="legend-button" className={FLOAT_ICON_BUTTON}>
           <Info aria-hidden="true" />
@@ -127,6 +143,12 @@ export function MobileLegend({ sensors, patterns = false }: LegendProps) {
       <PopoverContent side="right" align="start" sideOffset={8} collisionPadding={12} className="z-[1200] w-auto max-w-[calc(100vw-5.5rem)] p-3">
         <p className="text-xs font-medium text-foreground">{title(patterns)}</p>
         <LegendBody sensors={sensors} patterns={patterns} />
+        <ShowTips
+          onClick={() => {
+            setOpen(false)
+            onShowTips()
+          }}
+        />
       </PopoverContent>
     </Popover>
   )
