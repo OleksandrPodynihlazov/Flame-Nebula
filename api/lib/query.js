@@ -1,6 +1,8 @@
 // Shared query params for docs/contracts.md [3]: parse + validate, then build a parameterised WHERE.
 // Every user value reaches SQL only as a $n placeholder; nothing is concatenated.
 
+import { NOT_NON_FIRE, PLAIN } from "./confidence.js";
+
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const NUMBER_RE = /^[+-]?(\d+\.?\d*|\.\d+)$/;
 const TYPE_LIST_RE = /^[0-3](,[0-3])*$/;
@@ -117,14 +119,21 @@ export function parseCell(query) {
   return parseNumber(raw, "cell", MIN_CELL, MAX_CELL);
 }
 
-// Returns { from, to, circle, polygon, region, bbox, daynight, types, sensors }. Missing params are undefined / null.
-// A polygon overrides a circle (the frontend never sends both). A region (id from /api/regions) cannot be
-// combined with a polygon or a circle: that is a 400.
+// Returns { from, to, circle, polygon, region, bbox, daynight, types, sensors, includeNonFire }. Missing params are
+// undefined / null / false. A polygon overrides a circle (the frontend never sends both). A region (id from
+// /api/regions) cannot be combined with a polygon or a circle: that is a 400.
 export function parseFilters(query) {
   const f = {
     from: undefined, to: undefined, circle: null, polygon: null, region: null, bbox: null, daynight: null, types: null,
-    sensors: null,
+    sensors: null, includeNonFire: false,
   };
+
+  // Points classed non_fire:* (volcano, static source, offshore, urban; contract [1b]) are hidden unless asked for.
+  const includeNonFire = single(query, "include_non_fire");
+  if (includeNonFire !== undefined) {
+    if (includeNonFire !== "true" && includeNonFire !== "false") throw httpError("include_non_fire must be true or false");
+    f.includeNonFire = includeNonFire === "true";
+  }
 
   const from = single(query, "from");
   const to = single(query, "to");
@@ -194,8 +203,11 @@ export function parseFilters(query) {
 }
 
 // Builds `WHERE ...` (or '') and its params for the hotspots table. Column names are fixed here.
-export function buildWhere(f) {
+// `confidence`: the query reads hotspots_with_confidence (lib/confidence.js), so non_fire points can be hidden.
+// `hideNonFire: false` keeps them even then (/api/stats counts them in by_class and drops them itself).
+export function buildWhere(f, { confidence = false, hideNonFire = true } = {}) {
   const conds = [];
+  if (confidence && hideNonFire && !f.includeNonFire) conds.push(NOT_NON_FIRE);
   const params = [];
   const add = (value) => {
     params.push(value);
@@ -266,8 +278,9 @@ export function buildWhere(f) {
 // rounded to 4 decimals (~10 m). type = most common non-NULL type (mode() skips NULLs: FIRMS API rows
 // have none), lowest on a tie (mode() keeps the first of equally frequent values in ORDER BY order);
 // NULL only when every point in the cell has no type. One row past the cap tells "over" from "at".
-export function buildGridQuery(filters, cell) {
-  const { where, params } = buildWhere(filters);
+// `source` from lib/confidence.js hotspotsSource(): same non_fire rule as the point endpoints.
+export function buildGridQuery(filters, cell, source = PLAIN) {
+  const { where, params } = buildWhere(filters, { confidence: source.confidence });
   const c = `$${params.length + 1}`;
   const limit = `$${params.length + 2}`;
   return {
@@ -275,7 +288,7 @@ export function buildGridQuery(filters, cell) {
                   round(avg(longitude)::numeric, 4)::float8 AS lon,
                   COUNT(*) AS count,
                   mode() WITHIN GROUP (ORDER BY type) AS type
-             FROM hotspots
+             FROM ${source.from}
              ${where}
             GROUP BY floor(latitude / ${c}::float8), floor(longitude / ${c}::float8)
             LIMIT ${limit}`,

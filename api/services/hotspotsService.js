@@ -1,4 +1,5 @@
 import { pool } from "../db.js";
+import { confidenceJoin, hotspotsSource } from "../lib/confidence.js";
 import {
   DEFAULT_BBOX_MAX_ROWS,
   DEFAULT_MAX_ROWS,
@@ -21,6 +22,8 @@ const CAPS = {
 // reduces both sensors to one form: confidence_level low/nominal/high for MODIS and VIIRS, confidence_pct =
 // raw MODIS 0-100 (VIIRS has none). Aliased as `hotspots` so the shared WHERE builder keeps working.
 // brightness, scan, track and version are not part of the contract, so they are not selected.
+// confidence_score / _class / _reasons, worldview_url: fire confidence (contract [1b]), joined in by
+// confidenceJoin() (lib/confidence.js); null when the point is not scored or the DB has no confidence table.
 export const SELECT_HOTSPOTS = `
   SELECT id,
          latitude,
@@ -33,15 +36,20 @@ export const SELECT_HOTSPOTS = `
          frp,
          confidence_pct AS confidence,
          confidence_level,
-         type
+         type,
+         confidence_score,
+         confidence_class,
+         confidence_reasons,
+         worldview_url
     FROM hotspots_canonical AS hotspots`;
 
 async function queryHotspots(filters) {
-  const { where, params } = buildWhere(filters);
+  const source = await hotspotsSource(pool);
+  const { where, params } = buildWhere(filters, { confidence: source.confidence });
   const { cap, message } = rowCapFor(filters, CAPS);
   // Fetch one row past the cap to tell "exactly at the cap" from "over it"; never truncate silently.
   const { rows } = await pool.query(
-    `${SELECT_HOTSPOTS} ${where} ORDER BY acq_date, acq_time, id LIMIT $${params.length + 1}`,
+    `${SELECT_HOTSPOTS} ${confidenceJoin(source)} ${where} ORDER BY acq_date, acq_time, id LIMIT $${params.length + 1}`,
     [...params, cap + 1]
   );
   if (rows.length > cap) throw httpError(message);

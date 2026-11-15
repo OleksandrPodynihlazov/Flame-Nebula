@@ -146,6 +146,23 @@ Other sources:
 - FIRMS overview: <https://www.earthdata.nasa.gov/data/tools/firms>
 - Attribute docs: <https://www.earthdata.nasa.gov/data/tools/firms/faq>
 
+## Fire confidence
+
+Per-hotspot score, class and evidence (contract [1b]); the API serves them and hides `non_fire:*` points by default
+(contract [3], `include_non_fire`). Computed **offline** on a laptop (downloads land cover, burned area, EFFIS, Landsat);
+the server only needs the finished CSV and the load step.
+
+1. Table `hotspot_confidence` and view `hotspots_with_confidence` come from `db/init/views-init.sql`, which every deploy
+   applies (`infra/apply-db-schema.sh`). On a laptop with an older DB run `bash infra/apply-db-schema.sh` once. Without
+   them the API still works: the confidence fields are `null` and nothing is hidden.
+2. On a laptop, after the country's raw points are in `hotspots`: `python3 harmonize/confidence/run.py run --countries Italy`
+   (needs `pip install -r harmonize/requirements.txt`; L7 needs `EARTHDATA_TOKEN`, else it is `n/a`).
+3. Load (copy `data/processed/confidence/<Country>/hotspot_confidence.csv` to the server first):
+   `python3 harmonize/confidence/run.py load-db --countries Italy`. Idempotent upsert.
+4. Clear the gateway API cache (`docs/deploy.md`), or old answers stay up to 10 minutes.
+
+Re-run 2–4 after loading new hotspots, or the new points stay unscored. Unscored points are never hidden.
+
 ## Sensors
 
 | | MODIS | VIIRS |

@@ -1,19 +1,22 @@
 // GET /api/selection-summary (docs/contracts.md [3]): the selection card's numbers in one small answer,
 // so the browser no longer downloads every hotspot of the area to count them.
+import { PLAIN } from "./confidence.js";
 import { buildWhere } from "./query.js";
 
 // One scan, four groupings: per day (peaks, first / last), per type, per day/night, and the whole set.
 // GROUPING() tells a grouping-set NULL from a real NULL type or daynight. A grouping set () always
 // returns one row, so an empty match still yields { kind: "all", count: 0 }.
-export function buildSummaryQuery(filters) {
-  const { where, params } = buildWhere(filters);
+// `source` from lib/confidence.js hotspotsSource(): same non_fire rule as /api/hotspots and /api/stats,
+// so the selection card matches the stat cards for the same area.
+export function buildSummaryQuery(filters, source = PLAIN) {
+  const { where, params } = buildWhere(filters, { confidence: source.confidence });
   return {
     text: `SELECT CASE GROUPING(acq_date, type, daynight)
                     WHEN 3 THEN 'day' WHEN 5 THEN 'type' WHEN 6 THEN 'daynight' ELSE 'all'
                   END AS kind,
                   acq_date AS date, type, daynight,
                   COUNT(*) AS count, COUNT(frp) AS frp_count, SUM(frp) AS frp_sum, MAX(frp) AS frp_max
-             FROM hotspots
+             FROM ${source.from}
              ${where}
             GROUP BY GROUPING SETS ((acq_date), (type), (daynight), ())`,
     values: params,
