@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import L, { type ControlPosition, type FitBoundsOptions } from "leaflet";
 import { MapContainer, TileLayer, ZoomControl, useMap } from "react-leaflet";
 import { COMPARE_COLORS } from "../constants/compare";
-import { ITALY_BOUNDS, MONTHS_FULL } from "../constants/fire";
+import { EUROPE_BOUNDS, ITALY_BOUNDS, MONTHS_FULL } from "../constants/fire";
 import { flyToFit } from "../utils/flyTo";
 import { HOTSPOT_PANE, HOTSPOT_PANE_B, useGeoman, type DrawShape } from "../hooks/useGeoman";
 import { useHints } from "../hooks/useHints";
@@ -187,6 +187,24 @@ function DenseNote({ mobile }: { mobile: boolean }) {
   );
 }
 
+/** Keeps the zoom-out limit at "Europe fills the view", whatever the map's size (window resize, mobile sheet). */
+function EuropeLimit() {
+  const map = useMap();
+  useEffect(() => {
+    const apply = () => {
+      const min = map.getBoundsZoom(EUROPE_BOUNDS, true);
+      map.setMinZoom(min);
+      if (map.getZoom() < min) map.setZoom(min);
+    };
+    apply();
+    map.on("resize", apply);
+    return () => {
+      map.off("resize", apply);
+    };
+  }, [map]);
+  return null;
+}
+
 /** Desktop reset: an icon button stacked under the zoom +/- in Leaflet's top-left corner, so it stays aligned with it. */
 function ResetControl({ options }: { options?: FitBoundsOptions }) {
   const map = useMap();
@@ -297,15 +315,19 @@ export function HotspotMap({
         boundsOptions={fitOptions}
         zoomControl={false}
         zoomSnap={0.25}
+        maxBounds={EUROPE_BOUNDS}
+        maxBoundsViscosity={1}
         preferCanvas
         className="z-10 h-full w-full"
       >
+        <EuropeLimit />
         {!mobile && <ZoomControl position="topleft" />}
         {!mobile && <ResetControl options={fitOptions} />}
         <TileLayer
           url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"
           attribution="Tiles &copy; Esri"
           maxZoom={16}
+          noWrap
         />
 
         {showPatterns ? (

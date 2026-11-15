@@ -24,6 +24,12 @@ export const ITALY_BOUNDS: [[number, number], [number, number]] = [
   [47.1, 18.6],
 ]
 
+/** Pan/zoom limit: the map never shows more than Europe (and does not wrap around the globe). */
+export const EUROPE_BOUNDS: [[number, number], [number, number]] = [
+  [33, -12],
+  [72, 42],
+]
+
 export const MVP_YEAR = 2008
 
 /**
