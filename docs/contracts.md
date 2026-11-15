@@ -88,7 +88,8 @@ File `data/processed/confidence/<Country>/hotspot_confidence.csv` (one per count
 
 Adopted by [3] (API): the 4 fields are in `GET /api/hotspots` properties through the view `hotspots_with_confidence`
 (`db/init/views-init.sql`), and non_fire points are hidden by **default**, `include_non_fire=true` shows them (instead of the
-opt-in `exclude_non_fire` first suggested here). Missing join row → the fields are `null`. `min_confidence`: not yet.
+opt-in `exclude_non_fire` first suggested here). Missing join row → the fields are `null`. `min_confidence=<0-100>` filters
+on `score`; the CSV carries `score`, `class`, `reasons` (both in [3]).
 
 ## [2] db/ schema
 
@@ -173,6 +174,7 @@ Shared query params (area + filters):
 | `type` | `0` | Optional, comma list |
 | `sensor` | `MODIS` or `MODIS,VIIRS` | Optional, comma list. Matches `instrument` in [2] / `sensor` in [1] |
 | `include_non_fire` | `true` | Optional, `true` / `false` (else 400). Default `false`: points whose [1b] class is `non_fire:*` (volcano, static source, offshore, urban) are left out of `/hotspots`, `/hotspots/grid`, `/hotspots.csv`, `/calendar`, `/selection-summary` and the `/stats` totals. Unscored points (no [1b] row) are always kept |
+| `min_confidence` | `60` | Optional, whole number `0`–`100` (else 400). Off when absent. Keeps only points with [1b] `score ≥` it, on every data endpoint (`/stats` totals **and** `by_class`). Unscored points have no score, so they are left out while it is set (`0` = every scored point). Combines with `include_non_fire` |
 | `bbox` | `6.50,36.50,18.75,47.10` | Optional visible map area `west,south,east,north` in degrees: 4 numbers, `-180 ≤ west < east ≤ 180`, `-90 ≤ south < north ≤ 90`, else 400. No antimeridian wrap. ANDed with every other filter, including `region` / `polygon` / circle. SQL `latitude BETWEEN … AND longitude BETWEEN …` (uses the `(latitude, longitude)` index) |
 
 `region` cannot be combined with `polygon` or a circle → 400 `Send one area: region, polygon or circle`. If `polygon` and a circle are both sent, the polygon wins (the frontend never sends both).
@@ -185,7 +187,7 @@ Unknown `region` id → 400. No area given → all loaded data (currently Europe
 | `GET /api/calendar` | `{ "days": [ { "date": "2008-08-14", "count": 42, "frp": 1290.4 }, ... ] }`. `frp`: summed FRP (MW) of the day, 1 decimal |
 | `GET /api/selection-summary` | The selection card's numbers for the filters + area, aggregated in SQL. See below |
 | `GET /api/hotspots/grid` | Hotspots counted per grid cell, for the zoomed-out map. See below |
-| `GET /api/hotspots.csv` | CSV download, same columns as [1] |
+| `GET /api/hotspots.csv` | CSV download, same columns as [1] (+ `confidence_level`), then `score`, `class`, `reasons` from [1b] (empty when the point is not scored) |
 | `GET /api/patterns?month=8` | `{ "month": 8, "cells": [ { "lat": 37.65, "lon": 14.25, "years_burned": 14, "years_observed": 14, "probability": 1, "median_count": 6 } ] }`. One row per 0.1° cell of `fire_patterns` for that month (1–12, required); `lat`/`lon` = cell centre. Area params (circle, polygon, region, bbox) filter by cell centre; a region keeps cells holding one of its S-NPP hotspots. Optional `min_probability` (0–1) drops cells below it; the frontend sends `0.857` (≥ 12 of 14 years). Other params are ignored. Sorted by `probability`, then `median_count`, descending. Table not built → `"cells": []` |
 | `GET /api/patterns/summary` | `{ "months": [ { "month": 1, "cells": 0, "likely": 0, "max_probability": 0 }, … ] }`: always 12 months. `likely` = cells with `probability >= 0.5`. Same area params and `min_probability` as `/api/patterns` |
 | `GET /api/regions` | `{ "regions": [ { "id": 812, "name": "Sicilia", "level": 2, "country": "ITA", "parent_id": 77, "path": "Italy › Isole" } ] }`. No params → countries (level 0, `path` `""`); `?parent=<id>` → its children; `?q=<text>` → name search, 2–100 chars, case- and accent-insensitive, prefix matches first, max 20. `q` with `parent` → 400. Sorted by name. Not loaded yet → `"regions": []` |
@@ -251,6 +253,7 @@ Requests: all endpoints accept every shared param from the table above, with the
 | `bbox` | `5.33,35.11,17.34,47.12` | Map requests only (`/hotspots` from zoom 9, `/hotspots/grid` below): visible bounds + 10 % per side, rounded outward to 0.01°. Never sent to stats, calendar, CSV, `/selection-summary`, or the GeoJSON export's `/hotspots` |
 | `cell` | `1` | `/hotspots/grid` only: `90 / 2^zoom` snapped to 10, 5, 2, 1, 0.5, 0.25, 0.1, 0.05, 0.02, 0.01 |
 | `include_non_fire` | `true` | Only while "show excluded" is on; then on every data request (stats, calendar, grid, hotspots, CSV), so the views stay consistent. Absent → non_fire hidden |
+| `min_confidence` | `60` | Only while the confidence slider is above its "off" position; then on every data request, like `include_non_fire`. Tell the user that unscored points (no confidence yet) are hidden while it is on |
 
 Responses:
 

@@ -19,6 +19,36 @@ test("include_non_fire: false by default, only true or false accepted", () => {
   bad({ include_non_fire: ["true", "false"] }, /include_non_fire/);
 });
 
+test("min_confidence: off by default, whole number 0..100 only", () => {
+  assert.equal(parseFilters({}).minConfidence, null);
+  assert.equal(parseFilters({ min_confidence: "0" }).minConfidence, 0);
+  assert.equal(parseFilters({ min_confidence: "60" }).minConfidence, 60);
+  assert.equal(parseFilters({ min_confidence: "100" }).minConfidence, 100);
+  for (const bad_ of ["101", "-1", "60.5", "abc", "", " 60", "1e2"]) bad({ min_confidence: bad_ }, /min_confidence/);
+  bad({ min_confidence: ["50", "60"] }, /min_confidence/);
+});
+
+test("min_confidence becomes a score condition with its own $n, before the other params", () => {
+  const { where, params } = buildWhere(parseFilters({ min_confidence: "60", from: "2008-01-01" }), { confidence: true });
+  assert.match(where, /confidence_score >= \$1/);
+  assert.match(where, /acq_date >= \$2/);
+  assert.deepEqual(params, [60, "2008-01-01"]);
+});
+
+test("min_confidence also applies when non_fire is kept (stats, include_non_fire=true)", () => {
+  const f = parseFilters({ min_confidence: "60", include_non_fire: "true" });
+  assert.match(buildWhere(f, { confidence: true }).where, /confidence_score >= \$1/);
+  assert.match(buildWhere(parseFilters({ min_confidence: "60" }), { confidence: true, hideNonFire: false }).where,
+    /confidence_score >= \$1/);
+});
+
+test("min_confidence without the confidence source matches nothing instead of being ignored", () => {
+  const { where, params } = buildWhere(parseFilters({ min_confidence: "60" }));
+  assert.equal(where, "WHERE false");
+  assert.deepEqual(params, []);
+  assert.equal(buildWhere(parseFilters({})).where, "", "no filter, no condition");
+});
+
 test("non_fire is hidden only when the query reads the confidence view", () => {
   const f = parseFilters({ from: "2008-01-01" });
   assert.ok(!buildWhere(f).where.includes(NOT_NON_FIRE), "plain hotspots: no confidence column to filter on");

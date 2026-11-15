@@ -70,9 +70,12 @@ export async function getHotspots(filters) {
   };
 }
 
-// GET /api/hotspots.csv → the same rows as CSV (columns from docs/contracts.md [1]).
+// GET /api/hotspots.csv → the same rows as CSV (columns from docs/contracts.md [1]), then the [1b] fire confidence
+// as score, class, reasons (empty when the point is not scored). Appended at the end so earlier columns keep their place.
 export const CSV_COLUMNS = ["id", "latitude", "longitude", "acq_date", "acq_time", "sensor", "satellite", "daynight", "frp",
-  "confidence", "confidence_level", "type"];
+  "confidence", "confidence_level", "type", "score", "class", "reasons"];
+// CSV header → row field, where they differ.
+const CSV_FIELDS = { score: "confidence_score", class: "confidence_class", reasons: "confidence_reasons" };
 
 function csvCell(value) {
   if (value === null || value === undefined) return "";
@@ -83,6 +86,6 @@ function csvCell(value) {
 export async function getHotspotsCsv(filters) {
   const rows = await queryHotspots(filters);
   const lines = [CSV_COLUMNS.join(",")];
-  for (const row of rows) lines.push(CSV_COLUMNS.map((c) => csvCell(row[c])).join(","));
+  for (const row of rows) lines.push(CSV_COLUMNS.map((c) => csvCell(row[CSV_FIELDS[c] ?? c])).join(","));
   return lines.join("\n") + "\n";
 }

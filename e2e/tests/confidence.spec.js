@@ -71,6 +71,49 @@ test('calendar, grid and CSV follow the same rule as stats', async ({ request })
   }
 });
 
+test('min_confidence must be a whole number 0..100 -> else 400 JSON', async ({ request }) => {
+  for (const value of ['101', '-1', '60.5', 'abc', '']) {
+    const res = await request.get('/api/stats', { params: { ...YEAR_2008, min_confidence: value } });
+    expect(res.status(), `min_confidence=${value}`).toBe(400);
+    expect(typeof (await res.json()).error).toBe('string');
+  }
+});
+
+test('min_confidence keeps only scored points at or above it, on every endpoint', async ({ request }) => {
+  const base = await getJson(request, '/api/stats', { ...YEAR_2008, ...ALL });
+  const any = await getJson(request, '/api/stats', { ...YEAR_2008, ...ALL, min_confidence: '0' });
+  // 0 = every scored point: exactly the total minus the unscored ones.
+  expect(any.total).toBe(base.total - (base.by_class.unscored ?? 0));
+  expect(any.by_class.unscored).toBeUndefined();
+
+  const strict = { ...YEAR_2008, min_confidence: '60' };
+  const stats = await getJson(request, '/api/stats', strict);
+  expect(stats.total).toBeLessThanOrEqual(any.total);
+  expect(stats.by_class.unscored).toBeUndefined();
+  const { days } = await getJson(request, '/api/calendar', strict);
+  expect(sum(days.map((d) => d.count))).toBe(stats.total);
+
+  const { features } = await getJson(request, '/api/hotspots', { ...strict, bbox: ITALY_BBOX });
+  for (const { properties: p } of features) expect(p.confidence_score).toBeGreaterThanOrEqual(60);
+});
+
+test('CSV ends with score, class, reasons, filled from the confidence fields', async ({ request }) => {
+  const params = { ...YEAR_2008, from: '2008-08-01', to: '2008-08-31' };
+  const csv = await request.get('/api/hotspots.csv', { params });
+  expect(csv.status()).toBe(200);
+  const [header, ...rows] = (await csv.text()).split(/\r?\n/).filter(Boolean);
+  expect(header.split(',').slice(-3)).toEqual(['score', 'class', 'reasons']);
+  const { features } = await getJson(request, '/api/hotspots', params);
+  expect(rows.length).toBe(features.length);
+  const scored = features.findIndex((f) => f.properties.confidence_score !== null);
+  if (scored >= 0) {
+    // Rows are in the same order as the features (same query, same ORDER BY). reasons may hold commas,
+    // so it is quoted: compare the unquoted score and class only.
+    const p = features[scored].properties;
+    expect(rows[scored]).toContain(`,${p.confidence_score},${p.confidence_class},`);
+  }
+});
+
 test('hotspots carry the 4 confidence fields (null when unscored) and hide non_fire by default', async ({ request }) => {
   const params = { ...YEAR_2008, from: '2008-08-01', to: '2008-08-31', bbox: ITALY_BBOX };
   for (const extra of [{}, ALL]) {
