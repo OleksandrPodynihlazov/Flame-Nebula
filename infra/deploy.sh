@@ -32,6 +32,10 @@ git checkout --quiet --detach "$SHA"
 
 export APP_VERSION="$SHA"
 
+# Before the new API starts: an existing DB never re-runs db/init, so apply it here (idempotent files).
+echo "==> db schema"
+bash infra/apply-db-schema.sh
+
 echo "==> docker compose up (APP_VERSION=$APP_VERSION)"
 docker compose up -d --build --remove-orphans
 bash infra/sync-gateway.sh

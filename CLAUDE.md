@@ -41,6 +41,7 @@ Run everything with `docker compose up --build` from the repo root, then open ht
 - **Merge:** PR into `main` with 1 approving review. `main` must always run with `docker compose up`.
 - **Dates and times:** store UTC. `acq_date` is `YYYY-MM-DD`, `acq_time` is `HHMM` UTC, always 4 digits.
 - **Coordinates:** WGS84 decimal degrees, order `latitude, longitude` in CSV and JSON fields; GeoJSON uses `[longitude, latitude]` as its spec requires.
+- **Schema change** → edit `db/init/*.sql` idempotently (`IF NOT EXISTS`, explicit index names); deploy applies every file on every deploy.
 - **Raw data:** never commit files from `data/`. Document how to fetch a file in `docs/data-sources.md` instead.
 - **Python deps:** add to `harmonize/requirements.txt` with a pinned version (`pandas==2.2.3`).
 - **New endpoint or UI feature:** unfix or add its test in `e2e/tests/` in the same PR.

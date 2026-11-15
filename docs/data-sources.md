@@ -45,10 +45,16 @@ Expect `total: 131700 inserted …; 0 file(s) failed` (all MODIS Italy, ~9 s). A
 (`git checkout` leaves ignored files alone), and so does the `pgdata` volume. Loading is a one-time manual step, not part of
 `infra/deploy.sh`. Because it is idempotent, adding it to the deploy would also be safe.
 
-**When the schema changes** (e.g. `type` becomes nullable, a column is added):
-- Editing `db/init/hotspots-init.sql` does **not** change an existing database. Postgres runs init scripts only on an empty
-  volume, and `--create-table` skips an existing table. Apply the change explicitly, once per DB (laptop, VPS), as an
-  idempotent statement, e.g. `ALTER TABLE hotspots ALTER COLUMN type DROP NOT NULL;` or `ADD COLUMN IF NOT EXISTS …`.
+**When the schema changes** (e.g. `type` becomes nullable, a column is added, a view or index is added):
+- Postgres runs `db/init/*.sql` only on an empty volume, and `--create-table` skips an existing table. So every deploy
+  runs `infra/apply-db-schema.sh`, which applies **all** `db/init/*.sql` in alphabetical order (one transaction per file,
+  `ON_ERROR_STOP`) before the new API starts. A failing file stops the deploy. CI applies them a second time to prove it.
+- So write the change **into `db/init/*.sql`, idempotently**: `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS
+  <explicit name>` (an unnamed index gets a new name on every run = a duplicate index), `ADD COLUMN IF NOT EXISTS`,
+  `ALTER COLUMN … DROP NOT NULL`, `CREATE OR REPLACE VIEW` (or `DROP VIEW IF EXISTS` + `CREATE VIEW` when columns move).
+  Never `DROP TABLE`, `TRUNCATE`, `DELETE` or `ALTER … DROP` there: it would run against the live data on every deploy.
+- A big new index on a big table (the VPS has millions of rows) locks writes while it builds, during the deploy.
+- On a laptop: `bash infra/apply-db-schema.sh` does the same as the deploy.
 - Or rebuild, since the data is fully reproducible from `data/raw` in seconds:
   `docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "DROP TABLE hotspots CASCADE"'`
   (CASCADE also drops the harmonization views), then the load command above and the *Harmonize* commands below.
