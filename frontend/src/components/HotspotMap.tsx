@@ -8,6 +8,7 @@ import L, { type ControlPosition, type FitBoundsOptions } from "leaflet";
 import { MapContainer, TileLayer, ZoomControl, useMap } from "react-leaflet";
 import { COMPARE_COLORS } from "../constants/compare";
 import { ITALY_BOUNDS, MONTHS_FULL } from "../constants/fire";
+import { flyToFit } from "../utils/flyTo";
 import { HOTSPOT_PANE, HOTSPOT_PANE_B, useGeoman, type DrawShape } from "../hooks/useGeoman";
 import { useHints } from "../hooks/useHints";
 import { useHotspotLayer } from "../hooks/useHotspotLayer";
@@ -210,7 +211,7 @@ function ResetControl({ options }: { options?: FitBoundsOptions }) {
         <button
           type="button"
           aria-label="Reset view"
-          onClick={() => map.fitBounds(ITALY_BOUNDS, options)}
+          onClick={() => flyToFit(map, ITALY_BOUNDS, options)}
           className="flex size-9 items-center justify-center rounded-[7px] text-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
         >
           <RotateCcw className="size-4" aria-hidden="true" />
@@ -365,7 +366,7 @@ export function HotspotMap({
             variant="secondary"
             size="icon-lg"
             aria-label="Reset view"
-            onClick={() => map?.fitBounds(ITALY_BOUNDS, fitOptions)}
+            onClick={() => map && flyToFit(map, ITALY_BOUNDS, fitOptions)}
             className={FLOAT_ICON_BUTTON}
           >
             <RotateCcw aria-hidden="true" />

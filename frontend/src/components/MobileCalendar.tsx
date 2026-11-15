@@ -136,7 +136,7 @@ export function MobileCalendar({ grid, filters, loading, onYear, onMonth, onDate
                     type="button"
                     onClick={() => onMonth(mi as Month)}
                     className={cn(
-                      'flex w-full flex-col items-start rounded-lg px-2.5 py-2 text-left ring-1 transition-transform active:scale-95',
+                      'flex w-full flex-col items-start rounded-lg px-2.5 py-2 text-left ring-1 transition-transform active:scale-95 motion-safe:transition-[transform,background-color] duration-200',
                       peak ? 'ring-flare' : 'ring-border',
                       FOCUS_RING,
                       heatInk(idx),
@@ -184,7 +184,7 @@ export function MobileCalendar({ grid, filters, loading, onYear, onMonth, onDate
                       aria-pressed={selected}
                       aria-label={`${di + 1} ${MONTHS_FULL[month]}: ${count} hotspots`}
                       className={cn(
-                        'flex h-11 flex-col items-center justify-center rounded-md text-[11px] leading-none font-semibold transition-transform active:scale-95',
+                        'flex h-11 flex-col items-center justify-center rounded-md text-[11px] leading-none font-semibold transition-transform active:scale-95 motion-safe:transition-[transform,background-color] duration-200',
                         heatInk(idx),
                         selected && 'ring-2 ring-flare ring-offset-1 ring-offset-card',
                         FOCUS_RING,

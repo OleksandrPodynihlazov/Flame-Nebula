@@ -65,7 +65,7 @@ export function Delta({ from, to, testId }: { from: number | undefined; to: numb
 function DayNightBar({ dayPct }: { dayPct: number }) {
   return (
     <span role="img" aria-label={`${dayPct}% by day`} title={`${dayPct}% by day`} className="flex h-1 w-full gap-px overflow-hidden rounded-full">
-      <span className="bg-flare" style={{ width: `${dayPct}%` }} />
+      <span className="bg-flare motion-safe:transition-[width] duration-300 ease-out" style={{ width: `${dayPct}%` }} />
       <span className="flex-1 bg-compare-a" />
     </span>
   )

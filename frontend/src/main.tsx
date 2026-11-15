@@ -8,12 +8,14 @@ import 'leaflet/dist/leaflet.css'
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css'
 import './index.css'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { AppToaster } from '@/components/AppToaster'
 import App from './App'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <TooltipProvider delayDuration={300}>
       <App />
+      <AppToaster />
     </TooltipProvider>
   </StrictMode>,
 )

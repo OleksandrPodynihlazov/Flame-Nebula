@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { ChevronRight, SlidersHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { downloadCsv } from './api/client'
+import { downloadToast } from './utils/downloadToast'
 import { BurnCalendar } from './components/BurnCalendar'
 import { EmptyState } from './components/EmptyState'
 import { ErrorAlert } from './components/ErrorAlert'
@@ -66,8 +67,13 @@ export default function App() {
 
   const onDownload = async () => {
     setDownloading(true)
+    const rows = isPatterns || stats.loading ? null : (stats.data?.total ?? null)
+    const run = downloadCsv(selectionQuery, `firms_italy_${fileTag}.csv`)
+    downloadToast('CSV', run, () => rows)
     try {
-      await downloadCsv(selectionQuery, `firms_italy_${fileTag}.csv`)
+      await run
+    } catch {
+      // The failure is reported by the toast.
     } finally {
       setDownloading(false)
     }

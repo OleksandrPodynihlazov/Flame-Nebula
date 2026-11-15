@@ -1,6 +1,7 @@
 import L from 'leaflet'
 import { useEffect } from 'react'
 import { useMap } from 'react-leaflet'
+import { flyToFit } from '../utils/flyTo'
 import type { Area } from '../types/api'
 
 /** Mirrors --flare (outline) and --primary (fill); the drawn shapes in useGeoman use the same. */
@@ -28,7 +29,7 @@ export function RegionOutline({ area, fitOptions }: { area: Area | null; fitOpti
     layer.addTo(map)
     map.attributionControl?.addAttribution(CREDIT)
     const bounds = layer.getBounds()
-    if (bounds.isValid()) map.fitBounds(bounds, { padding: [24, 24], ...fitOptions })
+    if (bounds.isValid()) flyToFit(map, bounds, { padding: [24, 24], ...fitOptions })
     return () => {
       layer.remove()
       map.attributionControl?.removeAttribution(CREDIT)
