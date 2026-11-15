@@ -60,9 +60,3 @@ export function cellBounds(lat: number, lon: number, cell: number): [[number, nu
     [south + cell, west + cell],
   ]
 }
-
-/** Centre of the grid cell holding a point. Bubbles are drawn here, not at the points' mean, so neighbours are a full cell apart. */
-export function cellCenter(lat: number, lon: number, cell: number): { lat: number; lon: number } {
-  const [[south, west]] = cellBounds(lat, lon, cell)
-  return { lat: south + cell / 2, lon: west + cell / 2 }
-}
