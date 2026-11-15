@@ -48,7 +48,7 @@ How to build: `docs/data-sources.md` → *Harmonize*. Method and evidence: `rese
 |---|---|---|
 | `coverage(satellite, day, status, note)` | table | `status` ∈ `ok`/`partial`/`missing` per satellite × UTC day. **Draw non-ok days as "no data", never as 0.** |
 | `static_mask(cell_lat, cell_lon, category, core, qualifying_years)` | table | Industrial sites / flares (`static`) and `volcano` cells, grid `floor(deg*100)`, built from S-NPP. |
-| `hotspots_canonical` | view | `hotspots` + sensor-neutral fields: `confidence_level` (low/nominal/high, both sensors), `confidence_pct` (raw MODIS 0–100, NULL for VIIRS), `platform` (terra/aqua/snpp/noaa20/noaa21). SQL in `db/init/hotspots-views.sql` (fresh DBs get it automatically; `python3 harmonize/canonical.py` re-applies it). **Read per-hotspot fields from here, never branch on the sensor in the API.** |
+| `hotspots_canonical` | view | `hotspots` + sensor-neutral fields: `confidence_level` (low/nominal/high, both sensors), `confidence_pct` (raw MODIS 0–100, NULL for VIIRS), `platform` (terra/aqua/snpp/noaa20/noaa21). SQL in `db/init/hotspots-views.sql` (every deploy applies it; `python3 harmonize/canonical.py` re-applies it by hand). **Read per-hotspot fields from here, never branch on the sensor in the API.** |
 | `hotspots_flagged` | view | `hotspots` + `mask_category` + `is_burning` (= not masked and `type` ≠ 3; NULL `type` counts as land). **Count burning activity with `WHERE is_burning`.** Map/CSV can show all rows with the flag. |
 | `hotspot_country(hotspot_id, country, how)` | table | ISO3 of every point (`how`: `f` archive file name, `r` level-0 region, `g` geometry). `country` NULL = outside the Europe scope: left out of every series. |
 | `calibration` | table | Junction factors J1 Terra→Aqua, J2 Aqua→S-NPP, J3 S-NPP→NOAA-20, **per country** (ISO3, `EUR` = pooled) × month (0 = all months) × metric (`count`, `frp`), with interquartile band. |
@@ -93,6 +93,11 @@ optional filter `min_confidence=<0-100>` and `exclude_non_fire=true`. Missing jo
 ## [2] db/ schema
 
 Postgres 17. name: hotspots-init.sql
+
+Every `db/init/*.sql` must be safe to re-run: `infra/apply-db-schema.sh` applies all of them on every deploy
+(`IF NOT EXISTS`, explicit index names; never `DROP TABLE`/`TRUNCATE`/`DELETE`). Indexes on `hotspots`:
+`hotspots_acq_date_idx`, `hotspots_instrument_acq_date_idx`, `hotspots_latitude_longitude_idx` (this file),
+`hotspots_natural_key` (unique, `ingest/load_hotspots.py`), `hotspots_point_gist` (`regions-init.sql`).
 
 ```sql
 CREATE TABLE hotspots (
