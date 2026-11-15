@@ -4,7 +4,7 @@ import type { ApiQuery, CalendarResponse, Filters, SelectionSummaryResponse, Sta
 import { selectionQuery, yearQuery } from '../utils/filters'
 import { FILTER_DEBOUNCE_MS, useDebouncedValue } from './useDebouncedValue'
 
-interface State<T> {
+export interface State<T> {
   data: T | null
   loading: boolean
   error: string | null
@@ -20,7 +20,7 @@ interface Settled<T> {
  * `query` null = nothing to load: no request, no data. A changed query is asked for only after it has
  * stayed the same for FILTER_DEBOUNCE_MS; meanwhile `loading` is true and the previous data stays.
  */
-function useEndpoint<T>(fetcher: (q: ApiQuery, s: AbortSignal) => Promise<T>, query: ApiQuery | null): State<T> {
+export function useEndpoint<T, Q = ApiQuery>(fetcher: (q: Q, s: AbortSignal) => Promise<T>, query: Q | null): State<T> {
   const [settled, setSettled] = useState<Settled<T>>({ key: null, data: null, error: null })
   const key = query === null ? null : JSON.stringify(query)
   const requestKey = useDebouncedValue(key, FILTER_DEBOUNCE_MS)
@@ -28,7 +28,7 @@ function useEndpoint<T>(fetcher: (q: ApiQuery, s: AbortSignal) => Promise<T>, qu
   useEffect(() => {
     if (requestKey === null) return
     const ctrl = new AbortController()
-    fetcher(JSON.parse(requestKey) as ApiQuery, ctrl.signal)
+    fetcher(JSON.parse(requestKey) as Q, ctrl.signal)
       .then((data) => {
         // Mocks ignore the signal: a superseded response must never overwrite a newer query.
         if (!ctrl.signal.aborted) setSettled({ key: requestKey, data, error: null })

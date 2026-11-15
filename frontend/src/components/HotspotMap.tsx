@@ -3,11 +3,13 @@ import { useState, type CSSProperties, type ReactNode } from "react";
 import type { ControlPosition, FitBoundsOptions } from "leaflet";
 import { MapContainer, TileLayer, ZoomControl, useMap } from "react-leaflet";
 import { COMPARE_COLORS } from "../constants/compare";
-import { ITALY_BOUNDS } from "../constants/fire";
+import { ITALY_BOUNDS, MONTHS_FULL } from "../constants/fire";
 import { HOTSPOT_PANE, HOTSPOT_PANE_B, useGeoman } from "../hooks/useGeoman";
 import { useHotspotLayer } from "../hooks/useHotspotLayer";
+import { usePatternLayer } from "../hooks/usePatternLayer";
 import { useViewportData } from "../hooks/useViewportData";
-import type { ApiQuery, Area, SelectionSummaryResponse, Sensor } from "../types/api";
+import type { ApiQuery, Area, MapView, PatternCell, SelectionSummaryResponse, Sensor } from "../types/api";
+import { MapLayersButton } from "./MapLayersButton";
 import { MapLegend, SideLegend } from "./MapLegend";
 import { RegionOutline } from "./RegionOutline";
 import { SelectionPanel } from "./SelectionPanel";
@@ -61,6 +63,58 @@ function MapStatus({
       ) : (
         <span className="truncate text-xs font-medium text-slate-100" aria-live="polite">
           {label} · {totalLoading || total === null ? "loading…" : `${total.toLocaleString()} hotspots`}
+        </span>
+      )}
+      <ResetView options={fitOptions} />
+    </div>
+  );
+}
+
+export interface PatternSide {
+  month: number;
+  cells: PatternCell[] | null;
+  loading: boolean;
+  error: string | null;
+}
+
+export interface PatternMapView {
+  a: PatternSide;
+  /** Set: compare two months with the divider. */
+  b: PatternSide | null;
+}
+
+
+function PatternLayer({ side, pane, mobile }: { side: PatternSide; pane: string; mobile: boolean }) {
+  usePatternLayer(side.cells, MONTHS_FULL[side.month - 1], side.loading && side.cells !== null, mobile, pane);
+  return null;
+}
+
+function PatternLabel({ side }: { side: PatternSide }) {
+  return (
+    <span className="font-medium text-slate-100">
+      <span className="font-semibold">{MONTHS_FULL[side.month - 1]}</span>
+      <span className="text-slate-400"> · {side.loading || side.cells === null ? "…" : `${side.cells.length.toLocaleString()} cells`}</span>
+    </span>
+  );
+}
+
+function PatternStatus({ side, mobile, fitOptions }: { side: PatternSide; mobile: boolean; fitOptions?: FitBoundsOptions }) {
+  const text = side.loading || side.cells === null ? "loading…" : `${side.cells.length.toLocaleString()} cells burned ≥12 of 14 years`;
+  return (
+    <div
+      className={`absolute top-3 z-[1000] flex items-center gap-2 rounded-lg border bg-slate-900/90 px-3 py-1.5 shadow-xl backdrop-blur-md ${
+        side.error ? "border-rose-500/60" : "border-slate-700/80"
+      } ${mobile ? "left-3 max-w-[calc(100%-4.5rem)]" : "left-12 max-w-[calc(100%-4rem)]"}`}
+      data-testid="pattern-status"
+    >
+      <span className={`h-2 w-2 shrink-0 rounded-full ${side.error ? "bg-rose-500" : "bg-red-600"} ${side.loading ? "animate-pulse" : ""}`} />
+      {side.error ? (
+        <span role="alert" className="truncate text-xs font-medium text-rose-200" title={side.error}>
+          Patterns: {side.error}
+        </span>
+      ) : (
+        <span className="truncate text-xs font-medium text-slate-100" aria-live="polite">
+          Patterns · {MONTHS_FULL[side.month - 1]} · {text}
         </span>
       )}
       <ResetView options={fitOptions} />
@@ -141,6 +195,10 @@ interface Props {
   compare?: CompareView | null;
   /** Px of the map's right edge covered by a panel: kept out of fits and overlays. */
   rightInset?: number;
+  view?: MapView;
+  onViewChange?: (view: MapView) => void;
+  /** Pattern view data; used instead of hotspots when `view` is 'patterns'. */
+  patterns?: PatternMapView | null;
   children?: ReactNode;
 }
 
@@ -159,8 +217,13 @@ export function HotspotMap({
   mobile = false,
   compare = null,
   rightInset = 0,
+  view = "spots",
+  onViewChange,
+  patterns = null,
   children,
 }: Props) {
+  const showPatterns = view === "patterns" && patterns !== null;
+  const comparing = showPatterns ? patterns.b !== null : compare !== null;
   const [legendOpen, setLegendOpen] = useState(!mobile);
   const fitOptions: FitBoundsOptions | undefined = mobile
     ? { paddingTopLeft: [0, 48], paddingBottomRight: [0, 96] }
@@ -170,7 +233,7 @@ export function HotspotMap({
     <section
       className={
         mobile
-          ? `relative min-h-0 flex-1 ${compare ? "compare-mode" : ""}`
+          ? `relative min-h-0 flex-1 ${comparing ? "compare-mode" : ""}`
           : "relative h-full w-full"
       }
       style={{ "--panel-inset": `${rightInset}px` } as CSSProperties}
@@ -189,7 +252,28 @@ export function HotspotMap({
           maxZoom={16}
         />
 
-        {compare ? (
+        {showPatterns ? (
+          patterns.b ? (
+            <>
+              <PatternLayer side={patterns.a} pane={HOTSPOT_PANE} mobile={mobile} />
+              <PatternLayer side={patterns.b} pane={HOTSPOT_PANE_B} mobile={mobile} />
+              <SwipeCompare
+                leftPane={HOTSPOT_PANE}
+                rightPane={HOTSPOT_PANE_B}
+                left={<PatternLabel side={patterns.a} />}
+                right={<PatternLabel side={patterns.b} />}
+                leftColor={COMPARE_COLORS.a}
+                rightColor={COMPARE_COLORS.b}
+                rightInset={rightInset}
+              />
+            </>
+          ) : (
+            <>
+              <PatternLayer side={patterns.a} pane={HOTSPOT_PANE} mobile={mobile} />
+              <PatternStatus side={patterns.a} mobile={mobile} fitOptions={fitOptions} />
+            </>
+          )
+        ) : compare ? (
           <>
             <CompareLayer query={compare.a.query} pane={HOTSPOT_PANE} mobile={mobile} />
             <CompareLayer query={compare.b.query} pane={HOTSPOT_PANE_B} mobile={mobile} />
@@ -228,16 +312,26 @@ export function HotspotMap({
           open={legendOpen}
           onToggle={() => setLegendOpen((o) => !o)}
           sensors={sensors}
+          patterns={showPatterns}
         />
       ) : (
         <MapLegend
           open={legendOpen}
           onToggle={() => setLegendOpen((o) => !o)}
           sensors={sensors}
+          patterns={showPatterns}
         />
       )}
 
-      {area && !compare && (
+      {onViewChange && (
+        <MapLayersButton
+          view={view}
+          onChange={onViewChange}
+          className={mobile ? "top-14 left-3 flex-col items-start" : "bottom-8 right-[calc(var(--panel-inset,0px)+0.75rem)] flex-row-reverse"}
+        />
+      )}
+
+      {area && !compare && !showPatterns && (
         <SelectionPanel
           area={area}
           summary={selection.summary}

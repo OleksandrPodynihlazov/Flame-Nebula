@@ -6,16 +6,20 @@ import { CompareMiniStats, CompareStats, type CompareSideData } from './componen
 import { HotspotMap } from './components/HotspotMap'
 import { MobileCalendar } from './components/MobileCalendar'
 import { MobileSheet } from './components/MobileSheet'
+import { PatternMonths } from './components/patterns/PatternMonths'
+import { PatternMiniStats, PatternStats, type PatternSideStats } from './components/patterns/PatternStats'
 import { MiniStats, StatCards } from './components/StatCards'
 import { Brand, FilterControls, SearchField, TopBar } from './components/TopBar'
 import { COMPARE_COLORS, type CompareYears } from './constants/compare'
-import { DEFAULT_FILTERS, MONTHS } from './constants/fire'
+import { DEFAULT_FILTERS, MONTHS, MONTHS_FULL } from './constants/fire'
 import { useDashboardData } from './hooks/useDashboardData'
 import { useIsDesktop } from './hooks/useMediaQuery'
-import type { Area, Filters } from './types/api'
+import { usePatternCells, usePatternSummary } from './hooks/usePatternData'
+import type { Area, Filters, MapView } from './types/api'
 import { buildGrid } from './utils/calendar'
 import { filtersForYear, formatMW } from './utils/compare'
 import { activeSensors, selectionLabel, toggleDatePatch, toggleMonthPatch, yearPatch } from './utils/filters'
+import { PATTERN_DEFAULT_MONTH, YEAR_BANDS, patternStats, yearBands } from './utils/patterns'
 
 const PANEL_WIDTH = 600
 
@@ -26,13 +30,24 @@ export default function App() {
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [panelOpen, setPanelOpen] = useState(true)
   const [compare, setCompare] = useState<CompareYears | null>(null)
+  const [view, setView] = useState<MapView>('spots')
+  const [patternMonth, setPatternMonth] = useState(PATTERN_DEFAULT_MONTH)
+  const [patternCompare, setPatternCompare] = useState<CompareYears | null>(null)
   const isDesktop = useIsDesktop()
+  const isPatterns = view === 'patterns'
+
+  const patternSummary = usePatternSummary(filters, isPatterns)
+  const monthA = patternCompare?.a ?? patternMonth
+  const cellsA = usePatternCells(filters, isPatterns ? monthA : null)
+  const cellsB = usePatternCells(filters, isPatterns && patternCompare ? patternCompare.b : null)
+  const patternA = useMemo(() => patternStats(cellsA.data?.cells ?? null), [cellsA.data])
+  const patternB = useMemo(() => patternStats(cellsB.data?.cells ?? null), [cellsB.data])
 
   const filtersA = useMemo(() => (compare ? filtersForYear(filters, compare.a) : filters), [filters, compare])
   const filtersB = useMemo(() => filtersForYear(filters, compare?.b ?? filters.year), [filters, compare])
   // The selection card is hidden in compare mode, so only side A loads its summary, and only outside it.
-  const { calendar, stats, summary, isDemo, selectionQuery } = useDashboardData(filtersA, true, compare === null)
-  const second = useDashboardData(filtersB, compare !== null)
+  const { calendar, stats, summary, isDemo, selectionQuery } = useDashboardData(filtersA, !isPatterns, compare === null && !isPatterns)
+  const second = useDashboardData(filtersB, compare !== null && !isPatterns)
 
   const grid = useMemo(() => (calendar.data ? buildGrid(filtersA.year, calendar.data) : null), [calendar.data, filtersA.year])
   const gridB = useMemo(
@@ -55,7 +70,9 @@ export default function App() {
   }
 
   // Map and selection card show their own request errors.
-  const error = calendar.error ?? stats.error ?? (compare ? (second.calendar.error ?? second.stats.error) : null)
+  const error = isPatterns
+    ? (patternSummary.error ?? cellsA.error ?? cellsB.error)
+    : (calendar.error ?? stats.error ?? (compare ? (second.calendar.error ?? second.stats.error) : null))
 
   const errorBanner = error && (
     <p role="alert" className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
@@ -109,7 +126,39 @@ export default function App() {
     b: { year: compare.b, query: second.selectionQuery, total: second.stats.data?.total ?? null, loading: second.stats.loading },
   }
 
-  const controls = { filters, onChange: update, onDownload, downloading, compare, onCompareChange: setCompare }
+  const pSideA: PatternSideStats = { side: 'a', month: monthA, stats: patternA, loading: cellsA.loading }
+  const pSideB: PatternSideStats | null = patternCompare && { side: 'b', month: patternCompare.b, stats: patternB, loading: cellsB.loading }
+
+  const patternChart = patternCompare && (
+    <CompareBars
+      title={`Recurring cells · ${MONTHS_FULL[patternCompare.a - 1]} vs ${MONTHS_FULL[patternCompare.b - 1]}`}
+      subtitle="0.1° cells by years burned that month. Same area on both sides."
+      categories={YEAR_BANDS}
+      loading={cellsA.loading || cellsB.loading}
+      series={[
+        { label: MONTHS_FULL[patternCompare.a - 1], color: COMPARE_COLORS.a, values: yearBands(cellsA.data?.cells ?? null) },
+        { label: MONTHS_FULL[patternCompare.b - 1], color: COMPARE_COLORS.b, values: yearBands(cellsB.data?.cells ?? null) },
+      ]}
+    />
+  )
+
+  const patternMonths = (compact: boolean) => (
+    <PatternMonths months={patternSummary.data?.months ?? null} selected={patternMonth} loading={patternSummary.loading} onSelect={setPatternMonth} compact={compact} />
+  )
+
+  const scope = isPatterns
+    ? `Patterns · ${patternCompare ? `${MONTHS_FULL[patternCompare.a - 1].slice(0, 3)} vs ${MONTHS_FULL[patternCompare.b - 1].slice(0, 3)}` : MONTHS_FULL[patternMonth - 1]}`
+    : undefined
+
+  const controls = {
+    filters,
+    onChange: update,
+    onDownload,
+    downloading,
+    compare,
+    onCompareChange: setCompare,
+    patternMode: isPatterns ? { compare: patternCompare, onCompareChange: setPatternCompare } : null,
+  }
   const mapProps = {
     query: selectionQuery,
     total: stats.data?.total ?? null,
@@ -123,13 +172,21 @@ export default function App() {
     downloading,
     onDownloadCsv: onDownload,
     compare: mapCompare,
+    view,
+    onViewChange: setView,
+    patterns: isPatterns
+      ? {
+          a: { month: monthA, cells: cellsA.data?.cells ?? null, loading: cellsA.loading, error: cellsA.error },
+          b: patternCompare && { month: patternCompare.b, cells: cellsB.data?.cells ?? null, loading: cellsB.loading, error: cellsB.error },
+        }
+      : null,
   }
 
   if (!isDesktop) {
     return (
       <div className="flex h-dvh flex-col overflow-hidden bg-slate-950 font-sans text-slate-100 antialiased">
         <header className="z-30 flex h-14 shrink-0 items-center gap-3 border-b border-slate-800 bg-slate-900/95 px-3">
-          <Brand year={filters.year} sensors={sensors} isDemo={isDemo} compare={compare} />
+          <Brand year={filters.year} sensors={sensors} isDemo={isDemo} compare={compare} scope={scope} />
           <SearchField area={filters.area} onAreaChange={setArea} />
         </header>
 
@@ -149,7 +206,7 @@ export default function App() {
               </button>
               {filtersOpen && (
                 <div className="w-64 rounded-xl border border-slate-700/80 bg-slate-900/95 p-3 shadow-xl backdrop-blur-md">
-                  <FilterControls {...controls} stacked hideYear />
+                  <FilterControls {...controls} stacked hideYear patternMonth={patternMonth} />
                 </div>
               )}
             </div>
@@ -160,7 +217,9 @@ export default function App() {
               peek={
                 <div className="flex flex-col gap-2">
                   {errorBanner}
-                  {sideA && sideB ? (
+                  {isPatterns ? (
+                    <PatternMiniStats a={pSideA} b={pSideB} />
+                  ) : sideA && sideB ? (
                     <CompareMiniStats a={sideA} b={sideB} />
                   ) : (
                     <MiniStats stats={stats.data} grid={grid} loading={stats.loading} />
@@ -168,7 +227,9 @@ export default function App() {
                 </div>
               }
             >
-              {compareChart || (
+              {isPatterns ? (
+                patternChart || patternMonths(true)
+              ) : compareChart || (
                 <MobileCalendar
                   grid={grid}
                   filters={filters}
@@ -189,7 +250,7 @@ export default function App() {
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-slate-950 font-sans text-slate-100 antialiased">
-      <TopBar {...controls} isDemo={isDemo} />
+      <TopBar {...controls} isDemo={isDemo} scope={scope} patternMonth={patternMonth} />
 
       <main className="relative flex-1 overflow-hidden">
         <HotspotMap {...mapProps} rightInset={panelOpen ? panelWidth : 0} />
@@ -213,12 +274,21 @@ export default function App() {
           </button>
           <section className="flex h-full w-full flex-col gap-4 overflow-y-auto border-l border-slate-800 bg-slate-950/95 p-5 backdrop-blur-md">
             {errorBanner}
-            {sideA && sideB ? (
-              <CompareStats a={sideA} b={sideB} />
+            {isPatterns ? (
+              <>
+                <PatternStats a={pSideA} b={pSideB} />
+                {patternChart || patternMonths(false)}
+              </>
             ) : (
-              <StatCards stats={stats.data} grid={grid} scope={selectionLabel(filters)} loading={stats.loading} sensors={sensors} />
+              <>
+                {sideA && sideB ? (
+                  <CompareStats a={sideA} b={sideB} />
+                ) : (
+                  <StatCards stats={stats.data} grid={grid} scope={selectionLabel(filters)} loading={stats.loading} sensors={sensors} />
+                )}
+                {compareChart || calendarView}
+              </>
             )}
-            {compareChart || calendarView}
           </section>
         </aside>
       </main>
