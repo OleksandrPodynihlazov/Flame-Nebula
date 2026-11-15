@@ -121,21 +121,68 @@ Italy result: 473,861 points (99.98 %) → `ITA`; 17 → `FRA` and 14 → `CHE` 
 **Known gap:** CGAZ has no Lampedusa or Linosa (the per-country gbOpen file does). Their 41 detections stay unassigned:
 they appear in queries with no area, but not under Italy or Sicilia.
 
+## Europe + NOAA-20 data
+
+Harmonization covers the 41 countries of the `europe` preset that FIRMS publishes (`ingest/regions_scope.py`,
+`harmonize/firms_countries.py`). S-NPP stopped on 2026-11-02, so 2026 and NOAA-20 come from the API
+(`FIRMS_MAP_KEY` in `.env`). Run from the repo root; every step resumes or skips what is done.
+
+```sh
+EU="Albania Andorra Austria Belgium Bulgaria Bosnia_and_Herzegovina Belarus Switzerland Cyprus Czech_Republic \
+Germany Denmark Spain Estonia Finland France United_Kingdom Greece Croatia Hungary Ireland Iceland Italy Lithuania \
+Luxembourg Latvia Moldova Macedonia_Former_Yugoslav_Republic_of Malta Montenegro Netherlands Norway Poland Portugal \
+Romania Serbia Slovakia Slovenia Sweden Ukraine Kosovo"
+python3 ingest/firms_archive_fetch.py --sensor modis --years 2000-2025 --country $EU        # ~1.0k files
+python3 ingest/firms_archive_fetch.py --sensor viirs-snpp --years 2012-2025 --country $EU   # ~0.6k files
+set -a; . ./.env; set +a
+for BOX in -25,34.5,30,72 30,44,41,72 32,34.5,34.7,35.8; do                                # west, east, Cyprus
+  python3 ingest/firms_api_fetch.py fetch --source VIIRS_NOAA20_SP  --start 2018-04-01 --end 2026-07-31 --bbox $BOX
+  python3 ingest/firms_api_fetch.py fetch --source VIIRS_NOAA20_NRT --start 2026-08-01 --end <yesterday> --bbox $BOX
+  python3 ingest/firms_api_fetch.py fetch --source VIIRS_SNPP_SP    --start 2026-01-01 --end 2026-07-31 --bbox $BOX
+  python3 ingest/firms_api_fetch.py fetch --source VIIRS_SNPP_NRT   --start 2026-08-01 --end 2026-11-02 --bbox $BOX
+done
+python3 ingest/load_hotspots.py --create-table data/raw/firms_archive/*.csv
+python3 ingest/load_hotspots.py data/raw/firms_api/VIIRS_*_SP_*.csv data/raw/firms_api/VIIRS_*_NRT_*.csv   # SP first
+env/bin/python harmonize/country.py     # hotspot_country: file name for archive points, ADM0 geometry for API points
+```
+
+- Archive "country not in …" lines for Andorra, Malta or Iceland are normal: no fires that year, no file.
+- **API quota: 5000 transactions / 10 min per key.** A 5-day request on the west box costs ~10. Run the boxes one
+  after another, never in parallel. On `Exceeding allowed transaction limit` (later also `Invalid MAP_KEY`) wait
+  11 min and run the same command again: finished chunks are cached. All of it takes ~1.5 h.
+- NRT rows have no `type`: a DB created before `type` became nullable needs, once,
+  `ALTER TABLE hotspots ALTER COLUMN type DROP NOT NULL;` (the loader prints this hint).
+- `country.py` needs shapely (`env/`, see *Regions*). Points outside the 41 countries (Turkey, Russia, North Africa
+  in the API boxes) get country NULL and are left out of every series.
+
 ## Harmonize
 
-After loading MODIS **and** S-NPP (`--sensor viirs-snpp --years 2012-2025` in the fetch step), run in this order.
-Each step rebuilds its own tables/views from scratch, so re-running is safe. Total ~20 s.
+After loading the data, run in this order. Each step rebuilds its own tables/views from scratch, so re-running is
+safe. `--until` = the last day with data (yesterday).
 
 ```sh
 python3 harmonize/canonical.py       # view hotspots_canonical: confidence_level / platform for both sensors
-python3 harmonize/coverage_table.py   # coverage: satellite × day ok/partial/missing (known gaps, research/07 §6)
+python3 harmonize/coverage_table.py --until <yesterday>   # coverage: satellite × day ok/partial/missing (research/07 §6)
 python3 harmonize/static_mask.py      # static_mask + view hotspots_flagged
-python3 harmonize/calibrate.py        # calibration + views calibration_chain, harmonized_monthly; prints the factors
+python3 harmonize/calibrate.py        # per-country factors + calibration_chain, harmonized_monthly; prints EUR factors
 python3 harmonize/patterns.py         # fire_patterns: recurring fires per 0.1° cell × month, S-NPP only
 ```
 
-`patterns.py` on Italy 2012–2025 (measured 2026-11-14, ~1.5 s): `fire_patterns: 16955 cell-months, 3117 with
-probability >= 0.5`. Peak August (855 likely cells); top cells are western Sicily, burned 14 of 14 Augusts.
+Measured on Europe 2026-11-15 (8.9M points: MODIS 1.73M, S-NPP 3.81M + 0.31M in 2026, NOAA-20 3.06M):
+
+| Step | Time | Output |
+|---|---|---|
+| archive fetch (both sensors) | ~2.5 h (flaky network, retries) | 1,023 MODIS + 562 S-NPP files |
+| API fetch (4 products × 3 boxes) | ~1.5 h | quota waits included |
+| load API files | ~17 min | 3.37M rows |
+| `country.py` | ~20 min files + ~26 min geometry | 8.05M with a country, 0.86M outside (NULL) |
+| `coverage_table.py` · `static_mask.py` | <1 s · 14 s | 982 static + 7 volcano core cells |
+| `calibrate.py` | ~55 s | 2,620 rows, 39 countries + EUR |
+| `patterns.py` | ~17 s | 245,255 cell-months, 21,192 with probability ≥ 0.5 |
+
+Factors (EUR, count): J2 Aqua→S-NPP August 7.71 (countries 2.3–14.2, Italy 7.97); **J3 S-NPP→NOAA-20 1.03–1.18**
+by month (NOAA-20 sees 3–18 % more; Italy August 1.01). Check: NOAA-20 2025 in S-NPP units vs real S-NPP, per quarter,
+0–6 % apart (inside the fit window, so not independent). 2026-11 is the first NOAA-20 reference month.
 
 Re-run all four after loading new data. Outputs and how the backend uses them: `docs/contracts.md` §[1].
 Tests (real throwaway Postgres): `python3 -m unittest discover -s harmonize/tests`.

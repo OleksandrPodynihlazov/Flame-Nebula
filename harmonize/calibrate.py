@@ -3,7 +3,8 @@
 
 Method (research/07 §8, decisions H1/H2; per-country: docs/superpowers/specs/2026-11-14-europe-noaa20-design.md):
   * Platforms and junctions: harmonize/platforms.py. The reference platform of a month is the most
-    preferred one covering the whole month: Terra -> Aqua -> S-NPP (unit) -> NOAA-20 after 2026-11-02.
+    preferred one covering the whole month (the running month: up to the last data day):
+    Terra -> Aqua -> S-NPP (unit) -> NOAA-20 after 2026-11-02.
   * Junction factors are MULTIPLICATIVE, per country, per calendar month, per metric (count, Σ FRP):
         factor[c, m] = median over years y of  newer[c, y, m] / older[c, y, m]
         band[c, m]   = interquartile range of the same ratios
@@ -159,8 +160,9 @@ WITH span AS (
 ), ref AS (
   SELECT DISTINCT ON (m.month_start) m.month_start, s.satellite
   FROM months m
-  JOIN span s ON s.first_day <= m.month_start
-             AND s.last_day >= (m.month_start + interval '1 month' - interval '1 day')::date
+  JOIN span s ON s.first_day <= m.month_start      -- covers the whole month, or up to the last data day
+             AND s.last_day >= least((m.month_start + interval '1 month' - interval '1 day')::date,
+                                     (SELECT max(last_day) FROM span))
   JOIN (VALUES {prefs}) AS r(satellite, pref) ON r.satellite = s.satellite
   ORDER BY m.month_start, r.pref
 ), raw AS (
