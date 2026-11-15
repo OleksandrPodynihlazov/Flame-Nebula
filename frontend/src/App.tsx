@@ -150,10 +150,6 @@ export default function App() {
     <PatternMonths months={patternSummary.data?.months ?? null} selected={patternMonth} loading={patternSummary.loading} onSelect={setPatternMonth} compact={compact} />
   )
 
-  const scope = isPatterns
-    ? `Patterns · ${patternCompare ? `${MONTHS_FULL[patternCompare.a - 1].slice(0, 3)} vs ${MONTHS_FULL[patternCompare.b - 1].slice(0, 3)}` : MONTHS_FULL[patternMonth - 1]}`
-    : undefined
-
   const controls = {
     filters,
     onChange: update,
@@ -190,7 +186,7 @@ export default function App() {
     return (
       <div className="flex h-dvh flex-col overflow-hidden bg-background font-sans text-foreground antialiased">
         <header className="z-30 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-background px-3">
-          <Brand year={filters.year} sensors={sensors} isDemo={isDemo} compare={compare} scope={scope} />
+          <Brand isDemo={isDemo} />
           <SearchField area={filters.area} onAreaChange={setArea} />
         </header>
 
@@ -254,7 +250,7 @@ export default function App() {
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-background font-sans text-foreground antialiased">
-      <TopBar {...controls} isDemo={isDemo} scope={scope} patternMonth={patternMonth} />
+      <TopBar {...controls} isDemo={isDemo} patternMonth={patternMonth} />
 
       <main className="relative flex-1 overflow-hidden">
         <HotspotMap {...mapProps} rightInset={panelOpen ? panelWidth : 0} />
@@ -274,7 +270,7 @@ export default function App() {
           >
             <ChevronRight className={`size-4 motion-safe:transition-transform ${panelOpen ? '' : 'rotate-180'}`} aria-hidden="true" />
           </button>
-          <section className="flex h-full w-full flex-col gap-4 overflow-y-auto border-l border-border bg-background p-5">
+          <section className="flex h-full w-full flex-col gap-5 overflow-y-auto border-l border-border bg-background p-5">
             {errorBanner}
             {isPatterns ? (
               <>

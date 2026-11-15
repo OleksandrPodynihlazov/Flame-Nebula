@@ -45,7 +45,7 @@
   /* Phone: how far the Leaflet controls sit from the edges so they clear the 44px filters button and the bottom sheet's peek. */
   --map-top-offset: 56px;
   --sheet-peek-h: 104px;
-  --compare-peek-h: 160px;
+  --compare-peek-h: 128px;
 }
 
 /* Not `inline`: the Leaflet override below reads var(--font-sans), so it must exist as a CSS variable. */

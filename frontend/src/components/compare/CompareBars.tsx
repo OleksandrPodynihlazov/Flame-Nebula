@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { cn } from '@/lib/utils'
 
 export interface BarSeries {
   label: string
@@ -32,35 +33,35 @@ export function CompareBars({ title, subtitle, categories, series, loading = fal
 
   return (
     <div
-      className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-900/70 p-3 sm:gap-3.5 sm:p-4"
+      className="flex flex-col gap-4 border-t border-border pt-4"
       aria-busy={loading}
       data-testid="compare-bars"
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h2 className="text-sm font-semibold text-white">{title}</h2>
-          {subtitle && <p className="text-xs text-slate-400">{subtitle}</p>}
+          <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+          {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
         </div>
-        <ul className="flex items-center gap-3 text-[11px] text-slate-300">
+        <ul className="flex items-center gap-3 font-mono text-xs text-foreground">
           {series.map((s) => (
             <li key={s.label} className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-sm" style={{ background: s.color }} />
+              <span aria-hidden="true" className="size-2.5 rounded-[2px]" style={{ background: s.color }} />
               {s.label}
             </li>
           ))}
         </ul>
       </div>
 
-      <div className={`flex gap-2 transition-opacity ${loading ? 'opacity-50' : ''}`}>
-        <div className="flex h-44 flex-col justify-between pb-5 text-right font-mono text-[9px] text-slate-500 sm:h-56 sm:text-[10px]">
+      <div className={cn('flex gap-2 transition-opacity', loading && 'opacity-50')}>
+        <div className="flex h-44 flex-col justify-between pb-5 text-right font-mono text-[10px] text-muted-foreground tabular-nums sm:h-56 lg:h-72">
           {ticks.map((t) => (
             <span key={t}>{AXIS.format(t)}</span>
           ))}
         </div>
-        <div className="relative flex h-44 flex-1 flex-col sm:h-56">
+        <div className="relative flex h-44 flex-1 flex-col sm:h-56 lg:h-72">
           <div className="pointer-events-none absolute inset-x-0 top-0 bottom-5 flex flex-col justify-between">
             {ticks.map((t) => (
-              <div key={t} className="border-t border-slate-800" />
+              <div key={t} className="border-t border-border" />
             ))}
           </div>
           <div className="relative flex min-h-0 flex-1 items-end gap-1 sm:gap-1.5">
@@ -83,7 +84,7 @@ export function CompareBars({ title, subtitle, categories, series, loading = fal
           </div>
           <div className="flex h-5 gap-1 pt-1 sm:gap-1.5">
             {categories.map((c) => (
-              <span key={c} className="flex-1 text-center font-mono text-[9px] text-slate-500 sm:text-[10px]">
+              <span key={c} className="flex-1 text-center font-mono text-[10px] text-muted-foreground">
                 {c}
               </span>
             ))}

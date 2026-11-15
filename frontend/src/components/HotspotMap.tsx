@@ -1,8 +1,10 @@
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import type { ControlPosition, FitBoundsOptions } from "leaflet";
+import L, { type ControlPosition, type FitBoundsOptions } from "leaflet";
 import { MapContainer, TileLayer, ZoomControl, useMap } from "react-leaflet";
 import { COMPARE_COLORS } from "../constants/compare";
 import { ITALY_BOUNDS, MONTHS_FULL } from "../constants/fire";
@@ -61,7 +63,7 @@ function StatusChip({
         className={cn("size-2 shrink-0 rounded-full", error ? "bg-destructive" : "bg-primary", pulsing && "animate-pulse")}
       />
       {children}
-      <ResetView options={fitOptions} />
+      {mobile && <ResetView options={fitOptions} />}
     </div>
   );
 }
@@ -83,6 +85,8 @@ function MapStatus({
   mobile: boolean;
   fitOptions?: FitBoundsOptions;
 }) {
+  // Desktop: the stats panel already shows the totals and loading, so the pill only appears for an error.
+  if (!mobile && error === null) return null;
   return (
     <StatusChip error={error !== null} pulsing={loading || totalLoading} mobile={mobile} fitOptions={fitOptions}>
       {error ? (
@@ -203,6 +207,42 @@ function ResetView({ options }: { options?: FitBoundsOptions }) {
   );
 }
 
+/** Desktop reset: an icon button stacked under the zoom +/- in Leaflet's top-left corner, so it stays aligned with it. */
+function ResetControl({ options }: { options?: FitBoundsOptions }) {
+  const map = useMap();
+  const [bar] = useState(() => {
+    const el = L.DomUtil.create("div", "leaflet-bar leaflet-control");
+    L.DomEvent.disableClickPropagation(el);
+    return el;
+  });
+
+  useEffect(() => {
+    const control = new L.Control({ position: "topleft" });
+    control.onAdd = () => bar;
+    control.addTo(map);
+    return () => {
+      control.remove();
+    };
+  }, [map, bar]);
+
+  return createPortal(
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          aria-label="Reset view"
+          onClick={() => map.fitBounds(ITALY_BOUNDS, options)}
+          className="flex size-9 items-center justify-center rounded-[7px] text-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+        >
+          <RotateCcw className="size-4" aria-hidden="true" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="right">Reset view</TooltipContent>
+    </Tooltip>,
+    bar,
+  );
+}
+
 export interface CompareView {
   a: { year: number; query: ApiQuery; total: number | null; loading: boolean };
   b: { year: number; query: ApiQuery; total: number | null; loading: boolean };
@@ -280,6 +320,7 @@ export function HotspotMap({
         className="z-10 h-full w-full"
       >
         {!mobile && <ZoomControl position="topleft" />}
+        {!mobile && <ResetControl options={fitOptions} />}
         <TileLayer
           url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"
           attribution="Tiles &copy; Esri"

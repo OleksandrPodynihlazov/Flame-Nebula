@@ -1,8 +1,8 @@
+import { cn } from '@/lib/utils'
 import { COMPARE_COLORS, type CompareSide } from '../../constants/compare'
 import { MONTHS_FULL } from '../../constants/fire'
-import { formatPct, pctChange } from '../../utils/compare'
 import { formatProbability, type PatternStatsData } from '../../utils/patterns'
-import { Card } from '../StatCards'
+import { Delta, FIGURE, Metric, Readout } from '../StatCards'
 
 export interface PatternSideStats {
   side: CompareSide
@@ -16,47 +16,43 @@ function topLine(s: PatternStatsData | null) {
   return `${formatProbability(s.top.probability)} · ${s.top.years_burned}/${s.top.years_observed} yrs`
 }
 
-function Delta({ from, to }: { from: number | undefined; to: number | undefined }) {
-  if (from === undefined || to === undefined) return null
-  const p = pctChange(from, to)
-  const color = p === null || p === 0 ? 'text-muted-foreground' : p > 0 ? 'text-destructive' : 'text-foreground'
-  return <span className={`font-mono text-[11px] ${color}`}>{formatPct(p)}</span>
-}
-
-/** Desktop cards for one month (no compare) or one row per month (compare). */
+/** Desktop readout for one month (no compare) or one ruled readout per month (compare). */
 export function PatternStats({ a, b = null }: { a: PatternSideStats; b?: PatternSideStats | null }) {
   const rows = b ? [a, b] : [a]
   return (
-    <div className="flex flex-col gap-3" data-testid="pattern-stats">
+    <div className="flex flex-col gap-5" data-testid="pattern-stats">
       {rows.map((d) => {
         const other = b && d.side === 'b' ? a : null
         return (
           <div
             key={d.side}
-            className={`grid shrink-0 grid-cols-3 gap-3 ${b ? 'border-l-2 pl-3' : ''} ${d.loading ? 'opacity-60' : ''}`}
+            className={cn(b && 'border-l-2 pl-4', d.loading && 'opacity-60')}
             style={b ? { borderColor: COMPARE_COLORS[d.side] } : undefined}
             aria-busy={d.loading}
           >
-            <Card title="Recurring cells" badge={MONTHS_FULL[d.month - 1]}>
-              <span className="font-mono text-2xl font-semibold text-foreground tabular-nums" data-testid="pattern-likely">
-                {d.stats ? d.stats.cells.toLocaleString() : '—'}
-              </span>
-              {other && <Delta from={other.stats?.cells} to={d.stats?.cells} />}
-              {!other && <span className="text-xs text-muted-foreground">burned ≥12 of 14 years</span>}
-            </Card>
-            <Card title="Most regular cell">
-              <span className="text-base font-semibold whitespace-nowrap text-foreground tabular-nums">{topLine(d.stats)}</span>
-              {d.stats?.top && (
-                <span className="font-mono text-[11px] text-muted-foreground tabular-nums">
-                  {d.stats.top.lat.toFixed(2)}, {d.stats.top.lon.toFixed(2)}
+            <p className="mb-2 text-xs font-semibold text-foreground">{MONTHS_FULL[d.month - 1]}</p>
+            <Readout className="grid-cols-[1fr_1.3fr_1fr]">
+              <Metric
+                label="Recurring cells"
+                footer={other ? <Delta from={other.stats?.cells} to={d.stats?.cells} /> : <span className="block truncate">burned 12+ of 14 years</span>}
+              >
+                <span className={cn(FIGURE, 'text-3xl leading-none')} data-testid="pattern-likely">
+                  {d.stats ? d.stats.cells.toLocaleString('en-US') : '—'}
                 </span>
-              )}
-            </Card>
-            <Card title="Every year">
-              <span className="font-mono text-xl font-semibold text-foreground tabular-nums">{d.stats ? d.stats.everyYear.toLocaleString() : '—'}</span>
-              {other && <Delta from={other.stats?.everyYear} to={d.stats?.everyYear} />}
-              {!other && <span className="text-xs text-muted-foreground">cells, 14 of 14 years</span>}
-            </Card>
+              </Metric>
+              <Metric
+                label="Most regular cell"
+                footer={d.stats?.top ? <span className="font-mono tabular-nums">{d.stats.top.lat.toFixed(2)}, {d.stats.top.lon.toFixed(2)}</span> : undefined}
+              >
+                <span className="text-base leading-none font-semibold text-foreground tabular-nums">{topLine(d.stats)}</span>
+              </Metric>
+              <Metric
+                label="Every year"
+                footer={other ? <Delta from={other.stats?.everyYear} to={d.stats?.everyYear} /> : <span className="block truncate">cells, 14 of 14 years</span>}
+              >
+                <span className={cn(FIGURE, 'text-xl leading-none')}>{d.stats ? d.stats.everyYear.toLocaleString('en-US') : '—'}</span>
+              </Metric>
+            </Readout>
           </div>
         )
       })}

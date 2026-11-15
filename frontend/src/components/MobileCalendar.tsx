@@ -1,7 +1,10 @@
 import { useRef, type PointerEvent } from 'react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { MONTHS, MONTHS_FULL, YEARS } from '../constants/fire'
 import type { Filters, Month } from '../types/api'
-import { RAMP, rampIndex, type CalendarGrid } from '../utils/calendar'
+import { heatInk, heatVar, rampIndex, type CalendarGrid } from '../utils/calendar'
 import { isoDate } from '../utils/filters'
 
 interface Props {
@@ -16,30 +19,18 @@ interface Props {
 const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
 const SWIPE_PX = 40
 
-// Dark text from heat-4 up: white on #ff7a1a is only ~2.5:1.
-const textOn = (idx: number) => (idx >= 4 ? 'text-slate-950' : 'text-slate-100')
-
-function Chevron({ dir }: { dir: 'left' | 'right' }) {
-  return (
-    <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" d={dir === 'left' ? 'm15 6-6 6 6 6' : 'm9 6 6 6-6 6'} />
-    </svg>
-  )
-}
-
 function StepButton({ dir, label, disabled, onClick }: { dir: 'left' | 'right'; label: string; disabled: boolean; onClick: () => void }) {
+  const Icon = dir === 'left' ? ChevronLeft : ChevronRight
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={label}
-      className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-300 transition-colors hover:bg-slate-800 disabled:opacity-30"
-    >
-      <Chevron dir={dir} />
-    </button>
+    <Button type="button" variant="ghost" size="icon" onClick={onClick} disabled={disabled} aria-label={label} className="text-muted-foreground">
+      <Icon aria-hidden="true" />
+    </Button>
   )
 }
+
+const CRUMB = 'h-8 px-2 text-sm'
+const CRUMB_CURRENT = 'bg-secondary text-foreground ring-1 ring-flare hover:bg-secondary'
+const CRUMB_PARENT = 'text-muted-foreground hover:text-foreground'
 
 /** Phone calendar: year → 12 months → days of one month. Tap again to unselect; swipe to change month. */
 export function MobileCalendar({ grid, filters, loading, onYear, onMonth, onDate }: Props) {
@@ -73,52 +64,53 @@ export function MobileCalendar({ grid, filters, loading, onYear, onMonth, onDate
         {month === null ? (
           <StepButton dir="left" label="Previous year" disabled={year <= firstYear} onClick={() => onYear(year - 1)} />
         ) : (
-          <span className="w-8" />
+          <span className="w-8" aria-hidden="true" />
         )}
-        <nav className="flex items-center gap-1 text-sm font-semibold" aria-label="Calendar level">
-          <button
+        <nav className="flex items-center gap-0.5" aria-label="Calendar level">
+          <Button
             type="button"
+            variant="ghost"
             onClick={() => onMonth(null)}
-            className={`rounded-md px-2 py-1 font-mono ${month === null ? 'text-white' : 'text-orange-300 hover:bg-slate-800'}`}
+            className={cn(CRUMB, 'font-mono', month === null ? CRUMB_CURRENT : CRUMB_PARENT)}
             data-testid="calendar-year"
           >
             {year}
-          </button>
+          </Button>
           {month !== null && (
             <>
-              <span className="text-slate-600">/</span>
-              <button
+              <span className="text-muted-foreground" aria-hidden="true">/</span>
+              <Button
                 type="button"
+                variant="ghost"
                 onClick={() => onMonth(month)}
                 title="Unselect month"
-                className={`rounded-md px-2 py-1 ${
-                  filters.date ? 'text-orange-300 hover:bg-slate-800' : 'bg-orange-500/15 text-orange-200 ring-1 ring-orange-400/60'
-                }`}
+                className={cn(CRUMB, filters.date ? CRUMB_PARENT : CRUMB_CURRENT)}
                 data-testid="calendar-month"
               >
                 {MONTHS_FULL[month]}
-              </button>
+              </Button>
             </>
           )}
           {filters.date && (
             <>
-              <span className="text-slate-600">/</span>
-              <button
+              <span className="text-muted-foreground" aria-hidden="true">/</span>
+              <Button
                 type="button"
+                variant="ghost"
                 onClick={() => onDate(filters.date!)}
                 title="Unselect day"
-                className="rounded-md bg-orange-500/15 px-2 py-1 font-mono text-orange-200 ring-1 ring-orange-400/60"
+                className={cn(CRUMB, 'font-mono', CRUMB_CURRENT)}
                 data-testid="calendar-day"
               >
                 {Number(filters.date.slice(8))}
-              </button>
+              </Button>
             </>
           )}
         </nav>
         {month === null ? (
           <StepButton dir="right" label="Next year" disabled={year >= lastYear} onClick={() => onYear(year + 1)} />
         ) : (
-          <span className="w-8" />
+          <span className="w-8" aria-hidden="true" />
         )}
       </div>
 
@@ -135,14 +127,16 @@ export function MobileCalendar({ grid, filters, loading, onYear, onMonth, onDate
                   type="button"
                   role="listitem"
                   onClick={() => onMonth(mi as Month)}
-                  className={`flex flex-col items-start rounded-lg px-2.5 py-2 text-left ring-1 transition-transform active:scale-95 ${
-                    peak ? 'ring-orange-300' : 'ring-slate-800'
-                  } ${textOn(idx)}`}
-                  style={{ background: RAMP[idx] }}
+                  className={cn(
+                    'flex flex-col items-start rounded-lg px-2.5 py-2 text-left ring-1 transition-transform active:scale-95',
+                    peak ? 'ring-flare' : 'ring-border',
+                    heatInk(idx),
+                  )}
+                  style={{ background: heatVar(idx) }}
                   aria-label={`${MONTHS_FULL[mi]}: ${total} hotspots`}
                 >
                   <span className="text-xs font-semibold">{name}</span>
-                  <span className="font-mono text-[11px] opacity-80">{total.toLocaleString()}</span>
+                  <span className="font-mono text-[11px] tabular-nums">{total.toLocaleString('en-US')}</span>
                 </button>
               )
             })}
@@ -156,7 +150,7 @@ export function MobileCalendar({ grid, filters, loading, onYear, onMonth, onDate
               onPointerUp={onPointerUp}
               onPointerCancel={() => (startX.current = null)}
             >
-              <div className="mb-1 grid grid-cols-7 gap-1 text-center text-[10px] font-semibold text-slate-500">
+              <div className="mb-1 grid grid-cols-7 gap-1 text-center font-mono text-[10px] text-muted-foreground">
                 {WEEKDAYS.map((d) => (
                   <span key={d}>{d}</span>
                 ))}
@@ -178,13 +172,15 @@ export function MobileCalendar({ grid, filters, loading, onYear, onMonth, onDate
                       onClick={() => onDate(date)}
                       aria-pressed={selected}
                       aria-label={`${di + 1} ${MONTHS_FULL[month]}: ${count} hotspots`}
-                      className={`flex h-9 flex-col items-center justify-center rounded-md text-[11px] leading-none font-semibold transition-transform active:scale-95 ${textOn(idx)} ${
-                        selected ? 'ring-2 ring-white' : ''
-                      }`}
-                      style={{ background: RAMP[idx] }}
+                      className={cn(
+                        'flex h-9 flex-col items-center justify-center rounded-md text-[11px] leading-none font-semibold transition-transform active:scale-95',
+                        heatInk(idx),
+                        selected && 'ring-2 ring-flare ring-offset-1 ring-offset-card',
+                      )}
+                      style={{ background: heatVar(idx) }}
                     >
                       {di + 1}
-                      {count > 0 && <span className="mt-0.5 font-mono text-[9px] font-normal opacity-75">{count}</span>}
+                      {count > 0 && <span className="mt-0.5 font-mono text-[9px] font-normal">{count}</span>}
                     </button>
                   )
                 })}
@@ -195,7 +191,7 @@ export function MobileCalendar({ grid, filters, loading, onYear, onMonth, onDate
         )}
       </div>
 
-      <p className="text-center text-[11px] text-slate-500">
+      <p className="text-center text-xs text-muted-foreground">
         {month === null ? 'Tap a month to see its days' : 'Tap a day to filter · tap again to unselect · swipe for next month'}
       </p>
     </div>

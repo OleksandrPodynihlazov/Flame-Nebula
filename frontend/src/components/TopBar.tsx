@@ -127,20 +127,7 @@ function PatternControls({ mode, month, stacked }: { mode: PatternMode; month: n
   )
 }
 
-export function Brand({
-  year,
-  sensors,
-  isDemo,
-  compare = null,
-  scope,
-}: {
-  year: number
-  sensors: Sensor[]
-  isDemo: boolean
-  compare?: CompareYears | null
-  /** Overrides the year · sensors readout (pattern view). */
-  scope?: string
-}) {
+export function Brand({ isDemo }: { isDemo: boolean }) {
   return (
     <div className="flex min-w-0 items-center gap-2.5">
       <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-linear-to-br from-heat-4 to-heat-3 text-primary-foreground shadow-md shadow-primary/20">
@@ -149,9 +136,6 @@ export function Brand({
         </svg>
       </div>
       <h1 className="text-sm font-semibold tracking-tight whitespace-nowrap text-foreground max-[359px]:hidden">Flame Nebula</h1>
-      <span className="hidden font-mono text-xs whitespace-nowrap text-muted-foreground tabular-nums 2xl:inline">
-        Italy · {scope ?? `${compare ? `${compare.a} vs ${compare.b}` : year} · ${sensors.join(' + ')}`}
-      </span>
       {isDemo && (
         <Tooltip>
           <TooltipTrigger asChild>
@@ -424,11 +408,11 @@ function BarControls({
   )
 }
 
-export function TopBar({ isDemo, scope, patternMonth, ...rest }: Props & { scope?: string; patternMonth?: number }) {
+export function TopBar({ isDemo, patternMonth, ...rest }: Props & { patternMonth?: number }) {
   return (
     <header className="z-30 flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border bg-background px-4">
       <div className="flex min-w-0 items-center gap-4">
-        <Brand year={rest.filters.year} sensors={activeSensors(rest.filters)} isDemo={isDemo} compare={rest.compare} scope={scope} />
+        <Brand isDemo={isDemo} />
         <SearchField area={rest.filters.area} onAreaChange={(area) => rest.onChange({ area })} />
       </div>
       <BarControls {...rest} patternMonth={patternMonth} />
