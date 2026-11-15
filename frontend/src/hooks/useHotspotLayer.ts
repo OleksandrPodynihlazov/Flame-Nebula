@@ -17,6 +17,7 @@ const PADDING = 0.25
 const HIT_SLOP = 3
 const STROKE = '#020617'
 const DIM_OPACITY = '0.6'
+const BUBBLE_FONT_FAMILY = '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace'
 
 type Target =
   | { kind: 'cell'; lat: number; lon: number; cell: number; type: FireType; label: string }
@@ -61,7 +62,7 @@ function drawBubble(ctx: CanvasRenderingContext2D, b: Hit, type: FireType, label
   ctx.strokeStyle = STROKE
   ctx.stroke()
   ctx.fillStyle = STROKE
-  ctx.font = `700 ${b.r >= 18 ? 12 : 11}px Inter, ui-sans-serif, system-ui, sans-serif`
+  ctx.font = `600 ${b.r >= 18 ? 12 : 11}px ${BUBBLE_FONT_FAMILY}`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   ctx.fillText(label, b.x, b.y + 0.5)
@@ -108,6 +109,8 @@ class HotspotCanvasLayer extends L.Layer {
     map.on('zoomanim', this.onAnimZoom)
     map.on('click', this.onClick)
     this.redraw()
+    // Canvas text falls back to a system font until the webfont loads; draw again once it has.
+    void document.fonts?.load(`600 11px ${BUBBLE_FONT_FAMILY}`).then(this.redraw)
     return this
   }
 
