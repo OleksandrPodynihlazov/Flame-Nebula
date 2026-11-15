@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_FILTERS } from '../constants/fire'
-import { clearedFilters, countChangedFilters, filterSummary, sensorAvailableIn, sensorYears, toggleDatePatch, toggleMonthPatch, yearPatch } from './filters'
+import {
+  clearedFilters,
+  countChangedFilters,
+  filterSummary,
+  sensorAvailableIn,
+  sensorYears,
+  toggleDatePatch,
+  toggleDayPatch,
+  toggleMonthPatch,
+  yearPatch,
+} from './filters'
 
 describe('toggleMonthPatch', () => {
   it('selects a month and clears the day', () => {
@@ -23,6 +33,20 @@ describe('toggleDatePatch', () => {
 
   it('unselects the day and keeps the month', () => {
     expect(toggleDatePatch({ ...DEFAULT_FILTERS, month: 7, date: '2008-08-14' }, '2008-08-14')).toEqual({ date: null })
+  })
+})
+
+describe('toggleDayPatch', () => {
+  it('selects a day and its month', () => {
+    expect(toggleDayPatch(DEFAULT_FILTERS, '2008-08-14')).toEqual({ month: 7, date: '2008-08-14' })
+  })
+
+  it('moves to another day in the same month', () => {
+    expect(toggleDayPatch({ ...DEFAULT_FILTERS, month: 7, date: '2008-08-14' }, '2008-08-15')).toEqual({ month: 7, date: '2008-08-15' })
+  })
+
+  it('unselects the day and the month, back to the full year', () => {
+    expect(toggleDayPatch({ ...DEFAULT_FILTERS, month: 7, date: '2008-08-14' }, '2008-08-14')).toEqual({ month: null, date: null })
   })
 })
 

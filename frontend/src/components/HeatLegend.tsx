@@ -19,7 +19,6 @@ export function HeatLegend({ max, unit, loading = false }: { max: number; unit: 
         ))}
       </span>
       {loading ? <Skeleton className="h-3 w-14" /> : <span className="font-mono tabular-nums">{max.toLocaleString('en-US')} / {unit}</span>}
-      <span>log scale</span>
     </div>
   )
 }

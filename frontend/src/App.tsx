@@ -22,7 +22,7 @@ import { usePatternCells, usePatternSummary } from './hooks/usePatternData'
 import type { Area, Filters, MapView } from './types/api'
 import { gridForYear } from './utils/calendar'
 import { filtersForYear, formatMW } from './utils/compare'
-import { activeSensors, clearedFilters, selectionLabel, toggleDatePatch, toggleMonthPatch, yearPatch } from './utils/filters'
+import { activeSensors, clearedFilters, selectionLabel, toggleDatePatch, toggleDayPatch, toggleMonthPatch, yearPatch } from './utils/filters'
 import { PATTERN_DEFAULT_MONTH, YEAR_BANDS, patternStats, yearBands } from './utils/patterns'
 
 const PANEL_WIDTH = 600
@@ -96,7 +96,7 @@ export default function App() {
       sensors={sensors}
       loading={calendar.loading}
       onSelectMonth={(month) => update(toggleMonthPatch(filters, month))}
-      onSelectDate={(date) => update(toggleDatePatch(filters, date))}
+      onSelectDate={(date) => update(toggleDayPatch(filters, date))}
       onClear={() => update({ month: null, date: null })}
     />
   )
@@ -292,7 +292,7 @@ export default function App() {
                 {sideA && sideB ? (
                   <CompareStats a={sideA} b={sideB} />
                 ) : (
-                  <StatCards stats={stats.data} grid={grid} scope={selectionLabel(filters)} loading={stats.loading} sensors={sensors} />
+                  <StatCards stats={stats.data} grid={grid} scope={filters.month === null && filters.date === null ? null : selectionLabel(filters)} loading={stats.loading} />
                 )}
                 {emptyState}
                 {compareChart || calendarView}
