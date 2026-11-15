@@ -56,6 +56,7 @@ export function HarmonizedHistory({ label, months, loading, year }: Props) {
           { label: 'Harmonized (S-NPP units)', color: COMPARE_COLORS.b, values: points.map((p) => p.count) },
         ]}
         footer={footer}
+        testId="harmonized-bars"
       />
     </div>
   )
