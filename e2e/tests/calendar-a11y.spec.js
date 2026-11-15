@@ -70,7 +70,7 @@ test.describe('desktop calendar', () => {
     const tip = page.getByRole('tooltip');
     await expect(tip).toBeVisible();
     await expect(tip).toContainText('Fri 15 Aug 2008');
-    await expect(tip).toContainText(String(count));
+    await expect(tip).toContainText(`${count.toLocaleString('en-US')} hotspot`);
     await expect(tip).toContainText('Click to filter the map');
     await page.mouse.move(5, 5);
     await expect(tip).toBeHidden();
