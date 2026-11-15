@@ -20,6 +20,8 @@ merge to main ─▶ Deploy workflow ─▶ ssh VPS ─▶ infra/deploy.sh <sha>
 
 **DB schema.** Postgres runs `db/init/*.sql` only when the `pgdata` volume is empty, so a live DB never picks up a new table, view or index by itself (this once left `/api/hotspots` returning 500 for three deploys). `infra/apply-db-schema.sh` therefore applies every `db/init/*.sql` on every deploy, in alphabetical order, one transaction per file, with `ON_ERROR_STOP`; it logs `==> db schema: applied <file>`. A failing file stops the deploy before the new API starts, and only psql's `ERROR:` line is printed (no row values: CI output is public). Every file must be safe to re-run: see `docs/data-sources.md`, *When the schema changes*. CI runs the script once more on its freshly initialised DB, so a file that is not re-runnable fails the PR.
 
+**Postgres memory.** The `db` service starts with `shared_buffers=1GB`, `work_mem=16MB`, `effective_cache_size=3GB`, `maintenance_work_mem=256MB` and `shm_size: 512mb` (parallel queries need more than Docker's 64 MB `/dev/shm`). Override with `PG_SHARED_BUFFERS`, `PG_WORK_MEM`, `PG_EFFECTIVE_CACHE_SIZE`, `PG_MAINTENANCE_WORK_MEM` in `.env`; a change restarts `db` on the next deploy.
+
 The API logs every 5xx as one JSON line, e.g. `{"level":"error","method":"GET","path":"/api/hotspots","status":500,"message":"relation \"hotspots_canonical\" does not exist","code":"42P01"}` (`code` = Postgres SQLSTATE or `null`). The response body stays `{"error":"internal error"}`.
 
 The e2e job starts alongside deploy: it installs Chromium, polls `/api/health` (up to 6 min) until it reports this commit's sha, then runs the Playwright suite in `e2e/` against the public URL. Its HTML report is a downloadable artifact on the Actions run.

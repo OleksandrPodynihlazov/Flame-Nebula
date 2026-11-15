@@ -12,6 +12,20 @@ services:
     image: postgres:17-alpine
     restart: unless-stopped
     logging: *logging
+    # Defaults (128MB shared_buffers, 4MB work_mem) push a 2+ GB DB to disk; sized for the 8 GB VPS, override in .env.
+    # The official entrypoint still runs db/init on an empty volume when the command starts with "postgres".
+    command:
+      - postgres
+      - -c
+      - shared_buffers=${PG_SHARED_BUFFERS:-1GB}
+      - -c
+      - work_mem=${PG_WORK_MEM:-16MB}
+      - -c
+      - effective_cache_size=${PG_EFFECTIVE_CACHE_SIZE:-3GB}
+      - -c
+      - maintenance_work_mem=${PG_MAINTENANCE_WORK_MEM:-256MB}
+    # Parallel queries use /dev/shm; Docker's 64 MB default fails with "could not resize shared memory segment".
+    shm_size: 512mb
     environment:
       POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
