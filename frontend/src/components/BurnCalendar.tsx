@@ -1,10 +1,13 @@
+import { useRef, useState, type KeyboardEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { MONTHS, MONTHS_FULL } from '../constants/fire'
 import type { Filters, Month, Sensor } from '../types/api'
-import { RAMP, heatVar, rampBounds, rampIndex, topDays, type CalendarGrid } from '../utils/calendar'
+import { defaultCell, heatVar, isGridNavKey, moveCell, rampIndex, topDays, type CalendarGrid, type CellPos } from '../utils/calendar'
 import { daysInMonth, isoDate } from '../utils/filters'
+import { CAL_ATTR, CalendarTooltip } from './CalendarTooltip'
+import { HeatLegend } from './HeatLegend'
 import { DIM, SrLoading } from './StatCards'
 
 interface Props {
@@ -20,12 +23,39 @@ interface Props {
 const DAYS = Array.from({ length: 31 }, (_, i) => i + 1)
 const COLS = 'grid-cols-[34px_repeat(31,minmax(0,1fr))_48px]'
 const TOP_DAYS = 5
+const FOCUS_RING = 'focus-visible:z-20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none'
 
 export function BurnCalendar({ grid, filters, sensors, loading, onSelectMonth, onSelectDate, onClear }: Props) {
   const hasSelection = filters.month !== null || filters.date !== null
   const first = loading && grid === null
   // Reloading keeps the old grid dimmed; a year without hotspots or a failed load keeps the year's shape, dimmed.
   const dimmed = loading ? !first : grid === null || grid.total === 0
+
+  const gridRef = useRef<HTMLDivElement>(null)
+  // The roving-tabindex cell: the last one focused or clicked (this year only), else the default one.
+  const [active, setActive] = useState<(CellPos & { year: number }) | null>(null)
+  const tabCell: CellPos | null = grid
+    ? active?.year === filters.year && grid.counts[active.month][active.day - 1] !== null
+      ? active
+      : defaultCell(grid, filters.year, filters.date, new Date().toISOString().slice(0, 10))
+    : null
+
+  const onGridKeyDown = (e: KeyboardEvent<HTMLElement>) => {
+    const cell = (e.target as HTMLElement).closest<HTMLElement>(`[${CAL_ATTR}="day"]`)
+    if (!cell || e.altKey || e.ctrlKey || e.metaKey) return
+    if (e.key === 'Escape') {
+      if (hasSelection) {
+        e.preventDefault()
+        onClear()
+      }
+      return
+    }
+    if (!isGridNavKey(e.key)) return
+    e.preventDefault()
+    const to = moveCell(e.key, { month: Number(cell.dataset.month) as Month, day: Number(cell.dataset.day) }, filters.year)
+    setActive({ ...to, year: filters.year })
+    gridRef.current?.querySelector<HTMLElement>(`[${CAL_ATTR}="day"][data-month="${to.month}"][data-day="${to.day}"]`)?.focus()
+  }
 
   return (
     <section className="flex flex-col gap-4 border-t border-border pt-4" aria-label="Burning activity calendar">
@@ -48,7 +78,7 @@ export function BurnCalendar({ grid, filters, sensors, loading, onSelectMonth, o
 
       <div className={cn('flex flex-col', dimmed && DIM)} aria-busy={loading}>
         {first && <SrLoading />}
-        <div className="flex flex-col gap-px" role="grid" aria-label={`Hotspots per day, ${filters.year}`}>
+        <div ref={gridRef} className="flex flex-col gap-px" role="grid" aria-label={`Hotspots per day, ${filters.year}`} onKeyDown={onGridKeyDown}>
           <div className={`grid ${COLS} gap-px pb-1 font-mono text-[10px] text-muted-foreground`} role="row">
             <span role="columnheader" />
             {DAYS.map((d) => (
@@ -70,9 +100,11 @@ export function BurnCalendar({ grid, filters, sensors, loading, onSelectMonth, o
                 <button
                   type="button"
                   onClick={() => onSelectMonth(m)}
-                  title={`Show all of ${MONTHS_FULL[m]}`}
+                  data-cal="month"
+                  data-month={m}
                   className={cn(
                     'rounded-[2px] px-1 text-left font-mono text-[11px] transition-colors',
+                    FOCUS_RING,
                     monthSelected ? 'text-foreground ring-1 ring-flare' : 'text-muted-foreground hover:text-foreground',
                   )}
                 >
@@ -92,12 +124,17 @@ export function BurnCalendar({ grid, filters, sensors, loading, onSelectMonth, o
                       role="gridcell"
                       aria-label={label}
                       aria-selected={selected}
-                      title={label}
+                      data-cal="day"
+                      data-month={m}
+                      data-day={di + 1}
+                      tabIndex={tabCell?.month === m && tabCell.day === di + 1 ? 0 : -1}
+                      onFocus={() => setActive({ month: m, day: di + 1, year: filters.year })}
                       onClick={() => onSelectDate(date)}
                       className={cn(
                         'rounded-[2px] hover:ring-1 hover:ring-foreground/70',
                         selected && 'z-10 ring-2 ring-flare ring-offset-2 ring-offset-background',
                         !selected && monthSelected && 'ring-1 ring-flare/40',
+                        FOCUS_RING,
                       )}
                       style={{ background: heatVar(rampIndex(count, grid?.maxDay ?? 0)) }}
                     />
@@ -107,8 +144,11 @@ export function BurnCalendar({ grid, filters, sensors, loading, onSelectMonth, o
                 <button
                   type="button"
                   onClick={() => onSelectMonth(m)}
+                  data-cal="month"
+                  data-month={m}
                   className={cn(
                     'rounded-[2px] pr-1 text-right font-mono text-[11px] tabular-nums transition-colors',
+                    FOCUS_RING,
                     monthSelected ? 'text-foreground ring-1 ring-flare' : 'text-muted-foreground hover:text-foreground',
                   )}
                 >
@@ -120,6 +160,7 @@ export function BurnCalendar({ grid, filters, sensors, loading, onSelectMonth, o
         </div>
       </div>
 
+      <CalendarTooltip gridRef={gridRef} grid={grid} year={filters.year} selectedDate={filters.date} />
       <RampLegend max={grid?.maxDay ?? 0} total={grid?.total ?? 0} loading={first} />
       {first ? <BusiestDaysSkeleton /> : grid && grid.total > 0 && <BusiestDays grid={grid} filters={filters} onSelectDate={onSelectDate} />}
     </section>
@@ -127,20 +168,13 @@ export function BurnCalendar({ grid, filters, sensors, loading, onSelectMonth, o
 }
 
 function RampLegend({ max, total, loading }: { max: number; total: number; loading: boolean }) {
-  const bounds = rampBounds(max)
   return (
-    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-xs text-muted-foreground">
-      <div className="flex items-center gap-2">
-        <span className="font-mono tabular-nums">0</span>
-        <div className="flex items-center gap-px">
-          {RAMP.map((_, i) => (
-            <span key={i} className="h-2.5 w-5 rounded-[2px]" style={{ background: heatVar(i) }} title={i === 0 ? 'No detections' : `≤ ${bounds[i - 1]} per day`} />
-          ))}
-        </div>
-        {loading ? <Skeleton className="h-3 w-14" /> : <span className="font-mono tabular-nums">{max.toLocaleString('en-US')} / day</span>}
-        <span>log scale</span>
+    <div className="flex flex-col gap-1.5 text-xs text-muted-foreground">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <HeatLegend max={max} unit="day" loading={loading} />
+        {loading ? <Skeleton className="h-3 w-24" /> : <span className="font-mono tabular-nums">Year total {total.toLocaleString('en-US')}</span>}
       </div>
-      {loading ? <Skeleton className="h-3 w-24" /> : <span className="font-mono tabular-nums">Year total {total.toLocaleString('en-US')}</span>}
+      <p>Dark cell: no detections that day. Blank: no such date.</p>
     </div>
   )
 }
