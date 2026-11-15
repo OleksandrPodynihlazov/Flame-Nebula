@@ -1,6 +1,6 @@
 import { SENSORS, typeMeta } from "../constants/fire";
 import type { HotspotProperties } from "../types/api";
-import { confidenceSummary, reasonPhrases } from "../utils/confidence";
+import { confidenceSummary, reasonPhrases, sensorConfidence } from "../utils/confidence";
 
 /** Body of the popup that opens when a single hotspot dot is clicked. The card chrome comes from the Leaflet popup CSS in index.css. */
 export function HotspotPopup({ p }: { p: HotspotProperties }) {
@@ -31,7 +31,7 @@ export function HotspotPopup({ p }: { p: HotspotProperties }) {
         <dt className="text-muted-foreground">FRP</dt>
         <dd className="text-right font-mono text-foreground tabular-nums">{p.frp ?? "—"} MW</dd>
         <dt className="text-muted-foreground">Confidence</dt>
-        <dd className="text-right font-mono text-foreground tabular-nums">{p.confidence ?? "—"}%</dd>
+        <dd className="text-right font-mono text-foreground tabular-nums">{sensorConfidence(p)}</dd>
         <dt className="text-muted-foreground">Fire confidence</dt>
         <dd className="text-right text-foreground" data-testid="popup-confidence">
           {summary.kind === "unscored" && "No score yet"}
