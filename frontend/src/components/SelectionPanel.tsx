@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { USE_MOCKS, downloadBlob } from '../api/client'
+import { USE_MOCKS, downloadBlob, fetchHotspots } from '../api/client'
 import { ALL_TYPES, FIRE_TYPES, MONTHS, MONTHS_FULL } from '../constants/fire'
-import type { Area, HotspotFeature } from '../types/api'
+import type { ApiQuery, Area, SelectionSummaryResponse } from '../types/api'
 import { selectionGeoJson } from '../utils/selectionExport'
 import { formatAreaKm2, selectionSummary } from '../utils/selectionSummary'
 
@@ -9,10 +9,13 @@ type CircleArea = Extract<Area, { kind: 'circle' }>
 
 interface Props {
   area: Area
-  features: readonly HotspotFeature[]
+  /** `GET /api/selection-summary` for the area; null until the first answer. */
+  summary: SelectionSummaryResponse | null
   loading: boolean
-  /** Failed /hotspots request for the area (e.g. over the row cap): shown instead of the numbers. */
+  /** Failed summary request: shown instead of the numbers. */
   error: string | null
+  /** Filters + area; the GeoJSON export loads the area's dots with it on click. */
+  query: ApiQuery
   fileTag: string
   downloading: boolean
   onDownloadCsv: () => void
@@ -114,23 +117,35 @@ function CircleInputs({ area, onAreaChange }: { area: CircleArea; onAreaChange: 
   )
 }
 
-const NO_FEATURES: readonly HotspotFeature[] = []
-
 const BUTTON =
   'flex flex-1 items-center justify-center rounded-lg border px-2 py-1.5 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-orange-500 disabled:opacity-60'
 
-export function SelectionPanel({ area, features: loaded, loading, error, fileTag, downloading, onDownloadCsv, onAreaChange }: Props) {
+export function SelectionPanel({ area, summary, loading, error, query, fileTag, downloading, onDownloadCsv, onAreaChange }: Props) {
   const [expanded, setExpanded] = useState(false)
-  // Never summarize the previous area's dots under a failed request.
-  const features = error ? NO_FEATURES : loaded
-  const s = useMemo(() => selectionSummary(area, features), [area, features])
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState<{ queryKey: string; message: string } | null>(null)
+  const queryKey = JSON.stringify(query)
+  // Never show the previous area's numbers under a failed request.
+  const s = useMemo(() => selectionSummary(area, error ? null : summary), [area, summary, error])
   const areaText = `${formatAreaKm2(s.areaKm2)} km²`
   const countText = loading ? '…' : error ? '—' : fmt(s.count)
+  // An export error belongs to the filters it was made with.
+  const geoJsonError = exportError?.queryKey === queryKey ? exportError.message : null
 
-  const downloadGeoJson = () => {
-    const json = JSON.stringify(selectionGeoJson(area, features))
-    const name = `firms_italy_${fileTag}_area${USE_MOCKS ? '_DEMO' : ''}.geojson`
-    downloadBlob(new Blob([json], { type: 'application/geo+json' }), name)
+  // The dots are loaded only here, on click: the card itself needs only the summary.
+  const downloadGeoJson = async () => {
+    setExporting(true)
+    setExportError(null)
+    try {
+      const { features } = await fetchHotspots(query)
+      const json = JSON.stringify(selectionGeoJson(area, features))
+      const name = `firms_italy_${fileTag}_area${USE_MOCKS ? '_DEMO' : ''}.geojson`
+      downloadBlob(new Blob([json], { type: 'application/geo+json' }), name)
+    } catch (err: unknown) {
+      setExportError({ queryKey, message: err instanceof Error ? err.message : String(err) })
+    } finally {
+      setExporting(false)
+    }
   }
 
   return (
@@ -215,6 +230,12 @@ export function SelectionPanel({ area, features: loaded, loading, error, fileTag
           </p>
         )}
 
+        {geoJsonError && (
+          <p role="alert" className="text-[11px] text-rose-300" data-testid="selection-export-error">
+            GeoJSON: {geoJsonError}
+          </p>
+        )}
+
         {s.count === 0 && !loading && !error && (
           <p className="text-[11px] text-slate-400" data-testid="selection-empty">
             No hotspots in this area
@@ -251,12 +272,13 @@ export function SelectionPanel({ area, features: loaded, loading, error, fileTag
           </button>
           <button
             type="button"
-            onClick={downloadGeoJson}
-            disabled={loading || error !== null}
+            onClick={() => void downloadGeoJson()}
+            disabled={loading || error !== null || exporting}
+            aria-busy={exporting}
             data-testid="selection-download-geojson"
             className={`${BUTTON} border-slate-700 bg-slate-800/80 text-slate-100 hover:bg-slate-800`}
           >
-            GeoJSON
+            {exporting ? 'Preparing…' : 'GeoJSON'}
           </button>
           <button
             type="button"

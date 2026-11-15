@@ -145,7 +145,7 @@ CREATE INDEX hotspots_point_gist ON hotspots USING gist (point(longitude, latitu
 | Filter | SQL on `hotspots` |
 |---|---|
 | Region | `EXISTS (SELECT 1 FROM hotspot_regions hr WHERE hr.hotspot_id = hotspots.id AND hr.region_id = $1)` |
-| Drawn polygon | `point(longitude, latitude) <@ $1::polygon` (exactly this form, so `hotspots_point_gist` is used) |
+| Drawn polygon | `latitude BETWEEN … AND longitude BETWEEN …` over the vertices' bounding box (inclusive), then `point(longitude, latitude) <@ $n::polygon` (exactly this form, so `hotspots_point_gist` is used) |
 | Circle | latitude bounding box, then great-circle distance (haversine) ≤ `radius_km` |
 
 - Levels mean different things per country. Italy: ADM1 = 5 macro-zones (`Isole` = Sicily + Sardinia), ADM2 = the 20 regions.
@@ -177,12 +177,30 @@ Unknown `region` id → 400. No area given → all loaded data (currently Europe
 | `GET /api/hotspots` | GeoJSON `FeatureCollection` of points; properties = CSV columns |
 | `GET /api/stats` | `{ "total": 6689, "frp_sum": 184532.7, "by_type": { "0": 6473, ... }, "by_daynight": { "D": 5821, "N": 868 } }`. `frp_sum`: summed FRP (MW), 1 decimal; rows with no FRP add 0 |
 | `GET /api/calendar` | `{ "days": [ { "date": "2008-08-14", "count": 42, "frp": 1290.4 }, ... ] }`. `frp`: summed FRP (MW) of the day, 1 decimal |
+| `GET /api/selection-summary` | The selection card's numbers for the filters + area, aggregated in SQL. See below |
 | `GET /api/hotspots/grid` | Hotspots counted per grid cell, for the zoomed-out map. See below |
 | `GET /api/hotspots.csv` | CSV download, same columns as [1] |
 | `GET /api/regions` | `{ "regions": [ { "id": 812, "name": "Sicilia", "level": 2, "country": "ITA", "parent_id": 77, "path": "Italy › Isole" } ] }`. No params → countries (level 0, `path` `""`); `?parent=<id>` → its children; `?q=<text>` → name search, 2–100 chars, case- and accent-insensitive, prefix matches first, max 20. `q` with `parent` → 400. Sorted by name. Not loaded yet → `"regions": []` |
 | `GET /api/regions/:id` | GeoJSON `Feature`: `geometry` = simplified outline (Polygon / MultiPolygon), `properties` = the fields above. Unknown id → 404 `{ "error": … }` |
 
 Row cap: `GET /api/hotspots` and `GET /api/hotspots.csv` return at most `HOTSPOTS_MAX_ROWS` rows (env; 500000 in `docker-compose.yml`, code fallback 200000). More matching rows → 400 `{ "error": "Too many hotspots (more than <cap>). Narrow the date range or area." }`; never a truncated result. With `bbox` (map viewport) the cap is `HOTSPOTS_BBOX_MAX_ROWS` instead (env, default 20000) → 400 `{ "error": "Too many hotspots in view (more than <cap>). Zoom in." }`.
+
+`GET /api/selection-summary` — shared params (area optional, `bbox` optional like everywhere):
+
+```json
+{ "total": 6689,
+  "frp": { "sum": 184532.71, "mean": 27.59, "max": 1310.2 },
+  "peak_month": { "month": "2020-08", "count": 1520 },
+  "peak_day": { "date": "2020-08-14", "count": 212 },
+  "first": "2020-01-03", "last": "2020-12-29",
+  "by_type": { "0": 6473, "2": 216 }, "by_daynight": { "D": 5821, "N": 868 } }
+```
+
+- `total` = matching hotspots. `by_type` / `by_daynight`: same rules as `/api/stats` (zero counts left out; rows with `type` or `daynight` NULL count in `total` only).
+- `frp`: `sum`, `mean`, `max` in MW over rows with a non-null `frp` only (`mean` = `sum` / that count), not rounded. `null` when no row has one.
+- `peak_month` (`YYYY-MM`) and `peak_day` (`YYYY-MM-DD`): the most hotspots; a tie goes to the earliest. `first` / `last`: earliest and latest `acq_date`.
+- No match → 200 `{ "total": 0, "frp": null, "peak_month": null, "peak_day": null, "first": null, "last": null, "by_type": {}, "by_daynight": {} }`.
+- The area in km² is not here: it depends only on the shape, the browser computes it.
 
 `GET /api/hotspots/grid` — shared params + `bbox` (**required**) + `cell` (**required**, degrees, `0.01 ≤ cell ≤ 10`):
 
@@ -205,7 +223,7 @@ Owner may change these; update this table first.
 
 Owner: frontend data layer. Change any row → tag the frontend owner as reviewer.
 
-Requests: all endpoints accept every shared param from the table above, with the same meaning.
+Requests: all endpoints accept every shared param from the table above, with the same meaning. After a filter or area change the frontend waits 300 ms before asking (calendar, stats, selection summary, map), so quick clicks send one request per endpoint.
 
 | Param | Frontend sends | Notes |
 |---|---|---|
@@ -216,7 +234,7 @@ Requests: all endpoints accept every shared param from the table above, with the
 | `type` | `0` or `0,2` | Absent → all types |
 | `daynight` | `D` / `N` | Absent → both |
 | `sensor` | `MODIS`, `VIIRS` or `MODIS,VIIRS` | Always sent. Absent → all sensors. Counts are raw sums, not harmonized (method TBD) |
-| `bbox` | `5.33,35.11,17.34,47.12` | Map requests only (`/hotspots` from zoom 9, `/hotspots/grid` below): visible bounds + 10 % per side, rounded outward to 0.01°. Never sent to stats, calendar, CSV, or the selection card's `/hotspots` |
+| `bbox` | `5.33,35.11,17.34,47.12` | Map requests only (`/hotspots` from zoom 9, `/hotspots/grid` below): visible bounds + 10 % per side, rounded outward to 0.01°. Never sent to stats, calendar, CSV, `/selection-summary`, or the GeoJSON export's `/hotspots` |
 | `cell` | `1` | `/hotspots/grid` only: `90 / 2^zoom` snapped to 10, 5, 2, 1, 0.5, 0.25, 0.1, 0.05, 0.02, 0.01 |
 
 Responses:
@@ -227,6 +245,7 @@ Responses:
 | `GET /api/hotspots/grid` | Shape as above. No match → `"cells": []` |
 | `GET /api/stats` | Shape as above. No match → `{ "total": 0, "frp_sum": 0, "by_type": {}, "by_daynight": {} }` |
 | `GET /api/calendar` | Days sorted by `date` ascending; days with count 0 omitted. No match → `{ "days": [] }` |
+| `GET /api/selection-summary` | Shape as above. Requested only while the selection card is shown (an area is selected, compare mode off) |
 | `GET /api/hotspots.csv` | `Content-Type: text/csv`, `Content-Disposition: attachment; filename="hotspots_<from>_<to>.csv"` |
 
 General:

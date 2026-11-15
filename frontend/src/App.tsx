@@ -12,12 +12,11 @@ import { COMPARE_COLORS, type CompareYears } from './constants/compare'
 import { DEFAULT_FILTERS, MONTHS } from './constants/fire'
 import { useDashboardData } from './hooks/useDashboardData'
 import { useIsDesktop } from './hooks/useMediaQuery'
-import type { Area, Filters, HotspotFeature } from './types/api'
+import type { Area, Filters } from './types/api'
 import { buildGrid } from './utils/calendar'
 import { filtersForYear, formatMW } from './utils/compare'
 import { activeSensors, selectionLabel, toggleDatePatch, toggleMonthPatch, yearPatch } from './utils/filters'
 
-const NO_FEATURES: readonly HotspotFeature[] = []
 const PANEL_WIDTH = 600
 
 export default function App() {
@@ -31,7 +30,8 @@ export default function App() {
 
   const filtersA = useMemo(() => (compare ? filtersForYear(filters, compare.a) : filters), [filters, compare])
   const filtersB = useMemo(() => filtersForYear(filters, compare?.b ?? filters.year), [filters, compare])
-  const { calendar, stats, selection, isDemo, selectionQuery } = useDashboardData(filtersA)
+  // The selection card is hidden in compare mode, so only side A loads its summary, and only outside it.
+  const { calendar, stats, summary, isDemo, selectionQuery } = useDashboardData(filtersA, true, compare === null)
   const second = useDashboardData(filtersB, compare !== null)
 
   const grid = useMemo(() => (calendar.data ? buildGrid(filtersA.year, calendar.data) : null), [calendar.data, filtersA.year])
@@ -114,11 +114,7 @@ export default function App() {
     query: selectionQuery,
     total: stats.data?.total ?? null,
     totalLoading: stats.loading,
-    selection: {
-      features: selection.data?.features ?? NO_FEATURES,
-      loading: selection.loading,
-      error: selection.error,
-    },
+    selection: { summary: summary.data, loading: summary.loading, error: summary.error },
     label: selectionLabel(filters),
     sensors,
     area: filters.area,
