@@ -251,5 +251,19 @@ class Noaa20(CalTest):
         self.assertAlmostEqual(float(self.month("2026-11-01", "count_snpp_eq")), 20.0)   # 25 / 1.25
 
 
+class CurrentMonth(CalTest):
+    until = D(2026, 11, 13)                      # data ends mid-month: the month is still running
+
+    def test_running_month_gets_the_platform_that_covers_it_up_to_the_last_data_day(self):
+        for y in (2013, 2014, 2015):
+            ins(rows("Aqua", y, 7, 10) + rows("N", y, 7, 30))
+        for y in (2019, 2020, 2021):
+            ins(rows("N", y, 7, 40) + rows("N20", y, 7, 50))                           # J3 = 1.25
+        ins(rows("N20", 2026, 11, 10, first_day=1)[:10])
+        self.fit(J2, J3)
+        self.assertEqual(self.month("2026-10-01", "satellite"), "N")
+        self.assertEqual(self.month("2026-11-01", "satellite, raw_count"), "N20|10")
+
+
 if __name__ == "__main__":
     unittest.main()
