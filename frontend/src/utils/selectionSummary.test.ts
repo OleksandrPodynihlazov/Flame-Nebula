@@ -20,6 +20,11 @@ function dot(acq_date: string, opts: { frp?: number | null; type?: FireType | nu
       daynight: opts.daynight ?? 'D',
       frp: opts.frp === undefined ? 10 : opts.frp,
       confidence: 80,
+      confidence_level: 'high',
+      confidence_score: null,
+      confidence_class: null,
+      confidence_reasons: null,
+      worldview_url: null,
       type: opts.type === undefined ? 0 : opts.type,
     },
   }

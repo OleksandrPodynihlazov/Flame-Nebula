@@ -46,5 +46,6 @@ export const DEFAULT_FILTERS: Filters = {
   sensors: ['MODIS'],
   types: ALL_TYPES,
   hideNoise: false,
+  showNonFire: false,
   daynight: null,
 }

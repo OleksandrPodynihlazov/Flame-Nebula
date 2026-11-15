@@ -41,6 +41,7 @@ function baseQuery(f: Filters, from: string, to: string): ApiQuery {
   if (f.area?.kind === 'circle') Object.assign(q, { lat: f.area.lat, lon: f.area.lon, radius_km: f.area.radiusKm })
   if (f.area?.kind === 'polygon') q.polygon = JSON.stringify(f.area.points)
   if (f.area?.kind === 'region') q.region = f.area.id
+  if (f.showNonFire) q.include_non_fire = true
   return q
 }
 
@@ -89,23 +90,25 @@ export function toggleDayPatch(f: Filters, date: string): Partial<Filters> {
 
 const sameMembers = <T,>(a: readonly T[], b: readonly T[]) => a.length === b.length && a.every((x) => b.includes(x))
 
-/** How many of fire type, pass, hide noise and sensors differ from DEFAULT_FILTERS (the Filters button badge). */
+/** How many of fire type, pass, hide noise, non-fire and sensors differ from DEFAULT_FILTERS (the Filters button badge). */
 export function countChangedFilters(f: Filters): number {
   return [
     !sameMembers(f.types, DEFAULT_FILTERS.types),
     f.daynight !== DEFAULT_FILTERS.daynight,
     f.hideNoise !== DEFAULT_FILTERS.hideNoise,
+    f.showNonFire !== DEFAULT_FILTERS.showNonFire,
     !sameMembers(f.sensors, DEFAULT_FILTERS.sensors),
   ].filter(Boolean).length
 }
 
-/** Fire type, pass, hide noise and sensors back to DEFAULT_FILTERS; year, period and area stay. */
+/** Fire type, pass, hide noise, non-fire and sensors back to DEFAULT_FILTERS; year, period and area stay. */
 export function clearedFilters(f: Filters): Filters {
   return {
     ...f,
     types: DEFAULT_FILTERS.types,
     daynight: DEFAULT_FILTERS.daynight,
     hideNoise: DEFAULT_FILTERS.hideNoise,
+    showNonFire: DEFAULT_FILTERS.showNonFire,
     sensors: DEFAULT_FILTERS.sensors,
   }
 }

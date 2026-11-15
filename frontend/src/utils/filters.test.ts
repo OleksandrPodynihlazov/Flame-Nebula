@@ -5,12 +5,15 @@ import {
   countChangedFilters,
   filterSummary,
   sensorAvailableIn,
+  selectionQuery,
   sensorYears,
   toggleDatePatch,
   toggleDayPatch,
   toggleMonthPatch,
   yearPatch,
+  yearQuery,
 } from './filters'
+import { toSearchParams } from '../api/client'
 
 describe('toggleMonthPatch', () => {
   it('selects a month and clears the day', () => {
@@ -74,15 +77,38 @@ describe('countChangedFilters', () => {
     expect(countChangedFilters({ ...DEFAULT_FILTERS, daynight: 'D' })).toBe(1)
   })
 
+  it('counts the non-fire switch', () => {
+    expect(countChangedFilters({ ...DEFAULT_FILTERS, showNonFire: true })).toBe(1)
+  })
+
   it('treats reordered types and sensors as unchanged', () => {
     expect(countChangedFilters({ ...DEFAULT_FILTERS, types: [3, 2, 1, 0] })).toBe(0)
   })
 })
 
+describe('include_non_fire', () => {
+  const on = { ...DEFAULT_FILTERS, showNonFire: true }
+
+  it('is not sent by default, so the API hides non-fire points', () => {
+    expect(yearQuery(DEFAULT_FILTERS)).not.toHaveProperty('include_non_fire')
+    expect(toSearchParams(yearQuery(DEFAULT_FILTERS)).has('include_non_fire')).toBe(false)
+  })
+
+  it('is sent as include_non_fire=true while the switch is on, for the year and for a month or day', () => {
+    expect(toSearchParams(yearQuery(on)).get('include_non_fire')).toBe('true')
+    expect(toSearchParams(selectionQuery({ ...on, month: 7 })).get('include_non_fire')).toBe('true')
+    expect(toSearchParams(selectionQuery({ ...on, month: 7, date: '2008-08-14' })).get('include_non_fire')).toBe('true')
+  })
+
+  it('never sends min_confidence', () => {
+    expect(toSearchParams(yearQuery(on)).has('min_confidence')).toBe(false)
+  })
+})
+
 describe('clearedFilters', () => {
-  it('resets type, pass, noise and sensors and keeps year, period and area', () => {
+  it('resets type, pass, noise, non-fire and sensors and keeps year, period and area', () => {
     const area = { kind: 'circle', lat: 41, lon: 12, radiusKm: 20 } as const
-    const f = { ...DEFAULT_FILTERS, year: 2012, month: 7 as const, area, types: [1] as typeof DEFAULT_FILTERS.types, daynight: 'N' as const, hideNoise: true, sensors: ['VIIRS' as const] }
+    const f = { ...DEFAULT_FILTERS, year: 2012, month: 7 as const, area, types: [1] as typeof DEFAULT_FILTERS.types, daynight: 'N' as const, hideNoise: true, showNonFire: true, sensors: ['VIIRS' as const] }
     expect(clearedFilters(f)).toEqual({ ...DEFAULT_FILTERS, year: 2012, month: 7, area })
   })
 

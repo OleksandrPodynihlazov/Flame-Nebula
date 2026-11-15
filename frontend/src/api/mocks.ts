@@ -1,4 +1,7 @@
 import type {
+  ConfidenceClass,
+  HotspotProperties,
+  NonFireKind,
   PatternCell,
   PatternQuery,
   PatternsResponse,
@@ -21,6 +24,7 @@ import type {
 import { HttpError, TOO_MANY_IN_VIEW_PREFIX } from './errors'
 import { SENSORS } from '../constants/fire'
 import { haversineKm, inGeometry, inPolygon } from '../utils/area'
+import { classFromScore, isNonFire } from '../utils/confidence'
 import { summarizeFeatures } from '../utils/selectionSummary'
 
 /** Positive integer from an env value, else null. */
@@ -95,6 +99,63 @@ function pad(n: number, len = 2) {
 /** VIIRS (375 m) detects many more small fires than MODIS (1 km). Rough ratio, mock only. */
 const VIIRS_FACTOR = 2.2
 
+type MockConfidence = Pick<
+  HotspotProperties,
+  'confidence_level' | 'confidence_score' | 'confidence_class' | 'confidence_reasons' | 'worldview_url'
+>
+
+const NON_FIRE_BY_TYPE: Partial<Record<FireType, NonFireKind>> = { 1: 'volcano', 2: 'static', 3: 'offshore' }
+/** Share of volcano / static / offshore (type 1–3) points the mock calls non-fire; vegetation points are city areas 0.4 % of the time. */
+const NON_FIRE_SHARE_OF_NOISE = 0.9
+const URBAN_SHARE = 0.004
+const UNSCORED_SHARE = 0.05
+const MOCK_SATELLITES = ['snpp', 'noaa20'] as const
+
+/**
+ * Fire confidence for one mock point ([1b] fields). A pure function of the point itself (own seed from its id),
+ * so the dots stay the same between runs and the main generator's random sequence is untouched.
+ */
+export function mockConfidence(p: Pick<HotspotProperties, 'id' | 'latitude' | 'longitude' | 'acq_date' | 'sensor' | 'type' | 'confidence'>): MockConfidence {
+  const rand = rng(Math.imul(p.id, 2654435761) ^ 0x9e3779b9)
+  const level: MockConfidence['confidence_level'] =
+    p.confidence === null ? (rand() < 0.15 ? 'high' : 'nominal') : p.confidence >= 80 ? 'high' : p.confidence >= 30 ? 'nominal' : 'low'
+  const nonFireKind: NonFireKind | null =
+    p.type !== null && p.type !== 0
+      ? rand() < NON_FIRE_SHARE_OF_NOISE
+        ? (NON_FIRE_BY_TYPE[p.type] ?? null)
+        : null
+      : rand() < URBAN_SHARE
+        ? 'urban'
+        : null
+  if (nonFireKind === null && rand() < UNSCORED_SHARE) {
+    return { confidence_level: level, confidence_score: null, confidence_class: null, confidence_reasons: null, worldview_url: null }
+  }
+  const worldview_url = `https://worldview.earthdata.nasa.gov/?t=${p.acq_date}&v=${[p.longitude - 0.2, p.latitude - 0.2, p.longitude + 0.2, p.latitude + 0.2].map((n) => +n.toFixed(4)).join(',')}`
+  if (nonFireKind !== null) {
+    return {
+      confidence_level: level,
+      confidence_score: 10 + Math.floor(rand() * 30),
+      confidence_class: `non_fire:${nonFireKind}`,
+      confidence_reasons: `L1:${nonFireKind}`,
+      worldview_url,
+    }
+  }
+  // Mean 62, spread 22, nudged by the sensor's own confidence when it has one.
+  const base = 62 + gaussian(rand) * 22 + (p.confidence === null ? 0 : (p.confidence - 65) * 0.3)
+  const score = Math.min(100, Math.max(0, Math.round(base)))
+  const confidence_class = classFromScore(score)
+  const tokens: string[] = []
+  if (confidence_class === 'confirmed' || (confidence_class === 'likely' && rand() < 0.6)) {
+    tokens.push(`L3:xsensor:${MOCK_SATELLITES[Math.floor(rand() * MOCK_SATELLITES.length)]}`)
+  }
+  if (confidence_class === 'confirmed' && rand() < 0.5) {
+    tokens.push(`L6:effis:${100 + Math.floor(rand() * 900)}:${20 + Math.floor(rand() * 900)}ha`)
+  }
+  // A token the popup has no wording for: it must be left out, not shown raw.
+  if (rand() < 0.2) tokens.push('L5:burnscar')
+  return { confidence_level: level, confidence_score: score, confidence_class, confidence_reasons: tokens.join(';'), worldview_url }
+}
+
 function generate(year: number, sensor: Sensor): HotspotFeature[] {
   const { from, to } = SENSORS[sensor]
   if (year < from || year > to) return []
@@ -119,23 +180,24 @@ function generate(year: number, sensor: Sensor): HotspotFeature[] {
     const terra = rand() < 0.5
     // Overpass hours (UTC): Terra ~09/21, Aqua and S-NPP ~12/00-01.
     const hour = daynight === 'D' ? (terra && !viirs ? 9 : 12) : terra && !viirs ? 21 : 0
+    const base: Omit<HotspotProperties, keyof MockConfidence> = {
+      id: idBase + i,
+      latitude,
+      longitude,
+      acq_date: `${year}-${pad(month + 1)}-${pad(day)}`,
+      acq_time: `${pad(hour)}${pad(Math.floor(rand() * 60))}`,
+      sensor,
+      satellite: viirs ? 'N' : terra ? 'Terra' : 'Aqua',
+      daynight,
+      frp: +((viirs ? 1 : 5) + rand() * rand() * (viirs ? 80 : 300)).toFixed(1),
+      // VIIRS confidence is l/n/h; the numeric mapping is TBD in contracts.md, so null for now.
+      confidence: viirs ? null : 30 + Math.floor(rand() * 71),
+      type: pickWeighted(TYPE_WEIGHTS, rand()),
+    }
     features.push({
       type: 'Feature',
       geometry: { type: 'Point', coordinates: [longitude, latitude] },
-      properties: {
-        id: idBase + i,
-        latitude,
-        longitude,
-        acq_date: `${year}-${pad(month + 1)}-${pad(day)}`,
-        acq_time: `${pad(hour)}${pad(Math.floor(rand() * 60))}`,
-        sensor,
-        satellite: viirs ? 'N' : terra ? 'Terra' : 'Aqua',
-        daynight,
-        frp: +((viirs ? 1 : 5) + rand() * rand() * (viirs ? 80 : 300)).toFixed(1),
-        // VIIRS confidence is l/n/h; the numeric mapping is TBD in contracts.md, so null for now.
-        confidence: viirs ? null : 30 + Math.floor(rand() * 71),
-        type: pickWeighted(TYPE_WEIGHTS, rand()),
-      },
+      properties: { ...base, ...mockConfidence(base) },
     })
   }
   return features.sort((a, b) => a.properties.acq_date.localeCompare(b.properties.acq_date))
@@ -157,7 +219,8 @@ function dataset(q: ApiQuery): HotspotFeature[] {
   return out
 }
 
-function filter(q: ApiQuery) {
+/** Every point matching the query, hidden non-fire ones included (what `by_class` counts). */
+function matching(q: ApiQuery) {
   const types = q.type ? new Set(q.type.split(',').map(Number)) : null
   const polygon: LonLat[] | null = q.polygon ? JSON.parse(q.polygon) : null
   const circle = q.lat !== undefined && q.lon !== undefined && q.radius_km !== undefined
@@ -168,11 +231,17 @@ function filter(q: ApiQuery) {
     if (q.bbox && (p.latitude < south || p.latitude > north || p.longitude < west || p.longitude > east)) return false
     if (types && (p.type === null || !types.has(p.type))) return false
     if (q.daynight && p.daynight !== q.daynight) return false
+    if (q.min_confidence !== undefined && (p.confidence_score === null || p.confidence_score < q.min_confidence)) return false
     if (region) return inGeometry(geometry.coordinates, region)
     if (polygon) return inPolygon(geometry.coordinates, polygon)
     if (circle) return haversineKm(q.lat!, q.lon!, p.latitude, p.longitude) <= q.radius_km!
     return true
   })
+}
+
+/** Like the API: `non_fire:*` points are left out unless `include_non_fire` is true. */
+function filter(q: ApiQuery) {
+  return q.include_non_fire === true ? matching(q) : matching(q).filter(({ properties: p }) => !isNonFire(p.confidence_class))
 }
 
 /** Answers after the fake latency; rejects like a failing API when `endpoint` is listed in VITE_MOCK_FAIL. */
@@ -278,8 +347,19 @@ export function mockGrid(q: ApiQuery): Promise<GridResponse> {
 }
 
 export function mockStats(q: ApiQuery): Promise<StatsResponse> {
-  const res: StatsResponse = { total: 0, frp_sum: 0, by_type: {}, by_daynight: {} }
-  for (const { properties: p } of filter(q)) {
+  const byClass: NonNullable<StatsResponse['by_class']> = { non_fire: {} }
+  const res: StatsResponse = { total: 0, frp_sum: 0, by_type: {}, by_daynight: {}, by_class: byClass }
+  const showNonFire = q.include_non_fire === true
+  for (const { properties: p } of matching(q)) {
+    const c: ConfidenceClass | null = p.confidence_class
+    if (isNonFire(c)) {
+      const kind = c.slice('non_fire:'.length) as NonFireKind
+      byClass.non_fire[kind] = (byClass.non_fire[kind] ?? 0) + 1
+    } else {
+      const key = c ?? 'unscored'
+      byClass[key] = (byClass[key] ?? 0) + 1
+    }
+    if (!showNonFire && isNonFire(c)) continue
     res.total++
     res.frp_sum += p.frp ?? 0
     if (p.type !== null) res.by_type[`${p.type}`] = (res.by_type[`${p.type}`] ?? 0) + 1

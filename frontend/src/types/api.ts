@@ -48,6 +48,8 @@ export interface Filters {
   sensors: Sensor[]
   types: FireType[]
   hideNoise: boolean
+  /** Also show points the confidence table calls non-fire (volcano, industry, offshore, city). Off by default, as in the API. */
+  showNonFire: boolean
   daynight: DayNight | null
 }
 
@@ -111,6 +113,10 @@ export interface ApiQuery {
   bbox?: string
   /** Grid cell in degrees; `/hotspots/grid` only. */
   cell?: number
+  /** `true` shows `non_fire:*` points; sent only while the switch is on (the API hides them by default). */
+  include_non_fire?: boolean
+  /** Whole number 0–100: keep scored points at or above it. The UI does not send it yet; the mock API honours it. */
+  min_confidence?: number
 }
 
 export interface HotspotProperties {
@@ -124,8 +130,18 @@ export interface HotspotProperties {
   daynight: DayNight
   frp: number | null
   confidence: number | null
+  confidence_level: 'low' | 'nominal' | 'high' | null
   type: FireType | null
+  /** Fire confidence from docs/contracts.md [1b]; all four are null when the point is not scored. */
+  confidence_score: number | null
+  confidence_class: ConfidenceClass | null
+  /** `L1:static;L3:xsensor:snpp;L6:effis:123:450ha` */
+  confidence_reasons: string | null
+  worldview_url: string | null
 }
+
+export type NonFireKind = 'static' | 'volcano' | 'offshore' | 'urban'
+export type ConfidenceClass = 'confirmed' | 'likely' | 'unverified' | 'doubtful' | `non_fire:${NonFireKind}`
 
 export interface HotspotFeature {
   type: 'Feature'
@@ -159,6 +175,15 @@ export interface StatsResponse {
   frp_sum: number
   by_type: Partial<Record<`${FireType}` | 'null', number>>
   by_daynight: Partial<Record<DayNight, number>>
+  /** Every matching point, the hidden non-fire ones included. Zero counts are left out. */
+  by_class?: {
+    confirmed?: number
+    likely?: number
+    unverified?: number
+    doubtful?: number
+    unscored?: number
+    non_fire: Partial<Record<NonFireKind, number>>
+  }
 }
 
 /** `GET /api/selection-summary`: the selection card's numbers, aggregated by the API. */

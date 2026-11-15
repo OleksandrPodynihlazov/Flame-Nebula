@@ -360,7 +360,7 @@ export function HotspotMap({
       {mobile ? (
         <div className="absolute top-16 left-3 z-[1000] flex flex-col items-start gap-2">
           {onViewChange && <MapLayersButton view={view} onChange={onViewChange} menuSide="right" />}
-          <MobileLegend sensors={sensors} patterns={showPatterns} onShowTips={hints.restart} />
+          <MobileLegend sensors={sensors} patterns={showPatterns} showNonFire={query.include_non_fire === true} onShowTips={hints.restart} />
           <Button
             type="button"
             variant="secondary"
@@ -374,7 +374,7 @@ export function HotspotMap({
         </div>
       ) : (
         <>
-          <MapLegend open={legendOpen} onToggle={() => setLegendOpen((o) => !o)} sensors={sensors} patterns={showPatterns} onShowTips={showTips} />
+          <MapLegend open={legendOpen} onToggle={() => setLegendOpen((o) => !o)} sensors={sensors} patterns={showPatterns} showNonFire={query.include_non_fire === true} onShowTips={showTips} />
           {onViewChange && (
             <div className="absolute right-[calc(var(--panel-inset,0px)+10px)] bottom-9 z-[1000]">
               <MapLayersButton view={view} onChange={onViewChange} menuSide="left" />

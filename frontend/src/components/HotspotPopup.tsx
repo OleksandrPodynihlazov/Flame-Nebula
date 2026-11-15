@@ -1,9 +1,12 @@
 import { SENSORS, typeMeta } from "../constants/fire";
 import type { HotspotProperties } from "../types/api";
+import { confidenceSummary, reasonPhrases } from "../utils/confidence";
 
 /** Body of the popup that opens when a single hotspot dot is clicked. The card chrome comes from the Leaflet popup CSS in index.css. */
 export function HotspotPopup({ p }: { p: HotspotProperties }) {
   const meta = typeMeta(p.type);
+  const summary = confidenceSummary(p);
+  const reasons = reasonPhrases(p.confidence_reasons);
   return (
     <div className="flex min-w-[210px] flex-col gap-2 pr-5 text-xs">
       <div className="flex items-center gap-2 border-b border-border pb-2 font-medium text-foreground">
@@ -29,7 +32,40 @@ export function HotspotPopup({ p }: { p: HotspotProperties }) {
         <dd className="text-right font-mono text-foreground tabular-nums">{p.frp ?? "—"} MW</dd>
         <dt className="text-muted-foreground">Confidence</dt>
         <dd className="text-right font-mono text-foreground tabular-nums">{p.confidence ?? "—"}%</dd>
+        <dt className="text-muted-foreground">Fire confidence</dt>
+        <dd className="text-right text-foreground" data-testid="popup-confidence">
+          {summary.kind === "unscored" && "No score yet"}
+          {summary.kind === "non_fire" && `Not a fire · ${summary.noun}`}
+          {summary.kind === "scored" && (
+            <>
+              {summary.label}
+              {summary.score !== null && (
+                <>
+                  {" · "}
+                  <span className="font-mono tabular-nums">{summary.score}</span>
+                </>
+              )}
+            </>
+          )}
+        </dd>
       </dl>
+      {reasons.length > 0 && (
+        <ul className="flex flex-col gap-0.5 text-muted-foreground" data-testid="popup-reasons">
+          {reasons.map((r) => (
+            <li key={r}>{r}</li>
+          ))}
+        </ul>
+      )}
+      {p.worldview_url && (
+        <a
+          href={p.worldview_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-fit !text-muted-foreground underline underline-offset-2 outline-none hover:!text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          View in NASA Worldview
+        </a>
+      )}
     </div>
   );
 }

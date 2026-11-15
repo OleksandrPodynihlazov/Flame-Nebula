@@ -5,8 +5,9 @@ import { createRoot } from 'react-dom/client'
 import { useMap } from 'react-leaflet'
 import { HotspotPopup } from '../components/HotspotPopup'
 import { FIRE_TYPES, SENSORS, typeMeta } from '../constants/fire'
-import type { FireType, HotspotProperties, Sensor } from '../types/api'
+import type { FireType, HotspotProperties } from '../types/api'
 import { abbreviateCount, bubbleHeatColor, bubbleRadius, bubbleShare, drawOrder, labelFontSize, minBubbleRadius, topmostAt } from '../utils/clusters'
+import { DOT_STYLES, FLARE, MUTED, confidenceTier, dotRadius, orderDots, type ConfidenceTier } from '../utils/confidence'
 import { cellBounds } from '../utils/viewport'
 import { HOTSPOT_PANE } from './useGeoman'
 import type { MapData } from './useViewportData'
@@ -33,16 +34,26 @@ interface Hit {
   target: Target
 }
 
-/** Same look as the old <CircleMarker>: type color, dark 0.5 px stroke. */
-function drawDot(ctx: CanvasRenderingContext2D, d: Hit, type: FireType | null, sensor: Sensor) {
+/** Dot in its FIRMS type colour; confidence sets opacity, size, ring and draw order (utils/confidence.ts). */
+function drawDot(ctx: CanvasRenderingContext2D, d: Hit, type: FireType | null, tier: ConfidenceTier) {
+  const style = DOT_STYLES[tier]
+  const color = style.grey ? MUTED : typeMeta(type).color
   ctx.beginPath()
   ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2)
-  ctx.globalAlpha = sensor === 'VIIRS' ? 0.95 : 0.75
-  ctx.fillStyle = typeMeta(type).color
+  if (style.hollow) {
+    ctx.globalAlpha = style.opacity
+    ctx.lineWidth = 1.5
+    ctx.strokeStyle = color
+    ctx.stroke()
+    ctx.globalAlpha = 1
+    return
+  }
+  ctx.globalAlpha = style.opacity
+  ctx.fillStyle = color
   ctx.fill()
-  ctx.globalAlpha = 0.9
-  ctx.lineWidth = 0.5
-  ctx.strokeStyle = STROKE
+  ctx.globalAlpha = 0.9 * style.opacity
+  ctx.lineWidth = style.ring ? 1 : 0.5
+  ctx.strokeStyle = style.ring ? FLARE : STROKE
   ctx.stroke()
   ctx.globalAlpha = 1
 }
@@ -211,19 +222,20 @@ class HotspotCanvasLayer extends L.Layer {
     } else {
       for (const { properties: p } of data.features) {
         const { x, y } = map.latLngToContainerPoint([p.latitude, p.longitude])
-        const r = SENSORS[p.sensor].radius
+        const r = dotRadius(SENSORS[p.sensor].radius, confidenceTier(p))
         if (onCanvas(x, y, r)) dots.push({ x, y, r, target: { kind: 'dot', p } })
       }
     }
 
-    dots.sort((a, b) => b.r - a.r)
+    // Least confident first, confirmed on top; hit tests search from the end, so the top dot wins.
+    const orderedDots = orderDots(dots, (d) => (d.target.kind === 'dot' ? confidenceTier(d.target.p) : 'unscored'))
     ctx.translate(pad.x, pad.y)
-    for (const d of dots) if (d.target.kind === 'dot') drawDot(ctx, d, d.target.p.type, d.target.p.sensor)
+    for (const d of orderedDots) if (d.target.kind === 'dot') drawDot(ctx, d, d.target.p.type, confidenceTier(d.target.p))
     // Biggest first: smaller bubbles and their numbers end up on top.
     const orderedBubbles = drawOrder(bubbles)
     for (const b of orderedBubbles) if (b.target.kind === 'cell') drawBubble(ctx, b, b.target)
     // Bubbles are drawn last, smallest last, so the smallest wins hit tests (searched from the end).
-    this.hits = [...dots, ...orderedBubbles]
+    this.hits = [...orderedDots, ...orderedBubbles]
   }
 
   // A touch pinch changes center and zoom without moving the map pane or animating, so `zoom` must move the bitmap.
@@ -281,7 +293,7 @@ class HotspotCanvasLayer extends L.Layer {
     // Render before Leaflet measures the popup, so its size and auto-pan are right.
     flushSync(() => root.render(createElement(HotspotPopup, { p })))
     const popup = L.popup(
-      this.mobile ? { autoPanPaddingTopLeft: [12, 56], autoPanPaddingBottomRight: [12, 140] } : {},
+      this.mobile ? { autoPanPaddingTopLeft: [12, 56], autoPanPaddingBottomRight: [68, 140] } : {},
     )
       .setLatLng([p.latitude, p.longitude])
       .setContent(el)

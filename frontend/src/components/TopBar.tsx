@@ -155,9 +155,10 @@ export function SearchField({ area, onAreaChange }: { area: Area | null; onAreaC
   return <RegionSearch area={area} onSelect={onAreaChange} />
 }
 
-/** Fire type, pass, hide noise and sensors: the filters that live in the desktop popover and the phone panel. */
+/** Fire type, pass, hide noise, non-fire and sensors: the filters that live in the desktop popover and the phone panel. */
 export function FilterFields({ filters, onChange, compare }: Pick<Props, 'filters' | 'onChange' | 'compare'>) {
   const noiseId = useId()
+  const nonFireId = useId()
   const sensorsLabelId = useId()
   const typeValue = filters.types.length === ALL_TYPES.length ? 'all' : String(filters.types[0])
   const years = sensorYears(filters, compare)
@@ -215,6 +216,14 @@ export function FilterFields({ filters, onChange, compare }: Pick<Props, 'filter
           <span className="text-xs text-muted-foreground">Volcanoes, industry, offshore</span>
         </span>
         <Switch id={noiseId} checked={filters.hideNoise} onCheckedChange={toggleNoise} />
+      </label>
+
+      <label htmlFor={nonFireId} className="flex min-h-11 items-center justify-between gap-3 text-sm lg:min-h-9">
+        <span className="flex flex-col">
+          Show non-fire points
+          <span className="text-xs text-muted-foreground">Volcanoes, industry, offshore platforms and cities.</span>
+        </span>
+        <Switch id={nonFireId} checked={filters.showNonFire} onCheckedChange={(showNonFire) => onChange({ showNonFire })} />
       </label>
 
       <div role="group" aria-labelledby={sensorsLabelId} className="flex flex-col text-sm">

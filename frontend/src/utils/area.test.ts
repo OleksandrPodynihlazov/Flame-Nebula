@@ -17,6 +17,11 @@ function dot(id: number, lat: number, lon: number): HotspotFeature {
       daynight: 'D',
       frp: 10,
       confidence: 80,
+      confidence_level: 'high',
+      confidence_score: null,
+      confidence_class: null,
+      confidence_reasons: null,
+      worldview_url: null,
       type: 0,
     },
   }
