@@ -7,6 +7,7 @@ import { MONTHS, MONTHS_FULL, YEARS } from '../constants/fire'
 import type { Filters, Month } from '../types/api'
 import { heatInk, heatVar, rampIndex, type CalendarGrid } from '../utils/calendar'
 import { daysInMonth, isoDate } from '../utils/filters'
+import { HeatLegend } from './HeatLegend'
 import { DIM, SrLoading } from './StatCards'
 
 interface Props {
@@ -20,6 +21,7 @@ interface Props {
 
 const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
 const SWIPE_PX = 40
+const FOCUS_RING = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background'
 
 function StepButton({ dir, label, disabled, onClick }: { dir: 'left' | 'right'; label: string; disabled: boolean; onClick: () => void }) {
   const Icon = dir === 'left' ? ChevronLeft : ChevronRight
@@ -122,32 +124,33 @@ export function MobileCalendar({ grid, filters, loading, onYear, onMonth, onDate
 
       <div className={cn(dimmed && DIM)}>
         {month === null ? (
-          <div className="grid grid-cols-4 gap-2" role="list">
+          <ul className="grid grid-cols-4 gap-2">
             {MONTHS.map((name, mi) => {
-              if (first) return <Skeleton key={name} aria-hidden="true" className="h-[52px] rounded-lg" />
+              if (first) return <li key={name} aria-hidden="true"><Skeleton className="h-[52px] rounded-lg" /></li>
               const total = grid?.monthTotals[mi] ?? 0
               const idx = rampIndex(total, monthMax)
               const peak = grid?.peakMonth?.month === mi
               return (
-                <button
-                  key={name}
-                  type="button"
-                  role="listitem"
-                  onClick={() => onMonth(mi as Month)}
-                  className={cn(
-                    'flex flex-col items-start rounded-lg px-2.5 py-2 text-left ring-1 transition-transform active:scale-95',
-                    peak ? 'ring-flare' : 'ring-border',
-                    heatInk(idx),
-                  )}
-                  style={{ background: heatVar(idx) }}
-                  aria-label={`${MONTHS_FULL[mi]}: ${total} hotspots`}
-                >
-                  <span className="text-xs font-semibold">{name}</span>
-                  <span className="font-mono text-[11px] tabular-nums">{total.toLocaleString('en-US')}</span>
-                </button>
+                <li key={name}>
+                  <button
+                    type="button"
+                    onClick={() => onMonth(mi as Month)}
+                    className={cn(
+                      'flex w-full flex-col items-start rounded-lg px-2.5 py-2 text-left ring-1 transition-transform active:scale-95',
+                      peak ? 'ring-flare' : 'ring-border',
+                      FOCUS_RING,
+                      heatInk(idx),
+                    )}
+                    style={{ background: heatVar(idx) }}
+                    aria-label={`${MONTHS_FULL[mi]}: ${total} hotspots`}
+                  >
+                    <span className="text-xs font-semibold">{name}</span>
+                    <span className="font-mono text-[11px] tabular-nums">{total.toLocaleString('en-US')}</span>
+                  </button>
+                </li>
               )
             })}
-          </div>
+          </ul>
         ) : (
           <div className="flex items-center gap-1">
             <StepButton dir="left" label="Previous month" disabled={month <= 0} onClick={() => stepMonth(-1)} />
@@ -168,7 +171,7 @@ export function MobileCalendar({ grid, filters, loading, onYear, onMonth, onDate
                 ))}
                 {(grid?.counts[month] ?? Array.from({ length: first ? daysInMonth(year, month) : 0 }, () => 0)).map((count, di) => {
                   if (count === null) return null
-                  if (first) return <Skeleton key={di} aria-hidden="true" className="h-9 rounded-md" />
+                  if (first) return <Skeleton key={di} aria-hidden="true" className="h-11 rounded-md" />
                   const date = isoDate(year, month, di + 1)
                   const selected = filters.date === date
                   const idx = rampIndex(count, grid?.maxDay ?? 0)
@@ -181,9 +184,10 @@ export function MobileCalendar({ grid, filters, loading, onYear, onMonth, onDate
                       aria-pressed={selected}
                       aria-label={`${di + 1} ${MONTHS_FULL[month]}: ${count} hotspots`}
                       className={cn(
-                        'flex h-9 flex-col items-center justify-center rounded-md text-[11px] leading-none font-semibold transition-transform active:scale-95',
+                        'flex h-11 flex-col items-center justify-center rounded-md text-[11px] leading-none font-semibold transition-transform active:scale-95',
                         heatInk(idx),
                         selected && 'ring-2 ring-flare ring-offset-1 ring-offset-card',
+                        FOCUS_RING,
                       )}
                       style={{ background: heatVar(idx) }}
                     >
@@ -198,6 +202,8 @@ export function MobileCalendar({ grid, filters, loading, onYear, onMonth, onDate
           </div>
         )}
       </div>
+
+      {!first && grid && <HeatLegend max={month === null ? monthMax : grid.maxDay} unit={month === null ? 'month' : 'day'} />}
 
       <p className="text-center text-xs text-muted-foreground">
         {month === null ? 'Tap a month to see its days' : 'Tap a day to filter · tap again to unselect · swipe for next month'}
