@@ -1,11 +1,13 @@
 import { useRef, type PointerEvent } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { MONTHS, MONTHS_FULL, YEARS } from '../constants/fire'
 import type { Filters, Month } from '../types/api'
 import { heatInk, heatVar, rampIndex, type CalendarGrid } from '../utils/calendar'
-import { isoDate } from '../utils/filters'
+import { daysInMonth, isoDate } from '../utils/filters'
+import { DIM, SrLoading } from './StatCards'
 
 interface Props {
   grid: CalendarGrid | null
@@ -57,9 +59,13 @@ export function MobileCalendar({ grid, filters, loading, onYear, onMonth, onDate
   }
 
   const monthMax = Math.max(0, ...(grid?.monthTotals ?? []))
+  const first = loading && grid === null
+  // Reloading keeps the old grid dimmed; a year without hotspots or a failed load keeps the year's shape, dimmed.
+  const dimmed = loading ? !first : grid === null || grid.total === 0
 
   return (
     <div className="flex flex-col gap-3" aria-busy={loading} data-testid="mobile-calendar">
+      {first && <SrLoading />}
       <div className="flex items-center justify-between">
         {month === null ? (
           <StepButton dir="left" label="Previous year" disabled={year <= firstYear} onClick={() => onYear(year - 1)} />
@@ -114,10 +120,11 @@ export function MobileCalendar({ grid, filters, loading, onYear, onMonth, onDate
         )}
       </div>
 
-      <div className={`transition-opacity ${loading ? 'opacity-60' : ''}`}>
+      <div className={cn(dimmed && DIM)}>
         {month === null ? (
           <div className="grid grid-cols-4 gap-2" role="list">
             {MONTHS.map((name, mi) => {
+              if (first) return <Skeleton key={name} aria-hidden="true" className="h-[52px] rounded-lg" />
               const total = grid?.monthTotals[mi] ?? 0
               const idx = rampIndex(total, monthMax)
               const peak = grid?.peakMonth?.month === mi
@@ -159,8 +166,9 @@ export function MobileCalendar({ grid, filters, loading, onYear, onMonth, onDate
                 {Array.from({ length: (new Date(Date.UTC(year, month, 1)).getUTCDay() + 6) % 7 }, (_, i) => (
                   <span key={`pad-${i}`} aria-hidden="true" />
                 ))}
-                {(grid?.counts[month] ?? []).map((count, di) => {
+                {(grid?.counts[month] ?? Array.from({ length: first ? daysInMonth(year, month) : 0 }, () => 0)).map((count, di) => {
                   if (count === null) return null
+                  if (first) return <Skeleton key={di} aria-hidden="true" className="h-9 rounded-md" />
                   const date = isoDate(year, month, di + 1)
                   const selected = filters.date === date
                   const idx = rampIndex(count, grid?.maxDay ?? 0)

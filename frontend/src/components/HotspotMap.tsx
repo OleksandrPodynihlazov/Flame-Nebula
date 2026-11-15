@@ -60,7 +60,8 @@ function StatusChip({
         FLOAT_PANEL,
         "absolute top-3 z-[1000] flex h-11 items-center gap-2 pl-3 lg:top-[10px] lg:h-9",
         error && "border-destructive/60",
-        mobile ? "left-3 max-w-[calc(100%-4.5rem)]" : "left-[54px] max-w-[calc(100%-4rem)]",
+        // An error chip stops short of the selection card at the map's top right, so its button is never covered.
+        mobile ? "left-3 max-w-[calc(100%-4.5rem)]" : error ? "left-[54px] max-w-[28rem]" : "left-[54px] max-w-[calc(100%-4rem)]",
       )}
     >
       <span
@@ -73,12 +74,28 @@ function StatusChip({
   );
 }
 
+/** Slim indeterminate bar along the top edge of the map while hotspots load. Static (full width, dimmed) under reduced motion. */
+function MapProgress({ loading }: { loading: boolean }) {
+  if (!loading) return null
+  return (
+    <div
+      role="progressbar"
+      aria-label="Loading map data"
+      data-testid="map-progress"
+      className="pointer-events-none absolute inset-x-0 top-0 z-[1000] h-0.5 overflow-hidden bg-primary/20"
+    >
+      <div className="h-full w-1/3 bg-primary motion-safe:animate-map-progress motion-reduce:w-full motion-reduce:opacity-60" />
+    </div>
+  );
+}
+
 function MapStatus({
   label,
   total,
   totalLoading,
   loading,
   error,
+  onRetry,
   mobile,
   fitOptions,
 }: {
@@ -87,6 +104,7 @@ function MapStatus({
   totalLoading: boolean;
   loading: boolean;
   error: string | null;
+  onRetry: () => void;
   mobile: boolean;
   fitOptions?: FitBoundsOptions;
 }) {
@@ -95,9 +113,14 @@ function MapStatus({
   return (
     <StatusChip error={error !== null} pulsing={loading || totalLoading} mobile={mobile} fitOptions={fitOptions}>
       {error ? (
-        <span role="alert" data-testid="map-error" className="truncate text-xs font-medium text-destructive" title={error}>
-          Map: {error}
-        </span>
+        <>
+          <span role="alert" data-testid="map-error" className="truncate text-xs font-medium text-destructive" title={error}>
+            Map: {error}
+          </span>
+          <Button type="button" variant="outline" size="sm" onClick={onRetry} className="shrink-0 max-lg:h-9 lg:mr-1 lg:h-7">
+            Try again
+          </Button>
+        </>
       ) : (
         <span className="truncate text-xs text-muted-foreground" aria-live="polite">
           {label} ·{" "}
@@ -130,7 +153,7 @@ export interface PatternMapView {
 
 function PatternLayer({ side, pane, mobile }: { side: PatternSide; pane: string; mobile: boolean }) {
   usePatternLayer(side.cells, MONTHS_FULL[side.month - 1], side.loading && side.cells !== null, mobile, pane);
-  return null;
+  return <MapProgress loading={side.loading} />;
 }
 
 function PatternLabel({ side }: { side: PatternSide }) {
@@ -164,7 +187,7 @@ function PatternStatus({ side, mobile, fitOptions }: { side: PatternSide; mobile
 function CompareLayer({ query, pane, mobile }: { query: ApiQuery; pane: string; mobile: boolean }) {
   const { data, loading } = useViewportData(query);
   useHotspotLayer(data, loading && data !== null, mobile, pane);
-  return null;
+  return <MapProgress loading={loading} />;
 }
 
 function CompareLabel({ year, total, loading }: CompareView["a"]) {
@@ -190,10 +213,15 @@ function ViewportLayer({
   totalLoading: boolean;
   fitOptions?: FitBoundsOptions;
 }) {
-  const { data, loading, error } = useViewportData(query);
+  const { data, loading, error, reload } = useViewportData(query);
   // Old view's data is drawn dimmed until the new view arrives; a failed request draws nothing.
   useHotspotLayer(data, loading && data !== null, mobile);
-  return <MapStatus {...status} loading={loading} error={error} mobile={mobile} />;
+  return (
+    <>
+      <MapProgress loading={loading} />
+      <MapStatus {...status} loading={loading} error={error} onRetry={reload} mobile={mobile} />
+    </>
+  );
 }
 
 function ResetView({ options }: { options?: FitBoundsOptions }) {
@@ -260,7 +288,7 @@ interface Props {
   total: number | null;
   totalLoading: boolean;
   /** Selection card numbers from `/api/selection-summary` (only loaded while the card is shown). */
-  selection: { summary: SelectionSummaryResponse | null; loading: boolean; error: string | null };
+  selection: { summary: SelectionSummaryResponse | null; loading: boolean; error: string | null; onRetry: () => void };
   label: string;
   sensors: Sensor[];
   area: Area | null;
@@ -416,6 +444,7 @@ export function HotspotMap({
           summary={selection.summary}
           loading={selection.loading}
           error={selection.error}
+          onRetry={selection.onRetry}
           query={query}
           fileTag={fileTag}
           downloading={downloading}

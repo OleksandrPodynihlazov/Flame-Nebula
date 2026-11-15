@@ -11,6 +11,16 @@ export interface CalendarGrid {
   peakMonth: { month: Month; count: number } | null
 }
 
+/**
+ * The grid for `year`, or null while `cal` is not for that year: null (no answer yet) or the previous
+ * year's days still on screen after the year changed. Never a grid of zeros that only looks empty.
+ */
+export function gridForYear(year: number, cal: CalendarResponse | null): CalendarGrid | null {
+  if (cal === null) return null
+  const first = cal.days[0]
+  return first && !first.date.startsWith(`${year}-`) ? null : buildGrid(year, cal)
+}
+
 export function buildGrid(year: number, cal: CalendarResponse): CalendarGrid {
   const counts: (number | null)[][] = Array.from({ length: 12 }, (_, m) => {
     const len = new Date(Date.UTC(year, m + 1, 0)).getUTCDate()

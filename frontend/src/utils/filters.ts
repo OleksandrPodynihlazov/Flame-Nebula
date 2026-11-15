@@ -81,3 +81,27 @@ export function countChangedFilters(f: Filters): number {
     !sameMembers(f.sensors, DEFAULT_FILTERS.sensors),
   ].filter(Boolean).length
 }
+
+/** Fire type, pass, hide noise and sensors back to DEFAULT_FILTERS; year, period and area stay. */
+export function clearedFilters(f: Filters): Filters {
+  return {
+    ...f,
+    types: DEFAULT_FILTERS.types,
+    daynight: DEFAULT_FILTERS.daynight,
+    hideNoise: DEFAULT_FILTERS.hideNoise,
+    sensors: DEFAULT_FILTERS.sensors,
+  }
+}
+
+const sentenceCase = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
+
+/** What narrows the selection, for the empty state: "Aug 2008 · Night only · Active volcano · Selected area". */
+export function filterSummary(f: Filters): string {
+  const parts = [selectionLabel(f)]
+  if (f.daynight) parts.push(f.daynight === 'D' ? 'Day only' : 'Night only')
+  if (!sameMembers(f.types, ALL_TYPES)) parts.push(f.types.map((t) => sentenceCase(FIRE_TYPES[t].label)).join(', ') || 'No fire types')
+  if (f.hideNoise) parts.push('Noise hidden')
+  if (!sameMembers(f.sensors, DEFAULT_FILTERS.sensors)) parts.push(activeSensors(f).join(' + '))
+  if (f.area) parts.push(f.area.kind === 'region' ? f.area.name : 'Selected area')
+  return parts.join(' · ')
+}

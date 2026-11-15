@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react'
+import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { COMPARE_COLORS, type CompareSide } from '../../constants/compare'
 import { MONTHS_FULL } from '../../constants/fire'
 import type { StatsResponse } from '../../types/api'
 import type { CalendarGrid } from '../../utils/calendar'
 import { formatMW, peakIndex } from '../../utils/compare'
-import { Delta, FIGURE, Metric, Readout, UNIT } from '../StatCards'
+import { DIM, Delta, FIGURE, Metric, Readout, SrLoading, UNIT } from '../StatCards'
 
 export interface CompareSideData {
   side: CompareSide
@@ -51,9 +52,11 @@ export function CompareStats({ a, b }: { a: CompareSideData; b: CompareSideData 
         <Row key={d.side} d={d} other={d.side === 'b' ? a : null}>
           {(m, o) => {
             const vs = <span>vs {a.year}</span>
+            const first = d.loading && d.stats === null
             return (
-              <div className={cn('border-l-2 pl-4', d.loading && 'opacity-60')} style={{ borderColor: COMPARE_COLORS[d.side] }} aria-busy={d.loading}>
+              <div className={cn('border-l-2 pl-4', d.loading && !first && DIM)} style={{ borderColor: COMPARE_COLORS[d.side] }} aria-busy={d.loading}>
                 <p className="mb-2 font-mono text-xs font-semibold text-foreground">{d.year}</p>
+                {first && <SrLoading />}
                 <Readout className="grid-cols-[1.2fr_1fr_1fr]">
                   <Metric
                     label="Total FRP"
@@ -64,13 +67,19 @@ export function CompareStats({ a, b }: { a: CompareSideData; b: CompareSideData 
                       </span>
                     )}
                   >
-                    <span className={cn(FIGURE, 'text-3xl leading-none')} data-testid="stat-frp" title={m.frp === undefined ? undefined : `${m.frp.toLocaleString('en-US')} MW`}>
-                      {m.frp === undefined ? '—' : splitMW(m.frp)[0]}
-                    </span>
-                    {m.frp !== undefined && <span className={UNIT}>{splitMW(m.frp)[1]}</span>}
+                    {first ? (
+                      <Skeleton className="h-[30px] w-20" />
+                    ) : (
+                      <>
+                        <span className={cn(FIGURE, 'text-3xl leading-none')} data-testid="stat-frp" title={m.frp === undefined ? undefined : `${m.frp.toLocaleString('en-US')} MW`}>
+                          {m.frp === undefined ? '—' : splitMW(m.frp)[0]}
+                        </span>
+                        {m.frp !== undefined && <span className={UNIT}>{splitMW(m.frp)[1]}</span>}
+                      </>
+                    )}
                   </Metric>
                   <Metric label="Peak month" footer={m.peak ? <span className="font-mono tabular-nums">{formatMW(m.peak.frp)}</span> : undefined}>
-                    <span className="text-xl leading-none font-semibold text-foreground">{m.peak?.name ?? '—'}</span>
+                    {d.loading && d.grid === null ? <Skeleton className="h-5 w-20" /> : <span className="text-xl leading-none font-semibold text-foreground">{m.peak?.name ?? '—'}</span>}
                   </Metric>
                   <Metric
                     label="Hotspots"
@@ -81,9 +90,13 @@ export function CompareStats({ a, b }: { a: CompareSideData; b: CompareSideData 
                       </span>
                     )}
                   >
-                    <span className={cn(FIGURE, 'text-xl leading-none')} data-testid="stat-total">
-                      {m.total === undefined ? '—' : m.total.toLocaleString('en-US')}
-                    </span>
+                    {first ? (
+                      <Skeleton className="h-5 w-14" />
+                    ) : (
+                      <span className={cn(FIGURE, 'text-xl leading-none')} data-testid="stat-total">
+                        {m.total === undefined ? '—' : m.total.toLocaleString('en-US')}
+                      </span>
+                    )}
                   </Metric>
                 </Readout>
               </div>
@@ -107,18 +120,32 @@ export function CompareMiniStats({ a, b }: { a: CompareSideData; b: CompareSideD
       </div>
       {[a, b].map((d) => (
         <Row key={d.side} d={d} other={d.side === 'b' ? a : null}>
-          {(m, o) => (
-            <div className={`grid grid-cols-[3.25rem_1fr_1fr_1fr] items-baseline gap-x-2 ${d.loading ? 'opacity-60' : ''}`} aria-busy={d.loading}>
-              <YearTag side={d.side} year={d.year} />
-              <span className="truncate font-mono text-sm font-semibold text-foreground tabular-nums" data-testid="stat-frp">
-                {m.frp === undefined ? '—' : formatMW(m.frp).replace(' MW', '')} {o && <Delta compact from={o.frp} to={m.frp} testId="compare-delta" />}
-              </span>
-              <span className="truncate text-sm font-semibold text-foreground">{m.peak ? m.peak.name.slice(0, 3) : '—'}</span>
-              <span className="truncate font-mono text-sm font-semibold text-foreground tabular-nums" data-testid="stat-total">
-                {m.total === undefined ? '—' : m.total.toLocaleString()}
-              </span>
-            </div>
-          )}
+          {(m, o) => {
+            const first = d.loading && d.stats === null
+            return (
+              <div className={cn('grid grid-cols-[3.25rem_1fr_1fr_1fr] items-baseline gap-x-2', d.loading && !first && DIM)} aria-busy={d.loading}>
+                <YearTag side={d.side} year={d.year} />
+                {first ? (
+                  <>
+                    <SrLoading />
+                    <Skeleton className="h-3.5 w-12 self-center" />
+                    <Skeleton className="h-3.5 w-8 self-center" />
+                    <Skeleton className="h-3.5 w-12 self-center" />
+                  </>
+                ) : (
+                  <>
+                    <span className="truncate font-mono text-sm font-semibold text-foreground tabular-nums" data-testid="stat-frp">
+                      {m.frp === undefined ? '—' : formatMW(m.frp).replace(' MW', '')} {o && <Delta compact from={o.frp} to={m.frp} testId="compare-delta" />}
+                    </span>
+                    <span className="truncate text-sm font-semibold text-foreground">{m.peak ? m.peak.name.slice(0, 3) : '—'}</span>
+                    <span className="truncate font-mono text-sm font-semibold text-foreground tabular-nums" data-testid="stat-total">
+                      {m.total === undefined ? '—' : m.total.toLocaleString()}
+                    </span>
+                  </>
+                )}
+              </div>
+            )
+          }}
         </Row>
       ))}
     </div>
