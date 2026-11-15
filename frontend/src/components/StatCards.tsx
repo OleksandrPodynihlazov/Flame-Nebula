@@ -1,5 +1,4 @@
 import type { ComponentProps } from 'react'
-import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { MONTHS_FULL } from '../constants/fire'
@@ -39,34 +38,26 @@ export function SrLoading() {
   return <span className="sr-only">Loading…</span>
 }
 
-export const FIGURE = 'font-mono font-semibold text-foreground tabular-nums'
+/** Headline numbers: the sans face with fixed-width digits so columns of figures line up. */
+export const FIGURE = 'font-semibold tracking-tight text-foreground tabular-nums'
 export const UNIT = 'text-xs text-muted-foreground'
 
-/** Change from one side to the other as a neutral badge: a decrease is not "good", so no green or red. */
-export function Delta({ from, to, testId, compact = false }: { from: number | undefined; to: number | undefined; testId?: string; compact?: boolean }) {
+/** Change from one side to the other as muted text beside the number: a decrease is not "good", so no green or red. */
+export function Delta({ from, to, testId }: { from: number | undefined; to: number | undefined; testId?: string }) {
   if (from === undefined || to === undefined) return null
   const p = pctChange(from, to)
-  const body =
-    p === null ? (
-      '—'
-    ) : (
-      <>
-        {p !== 0 && <span aria-hidden="true">{p > 0 ? '↑' : '↓'}</span>}
-        {p !== 0 && <span className="sr-only">{p > 0 ? 'up ' : 'down '}</span>}
-        {Math.abs(p)}%
-      </>
-    )
-  if (compact) {
-    return (
-      <span className="font-mono text-[11px] text-muted-foreground tabular-nums" data-testid={testId}>
-        {body}
-      </span>
-    )
-  }
   return (
-    <Badge variant="outline" className="font-mono text-muted-foreground tabular-nums" data-testid={testId}>
-      {body}
-    </Badge>
+    <span className="text-xs text-muted-foreground tabular-nums" data-testid={testId}>
+      {p === null ? (
+        '—'
+      ) : (
+        <>
+          {p !== 0 && <span className="sr-only">{p > 0 ? 'up ' : 'down '}</span>}
+          {p > 0 ? '+' : p < 0 ? '−' : ''}
+          {Math.abs(p)}%
+        </>
+      )}
+    </span>
   )
 }
 

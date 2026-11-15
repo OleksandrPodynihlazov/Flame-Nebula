@@ -11,11 +11,6 @@ export interface PatternSideStats {
   loading: boolean
 }
 
-function topLine(s: PatternStatsData | null) {
-  if (!s?.top) return '—'
-  return `${formatProbability(s.top.probability)} · ${s.top.years_burned}/${s.top.years_observed} yrs`
-}
-
 /** Desktop readout for one month (no compare) or one ruled readout per month (compare). */
 export function PatternStats({ a, b = null }: { a: PatternSideStats; b?: PatternSideStats | null }) {
   const rows = b ? [a, b] : [a]
@@ -23,6 +18,7 @@ export function PatternStats({ a, b = null }: { a: PatternSideStats; b?: Pattern
     <div className="flex flex-col gap-5" data-testid="pattern-stats">
       {rows.map((d) => {
         const other = b && d.side === 'b' ? a : null
+        const top = d.stats?.top
         return (
           <div
             key={d.side}
@@ -30,27 +26,25 @@ export function PatternStats({ a, b = null }: { a: PatternSideStats; b?: Pattern
             style={b ? { borderColor: COMPARE_COLORS[d.side] } : undefined}
             aria-busy={d.loading}
           >
-            <p className="mb-2 text-xs font-semibold text-foreground">{MONTHS_FULL[d.month - 1]}</p>
+            <p className="mb-2 text-xs font-semibold text-foreground">{b ? MONTHS_FULL[d.month - 1] : `Patterns · ${MONTHS_FULL[d.month - 1]}`}</p>
             <Readout className="grid-cols-[1fr_1.3fr_1fr]">
-              <Metric
-                label="Recurring cells"
-                footer={other ? <Delta from={other.stats?.cells} to={d.stats?.cells} /> : <span className="block truncate">burned 12+ of 14 years</span>}
-              >
+              <Metric label="Recurring cells">
                 <span className={cn(FIGURE, 'text-3xl leading-none')} data-testid="pattern-likely">
                   {d.stats ? d.stats.cells.toLocaleString('en-US') : '—'}
                 </span>
+                {other && <Delta from={other.stats?.cells} to={d.stats?.cells} />}
               </Metric>
-              <Metric
-                label="Most regular cell"
-                footer={d.stats?.top ? <span className="font-mono tabular-nums">{d.stats.top.lat.toFixed(2)}, {d.stats.top.lon.toFixed(2)}</span> : undefined}
-              >
-                <span className="text-base leading-none font-semibold text-foreground tabular-nums">{topLine(d.stats)}</span>
+              <Metric label="Most regular cell">
+                <span className={cn(FIGURE, 'text-xl leading-none')}>{top ? formatProbability(top.probability) : '—'}</span>
+                {top && (
+                  <span className="truncate text-xs text-muted-foreground tabular-nums">
+                    {top.lat.toFixed(2)}, {top.lon.toFixed(2)}
+                  </span>
+                )}
               </Metric>
-              <Metric
-                label="Every year"
-                footer={other ? <Delta from={other.stats?.everyYear} to={d.stats?.everyYear} /> : <span className="block truncate">cells, 14 of 14 years</span>}
-              >
+              <Metric label="Every year">
                 <span className={cn(FIGURE, 'text-xl leading-none')}>{d.stats ? d.stats.everyYear.toLocaleString('en-US') : '—'}</span>
+                {other && <Delta from={other.stats?.everyYear} to={d.stats?.everyYear} />}
               </Metric>
             </Readout>
           </div>
@@ -77,11 +71,11 @@ export function PatternMiniStats({ a, b = null }: { a: PatternSideStats; b?: Pat
             {b && <span aria-hidden="true" className="size-2.5 rounded-full" style={{ background: COMPARE_COLORS[d.side] }} />}
             {MONTHS_FULL[d.month - 1].slice(0, 3)}
           </span>
-          <span className="truncate font-mono text-sm font-semibold text-foreground tabular-nums" data-testid="pattern-likely">
+          <span className="truncate text-sm font-semibold tracking-tight text-foreground tabular-nums" data-testid="pattern-likely">
             {d.stats ? d.stats.cells.toLocaleString() : '—'}
           </span>
-          <span className="truncate font-mono text-sm font-semibold text-foreground tabular-nums">{d.stats?.top ? formatProbability(d.stats.top.probability) : '—'}</span>
-          <span className="truncate font-mono text-sm font-semibold text-foreground tabular-nums">{d.stats ? d.stats.everyYear.toLocaleString() : '—'}</span>
+          <span className="truncate text-sm font-semibold tracking-tight text-foreground tabular-nums">{d.stats?.top ? formatProbability(d.stats.top.probability) : '—'}</span>
+          <span className="truncate text-sm font-semibold tracking-tight text-foreground tabular-nums">{d.stats ? d.stats.everyYear.toLocaleString() : '—'}</span>
         </div>
       ))}
     </div>

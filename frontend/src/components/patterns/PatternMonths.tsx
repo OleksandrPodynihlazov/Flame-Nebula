@@ -16,16 +16,11 @@ export function PatternMonths({ months, selected, loading, onSelect, compact = f
   const max = Math.max(1, ...(months ?? []).map((m) => m.cells))
   return (
     <div
-      className={cn('flex flex-col gap-3', !compact && 'rounded-lg border border-border bg-card p-4')}
+      className={cn('flex flex-col gap-3', !compact && 'border-t border-border pt-4')}
       aria-busy={loading}
       data-testid="pattern-months"
     >
-      {!compact && (
-        <div>
-          <h2 className="text-sm font-medium text-foreground">Fire patterns by month</h2>
-          <p className="text-xs text-muted-foreground">Cells that burned in at least 12 of 14 years that month (S-NPP, 2012–2025). Pick a month.</p>
-        </div>
-      )}
+      {!compact && <h2 className="text-sm font-semibold text-foreground">By month</h2>}
       <div className={cn('grid grid-cols-4 gap-2 transition-opacity', loading && 'opacity-60')} role="radiogroup" aria-label="Pattern month">
         {MONTHS.map((name, i) => {
           const m = months?.[i]
@@ -42,18 +37,17 @@ export function PatternMonths({ months, selected, loading, onSelect, compact = f
               onClick={() => onSelect(i + 1)}
               className={cn(
                 'flex min-h-11 flex-col items-start rounded-lg px-2.5 py-2 text-left outline-none transition-transform focus-visible:ring-2 focus-visible:ring-ring active:scale-95',
-                active ? 'ring-2 ring-foreground' : 'ring-1 ring-border',
+                active ? 'ring-2 ring-foreground' : null,
                 likely === 0 ? 'bg-muted text-muted-foreground' : ratio > 0.6 ? 'text-foreground' : 'text-primary-foreground',
               )}
               style={likely > 0 ? { background: patternColor(0.15 + 0.85 * ratio) } : undefined}
             >
               <span className="text-xs font-medium">{name}</span>
-              <span className="font-mono text-[11px] tabular-nums opacity-80">{likely.toLocaleString()}</span>
+              <span className="text-[11px] tabular-nums opacity-80">{likely.toLocaleString()}</span>
             </button>
           )
         })}
       </div>
-      <p className="text-[11px] text-muted-foreground">Number = recurring cells (≥12 of 14 years) in the area.</p>
     </div>
   )
 }

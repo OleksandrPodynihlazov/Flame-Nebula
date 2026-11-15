@@ -16,7 +16,7 @@ import { useViewportData } from "../hooks/useViewportData";
 import type { ApiQuery, Area, MapView, PatternCell, SelectionSummaryResponse, Sensor } from "../types/api";
 import { CoachMarks } from "./CoachMarks";
 import { DrawHint } from "./DrawHint";
-import { FLOAT_PANEL } from "./floating";
+import { FLOAT_ICON_BUTTON, FLOAT_PANEL } from "./floating";
 import { MapLayersButton } from "./MapLayersButton";
 import { MapLegend, MobileLegend } from "./MapLegend";
 import { RegionOutline } from "./RegionOutline";
@@ -38,38 +38,20 @@ function DrawTools({
   return null;
 }
 
-function StatusChip({
-  error,
-  pulsing,
-  mobile,
-  fitOptions,
-  testId,
-  children,
-}: {
-  error: boolean;
-  pulsing: boolean;
-  mobile: boolean;
-  fitOptions?: FitBoundsOptions;
-  testId?: string;
-  children: ReactNode;
-}) {
+/** Error chip, top left. Healthy states have no chip: the stats panel and sheet already show totals and loading. */
+function ErrorChip({ mobile, testId, children }: { mobile: boolean; testId?: string; children: ReactNode }) {
   return (
     <div
       data-testid={testId}
       className={cn(
         FLOAT_PANEL,
-        "absolute top-3 z-[1000] flex h-11 items-center gap-2 pl-3 lg:top-[10px] lg:h-9",
-        error && "border-destructive/60",
-        // An error chip stops short of the selection card at the map's top right, so its button is never covered.
-        mobile ? "left-3 max-w-[calc(100%-4.5rem)]" : error ? "left-[54px] max-w-[28rem]" : "left-[54px] max-w-[calc(100%-4rem)]",
+        "absolute top-3 z-[1000] flex h-11 items-center gap-2 border-destructive/60 px-3 lg:top-[10px] lg:h-9 lg:pr-1",
+        // Stops short of the selection card at the map's top right, so its button is never covered.
+        mobile ? "left-3 max-w-[calc(100%-4.5rem)]" : "left-[54px] max-w-[28rem]",
       )}
     >
-      <span
-        aria-hidden="true"
-        className={cn("size-2 shrink-0 rounded-full", error ? "bg-destructive" : "bg-primary", pulsing && "animate-pulse")}
-      />
+      <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-destructive" />
       {children}
-      {mobile && <ResetView options={fitOptions} />}
     </div>
   );
 }
@@ -89,51 +71,17 @@ function MapProgress({ loading }: { loading: boolean }) {
   );
 }
 
-function MapStatus({
-  label,
-  total,
-  totalLoading,
-  loading,
-  error,
-  onRetry,
-  mobile,
-  fitOptions,
-}: {
-  label: string;
-  total: number | null;
-  totalLoading: boolean;
-  loading: boolean;
-  error: string | null;
-  onRetry: () => void;
-  mobile: boolean;
-  fitOptions?: FitBoundsOptions;
-}) {
-  // Desktop: the stats panel already shows the totals and loading, so the pill only appears for an error.
-  if (!mobile && error === null) return null;
+function MapStatus({ error, onRetry, mobile }: { error: string | null; onRetry: () => void; mobile: boolean }) {
+  if (error === null) return null;
   return (
-    <StatusChip error={error !== null} pulsing={loading || totalLoading} mobile={mobile} fitOptions={fitOptions}>
-      {error ? (
-        <>
-          <span role="alert" data-testid="map-error" className="truncate text-xs font-medium text-destructive" title={error}>
-            Map: {error}
-          </span>
-          <Button type="button" variant="outline" size="sm" onClick={onRetry} className="shrink-0 max-lg:h-9 lg:mr-1 lg:h-7">
-            Try again
-          </Button>
-        </>
-      ) : (
-        <span className="truncate text-xs text-muted-foreground" aria-live="polite">
-          {label} ·{" "}
-          {totalLoading || total === null ? (
-            "loading…"
-          ) : (
-            <>
-              <span className="font-mono font-medium text-foreground tabular-nums">{total.toLocaleString()}</span> hotspots
-            </>
-          )}
-        </span>
-      )}
-    </StatusChip>
+    <ErrorChip mobile={mobile}>
+      <span role="alert" data-testid="map-error" className="truncate text-xs font-medium text-destructive" title={error}>
+        Map: {error}
+      </span>
+      <Button type="button" variant="outline" size="sm" onClick={onRetry} className="shrink-0 max-lg:h-9 lg:h-7">
+        Try again
+      </Button>
+    </ErrorChip>
   );
 }
 
@@ -166,20 +114,22 @@ function PatternLabel({ side }: { side: PatternSide }) {
   );
 }
 
-function PatternStatus({ side, mobile, fitOptions }: { side: PatternSide; mobile: boolean; fitOptions?: FitBoundsOptions }) {
-  const text = side.loading || side.cells === null ? "loading…" : `${side.cells.length.toLocaleString()} cells burned ≥12 of 14 years`;
-  return (
-    <StatusChip error={side.error !== null} pulsing={side.loading} mobile={mobile} fitOptions={fitOptions} testId="pattern-status">
-      {side.error ? (
+/** The panel shows the pattern numbers; this is the screen-reader status, and a chip only when the request failed. */
+function PatternStatus({ side, mobile }: { side: PatternSide; mobile: boolean }) {
+  if (side.error) {
+    return (
+      <ErrorChip mobile={mobile} testId="pattern-status">
         <span role="alert" className="truncate text-xs font-medium text-destructive" title={side.error}>
           Patterns: {side.error}
         </span>
-      ) : (
-        <span className="truncate text-xs text-muted-foreground" aria-live="polite">
-          Patterns · {MONTHS_FULL[side.month - 1]} · {text}
-        </span>
-      )}
-    </StatusChip>
+      </ErrorChip>
+    );
+  }
+  const cells = side.loading || side.cells === null ? "loading" : `${side.cells.length.toLocaleString()} recurring cells`;
+  return (
+    <span className="sr-only" aria-live="polite" data-testid="pattern-status">
+      Patterns · {MONTHS_FULL[side.month - 1]} · {cells}
+    </span>
   );
 }
 
@@ -200,26 +150,15 @@ function CompareLabel({ year, total, loading }: CompareView["a"]) {
   );
 }
 
-/** Loads the visible area, draws it, and shows the status pill (both need the map context). */
-function ViewportLayer({
-  query,
-  mobile,
-  ...status
-}: {
-  query: ApiQuery;
-  mobile: boolean;
-  label: string;
-  total: number | null;
-  totalLoading: boolean;
-  fitOptions?: FitBoundsOptions;
-}) {
+/** Loads the visible area, draws it, and shows an error chip if the request fails (all need the map context). */
+function ViewportLayer({ query, mobile }: { query: ApiQuery; mobile: boolean }) {
   const { data, loading, error, fallback, reload } = useViewportData(query);
   // Old view's data is drawn dimmed until the new view arrives; a failed request draws nothing.
   useHotspotLayer(data, loading && data !== null, mobile);
   return (
     <>
       <MapProgress loading={loading} />
-      <MapStatus {...status} loading={loading} error={error} onRetry={reload} mobile={mobile} />
+      <MapStatus error={error} onRetry={reload} mobile={mobile} />
       {fallback && error === null && <DenseNote mobile={mobile} />}
     </>
   );
@@ -244,22 +183,6 @@ function DenseNote({ mobile }: { mobile: boolean }) {
     >
       Too many hotspots to show one by one. Showing groups — zoom in for single dots.
     </div>
-  );
-}
-
-function ResetView({ options }: { options?: FitBoundsOptions }) {
-  const map = useMap();
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="sm"
-      onClick={() => map.fitBounds(ITALY_BOUNDS, options)}
-      className="h-full shrink-0 rounded-l-none rounded-r-[7px] px-3 text-muted-foreground max-lg:w-11 max-lg:px-0 lg:mr-1 lg:h-7 lg:rounded-lg lg:px-2"
-    >
-      <RotateCcw data-icon="inline-start" aria-hidden="true" />
-      <span className="max-lg:sr-only">Reset view</span>
-    </Button>
   );
 }
 
@@ -307,12 +230,8 @@ export interface CompareView {
 interface Props {
   /** Filters + area for the map; the map adds its own bbox (visible area). */
   query: ApiQuery;
-  /** Hotspots for the whole selection (stats total), shown in the status pill. */
-  total: number | null;
-  totalLoading: boolean;
   /** Selection card numbers from `/api/selection-summary` (only loaded while the card is shown). */
   selection: { summary: SelectionSummaryResponse | null; loading: boolean; error: string | null; onRetry: () => void };
-  label: string;
   sensors: Sensor[];
   area: Area | null;
   onAreaChange: (area: Area | null) => void;
@@ -333,10 +252,7 @@ interface Props {
 
 export function HotspotMap({
   query,
-  total,
-  totalLoading,
   selection,
-  label,
   sensors,
   area,
   onAreaChange,
@@ -354,6 +270,7 @@ export function HotspotMap({
   const showPatterns = view === "patterns" && patterns !== null;
   const comparing = showPatterns ? patterns.b !== null : compare !== null;
   const [legendOpen, setLegendOpen] = useState(false);
+  const [map, setMap] = useState<L.Map | null>(null);
   const [drawShape, setDrawShape] = useState<DrawShape | null>(null);
   const hints = useHints();
   const showTips = () => {
@@ -374,6 +291,7 @@ export function HotspotMap({
       style={{ "--panel-inset": `${rightInset}px` } as CSSProperties}
     >
       <MapContainer
+        ref={setMap}
         bounds={ITALY_BOUNDS}
         boundsOptions={fitOptions}
         zoomControl={false}
@@ -407,7 +325,7 @@ export function HotspotMap({
           ) : (
             <>
               <PatternLayer side={patterns.a} pane={HOTSPOT_PANE} mobile={mobile} />
-              <PatternStatus side={patterns.a} mobile={mobile} fitOptions={fitOptions} />
+              <PatternStatus side={patterns.a} mobile={mobile} />
             </>
           )
         ) : compare ? (
@@ -425,14 +343,7 @@ export function HotspotMap({
             />
           </>
         ) : (
-          <ViewportLayer
-            query={query}
-            mobile={mobile}
-            label={label}
-            total={total}
-            totalLoading={totalLoading}
-            fitOptions={fitOptions}
-          />
+          <ViewportLayer query={query} mobile={mobile} />
         )}
 
         <DrawTools
@@ -449,6 +360,16 @@ export function HotspotMap({
         <div className="absolute top-16 left-3 z-[1000] flex flex-col items-start gap-2">
           {onViewChange && <MapLayersButton view={view} onChange={onViewChange} menuSide="right" />}
           <MobileLegend sensors={sensors} patterns={showPatterns} onShowTips={hints.restart} />
+          <Button
+            type="button"
+            variant="secondary"
+            size="icon-lg"
+            aria-label="Reset view"
+            onClick={() => map?.fitBounds(ITALY_BOUNDS, fitOptions)}
+            className={FLOAT_ICON_BUTTON}
+          >
+            <RotateCcw aria-hidden="true" />
+          </Button>
         </div>
       ) : (
         <>
