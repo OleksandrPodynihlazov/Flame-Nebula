@@ -25,7 +25,7 @@ export function MobileSheet({ open, onOpenChange, peek, children }: Props) {
   }
 
   return (
-    <div className="absolute inset-x-0 bottom-0 z-[1000] rounded-t-2xl border-t border-slate-700/80 bg-slate-950/80 shadow-[0_-8px_24px_rgba(0,0,0,0.4)] backdrop-blur-md">
+    <div className="absolute inset-x-0 bottom-0 z-[1000] rounded-t-xl border-t border-border bg-card text-card-foreground shadow-[0_-8px_24px_-6px_rgb(0_0_0/0.6)]">
       <button
         type="button"
         onClick={() => onOpenChange(!open)}
@@ -33,9 +33,9 @@ export function MobileSheet({ open, onOpenChange, peek, children }: Props) {
         onPointerUp={onPointerUp}
         aria-expanded={open}
         aria-label={open ? 'Hide calendar' : 'Show calendar'}
-        className="flex w-full touch-none flex-col items-center pt-2 pb-2"
+        className="flex h-11 w-full touch-none items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
       >
-        <span className="h-1 w-10 rounded-full bg-slate-600" />
+        <span className="h-1 w-10 rounded-full bg-muted-foreground/50" aria-hidden="true" />
       </button>
 
       <div className="px-3 pb-3">{peek}</div>

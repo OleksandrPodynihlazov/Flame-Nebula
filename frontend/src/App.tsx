@@ -274,7 +274,7 @@ export default function App() {
           >
             <ChevronRight className={`size-4 motion-safe:transition-transform ${panelOpen ? '' : 'rotate-180'}`} aria-hidden="true" />
           </button>
-          <section className="flex h-full w-full flex-col gap-4 overflow-y-auto border-l border-border bg-background p-5">
+          <section className="flex h-full w-full flex-col gap-5 overflow-y-auto border-l border-border bg-background p-5">
             {errorBanner}
             {isPatterns ? (
               <>

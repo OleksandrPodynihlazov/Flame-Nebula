@@ -1,6 +1,8 @@
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { MONTHS, MONTHS_FULL } from '../constants/fire'
 import type { Filters, Month, Sensor } from '../types/api'
-import { RAMP, rampBounds, rampIndex, type CalendarGrid } from '../utils/calendar'
+import { RAMP, heatVar, rampBounds, rampIndex, topDays, type CalendarGrid } from '../utils/calendar'
 import { isoDate } from '../utils/filters'
 
 interface Props {
@@ -14,36 +16,34 @@ interface Props {
 }
 
 const DAYS = Array.from({ length: 31 }, (_, i) => i + 1)
-const COLS = 'grid-cols-[28px_repeat(31,minmax(0,1fr))_38px] sm:grid-cols-[34px_repeat(31,minmax(0,1fr))_48px]'
+const COLS = 'grid-cols-[34px_repeat(31,minmax(0,1fr))_48px]'
+const TOP_DAYS = 5
 
 export function BurnCalendar({ grid, filters, sensors, loading, onSelectMonth, onSelectDate, onClear }: Props) {
   const hasSelection = filters.month !== null || filters.date !== null
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-900/70 p-3 sm:gap-3.5 sm:p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <section className="flex flex-col gap-4 border-t border-border pt-4" aria-label="Burning activity calendar">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-white">Burning activity calendar · {filters.year}</h2>
-          <p className="text-xs text-slate-400">Hotspots per day (UTC). Tap a day or a month to filter the map.</p>
+          <h2 className="text-sm font-semibold text-foreground">
+            Burning activity calendar <span className="font-mono font-normal text-muted-foreground">· {filters.year}</span>
+          </h2>
+          <p className="text-xs text-muted-foreground">Hotspots per day (UTC). Select a day or a month to filter the map.</p>
           {sensors.length > 1 && (
-            <p className="mt-1 text-[11px] text-amber-300/90">
-              MODIS + VIIRS raw counts added together — not harmonized. VIIRS detects more, smaller fires.
-            </p>
+            <p className="mt-1 text-xs text-flare">MODIS + VIIRS raw counts added together, not harmonized. VIIRS detects more, smaller fires.</p>
           )}
         </div>
-        <button
-          type="button"
-          onClick={onClear}
-          disabled={!hasSelection}
-          className="rounded-lg border border-slate-700 bg-slate-800/80 px-2.5 py-1.5 text-xs font-medium text-slate-200 transition-colors hover:bg-slate-800 disabled:opacity-40"
-        >
-          Show full year
-        </button>
+        {hasSelection && (
+          <Button type="button" variant="outline" size="sm" onClick={onClear} className="shrink-0">
+            Show full year
+          </Button>
+        )}
       </div>
 
-      <div className={`pb-1 ${loading ? 'opacity-60' : ''}`} aria-busy={loading}>
-        <div className="flex flex-col gap-0.5 sm:gap-[3px]" role="grid" aria-label={`Hotspots per day, ${filters.year}`}>
-          <div className={`grid ${COLS} gap-0.5 pb-1 text-[9px] font-semibold text-slate-500 sm:gap-[3px] sm:text-[10px]`} role="row">
+      <div className={cn('flex flex-col', loading && 'opacity-60')} aria-busy={loading}>
+        <div className="flex flex-col gap-px" role="grid" aria-label={`Hotspots per day, ${filters.year}`}>
+          <div className={`grid ${COLS} gap-px pb-1 font-mono text-[10px] text-muted-foreground`} role="row">
             <span role="columnheader" />
             {DAYS.map((d) => (
               <span key={d} role="columnheader" className="text-center">
@@ -60,14 +60,15 @@ export function BurnCalendar({ grid, filters, sensors, loading, onSelectMonth, o
             const row = grid?.counts[m] ?? Array<number | null>(31).fill(0)
             const monthSelected = filters.month === m && filters.date === null
             return (
-              <div key={name} className={`grid ${COLS} items-center gap-0.5 sm:gap-[3px]`} role="row">
+              <div key={name} className={`grid h-6 ${COLS} items-stretch gap-px`} role="row">
                 <button
                   type="button"
                   onClick={() => onSelectMonth(m)}
                   title={`Show all of ${MONTHS_FULL[m]}`}
-                  className={`rounded px-0.5 py-0.5 text-left font-mono text-[10px] font-semibold sm:px-1 sm:text-[11px] transition-colors ${
-                    monthSelected ? 'bg-orange-500/20 text-orange-300 ring-1 ring-orange-400' : 'text-slate-300 hover:bg-slate-800'
-                  }`}
+                  className={cn(
+                    'rounded-[2px] px-1 text-left font-mono text-[11px] transition-colors',
+                    monthSelected ? 'text-foreground ring-1 ring-flare' : 'text-muted-foreground hover:text-foreground',
+                  )}
                 >
                   {name}
                 </button>
@@ -76,7 +77,6 @@ export function BurnCalendar({ grid, filters, sensors, loading, onSelectMonth, o
                   if (count === null) return <span key={di} role="gridcell" aria-hidden="true" />
                   const date = isoDate(filters.year, m, di + 1)
                   const selected = filters.date === date
-                  const inMonth = monthSelected
                   const label = `${di + 1} ${MONTHS_FULL[m]}: ${count} hotspot${count === 1 ? '' : 's'}`
                   return (
                     <button
@@ -87,10 +87,12 @@ export function BurnCalendar({ grid, filters, sensors, loading, onSelectMonth, o
                       aria-selected={selected}
                       title={label}
                       onClick={() => onSelectDate(date)}
-                      className={`h-4 rounded-[2px] transition-transform sm:h-5 sm:rounded-[3px] sm:hover:scale-125 hover:ring-1 hover:ring-white/70 ${
-                        selected ? 'z-10 scale-125 ring-2 ring-white' : inMonth ? 'ring-1 ring-orange-400/60' : ''
-                      }`}
-                      style={{ background: RAMP[rampIndex(count, grid?.maxDay ?? 0)] }}
+                      className={cn(
+                        'rounded-[2px] hover:ring-1 hover:ring-foreground/70',
+                        selected && 'z-10 ring-2 ring-flare ring-offset-2 ring-offset-background',
+                        !selected && monthSelected && 'ring-1 ring-flare/40',
+                      )}
+                      style={{ background: heatVar(rampIndex(count, grid?.maxDay ?? 0)) }}
                     />
                   )
                 })}
@@ -98,11 +100,12 @@ export function BurnCalendar({ grid, filters, sensors, loading, onSelectMonth, o
                 <button
                   type="button"
                   onClick={() => onSelectMonth(m)}
-                  className={`h-4 rounded border border-slate-800 bg-slate-900/90 pr-1 text-right font-mono text-[9px] sm:h-5 sm:pr-1.5 sm:text-[11px] font-semibold text-slate-200 hover:bg-slate-800 ${
-                    monthSelected ? 'ring-1 ring-white' : ''
-                  }`}
+                  className={cn(
+                    'rounded-[2px] pr-1 text-right font-mono text-[11px] tabular-nums transition-colors',
+                    monthSelected ? 'text-foreground ring-1 ring-flare' : 'text-muted-foreground hover:text-foreground',
+                  )}
                 >
-                  {(grid?.monthTotals[m] ?? 0).toLocaleString()}
+                  {(grid?.monthTotals[m] ?? 0).toLocaleString('en-US')}
                 </button>
               </div>
             )
@@ -111,30 +114,66 @@ export function BurnCalendar({ grid, filters, sensors, loading, onSelectMonth, o
       </div>
 
       <RampLegend max={grid?.maxDay ?? 0} total={grid?.total ?? 0} />
-    </div>
+      {grid && <BusiestDays grid={grid} filters={filters} onSelectDate={onSelectDate} />}
+    </section>
   )
 }
 
 function RampLegend({ max, total }: { max: number; total: number }) {
   const bounds = rampBounds(max)
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-800/80 pt-2.5 text-[11px] text-slate-400">
+    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-xs text-muted-foreground">
       <div className="flex items-center gap-2">
-        <span>0</span>
-        <div className="flex items-center gap-1">
-          {RAMP.map((c, i) => (
-            <span
-              key={c}
-              className="h-3 w-5 rounded-sm border border-slate-700/60"
-              style={{ background: c }}
-              title={i === 0 ? 'No detections' : `≤ ${bounds[i - 1]} per day`}
-            />
+        <span className="font-mono tabular-nums">0</span>
+        <div className="flex items-center gap-px">
+          {RAMP.map((_, i) => (
+            <span key={i} className="h-2.5 w-5 rounded-[2px]" style={{ background: heatVar(i) }} title={i === 0 ? 'No detections' : `≤ ${bounds[i - 1]} per day`} />
           ))}
         </div>
-        <span>{max.toLocaleString()} / day</span>
-        <span className="text-slate-600">(log scale)</span>
+        <span className="font-mono tabular-nums">{max.toLocaleString('en-US')} / day</span>
+        <span>log scale</span>
       </div>
-      <span className="font-mono text-slate-300">Year total: {total.toLocaleString()}</span>
+      <span className="font-mono tabular-nums">Year total {total.toLocaleString('en-US')}</span>
+    </div>
+  )
+}
+
+const dayLabel = (date: string, names: readonly string[]) => `${Number(date.slice(8))} ${names[Number(date.slice(5, 7)) - 1]}`
+
+function BusiestDays({ grid, filters, onSelectDate }: { grid: CalendarGrid; filters: Filters; onSelectDate: (date: string) => void }) {
+  const month = filters.date ? ((Number(filters.date.slice(5, 7)) - 1) as Month) : filters.month
+  const days = topDays(grid, filters.year, month, TOP_DAYS)
+  if (days.length === 0) return null
+  const top = days[0].count
+  return (
+    <div className="flex flex-col gap-1 border-t border-border pt-3">
+      <h3 className="mb-1 text-xs text-muted-foreground">
+        Busiest days <span className="font-mono">· {month === null ? filters.year : `${MONTHS[month]} ${filters.year}`}</span>
+      </h3>
+      <ul className="flex flex-col">
+        {days.map(({ date, count }) => (
+          <li key={date}>
+            <button
+              type="button"
+              onClick={() => onSelectDate(date)}
+              aria-label={`Busiest day: ${dayLabel(date, MONTHS_FULL)}, ${count} hotspots`}
+              className={cn(
+                'grid h-8 w-full grid-cols-[4rem_1fr_3.5rem] items-center gap-3 rounded-md px-2 text-left transition-colors hover:bg-accent',
+                filters.date === date && 'ring-1 ring-flare',
+              )}
+            >
+              <span className="font-mono text-xs text-foreground">{dayLabel(date, MONTHS)}</span>
+              <span className="h-1.5 rounded-full bg-muted" aria-hidden="true">
+                <span
+                  className="block h-full rounded-full"
+                  style={{ width: `${Math.max(4, (count / top) * 100)}%`, background: heatVar(rampIndex(count, grid.maxDay)) }}
+                />
+              </span>
+              <span className="text-right font-mono text-xs text-foreground tabular-nums">{count.toLocaleString('en-US')}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }
