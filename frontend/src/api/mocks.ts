@@ -12,12 +12,14 @@ import type {
   HotspotCollection,
   HotspotFeature,
   LonLat,
+  Region,
+  RegionFeature,
   SelectionSummaryResponse,
   Sensor,
   StatsResponse,
 } from '../types/api'
 import { SENSORS } from '../constants/fire'
-import { haversineKm, inPolygon } from '../utils/area'
+import { haversineKm, inGeometry, inPolygon } from '../utils/area'
 import { summarizeFeatures } from '../utils/selectionSummary'
 
 /** Positive integer from an env value, else null. */
@@ -142,11 +144,13 @@ function filter(q: ApiQuery) {
   const polygon: LonLat[] | null = q.polygon ? JSON.parse(q.polygon) : null
   const circle = q.lat !== undefined && q.lon !== undefined && q.radius_km !== undefined
   const [west, south, east, north] = q.bbox ? q.bbox.split(',').map(Number) : []
+  const region = q.region === undefined ? null : mockRegionFeature(q.region).geometry
   return dataset(q).filter(({ properties: p, geometry }) => {
     if (p.acq_date < q.from || p.acq_date > q.to) return false
     if (q.bbox && (p.latitude < south || p.latitude > north || p.longitude < west || p.longitude > east)) return false
     if (types && (p.type === null || !types.has(p.type))) return false
     if (q.daynight && p.daynight !== q.daynight) return false
+    if (region) return inGeometry(geometry.coordinates, region)
     if (polygon) return inPolygon(geometry.coordinates, polygon)
     if (circle) return haversineKm(q.lat!, q.lon!, p.latitude, p.longitude) <= q.radius_km!
     return true
@@ -156,6 +160,64 @@ function filter(q: ApiQuery) {
 function delay<T>(value: T): Promise<T> {
   if (MOCK_DELAY_MS === null) return Promise.resolve(value)
   return new Promise((resolve) => setTimeout(() => resolve(value), MOCK_DELAY_MS))
+}
+
+const ITALY = 'Italy'
+const MOCK_REGION_DEFS: { id: number; name: string; parent_id: number; zone: string; ring: LonLat[] }[] = [
+  { id: 9101, name: 'Sicilia', parent_id: 9001, zone: 'Isole', ring: [[15.65, 38.27], [15.25, 37.85], [15.3, 37.05], [15.13, 36.68], [14.85, 36.72], [13.95, 37.1], [13.1, 37.5], [12.45, 37.8], [12.7, 38.1], [13.35, 38.12], [14, 38.02], [14.8, 38.15]] },
+  { id: 9102, name: 'Sardegna', parent_id: 9001, zone: 'Isole', ring: [[9.2, 41.25], [9.65, 40.9], [9.75, 40.3], [9.65, 39.6], [9.6, 39.25], [9.2, 39.2], [8.85, 38.88], [8.4, 39.1], [8.45, 39.9], [8.4, 40.3], [8.2, 40.65], [8.2, 40.95], [8.5, 41.1]] },
+  { id: 9103, name: 'Calabria', parent_id: 9002, zone: 'Sud', ring: [[15.75, 39.95], [15.85, 39.5], [16.15, 39], [15.85, 38.65], [15.65, 38.25], [16, 37.92], [16.55, 38.4], [16.55, 38.8], [17.15, 39], [17.1, 39.35], [16.6, 39.7], [16.65, 40.05], [16.1, 40.05]] },
+  { id: 9104, name: 'Puglia', parent_id: 9002, zone: 'Sud', ring: [[15.15, 41.95], [16.2, 41.95], [15.9, 41.6], [16.3, 41.25], [16.9, 41.1], [17.95, 40.65], [18.5, 40.15], [18.35, 39.8], [17.9, 40.3], [17.2, 40.45], [16.85, 40.4], [16.2, 40.85], [15.7, 41.1], [15.15, 41.4]] },
+  { id: 9105, name: 'Campania', parent_id: 9002, zone: 'Sud', ring: [[13.8, 41.2], [14.3, 40.85], [14.4, 40.6], [14.8, 40.65], [15.3, 40], [15.65, 39.95], [15.9, 40.3], [15.4, 40.75], [15.1, 41.2], [14.8, 41.5], [14.2, 41.5], [13.9, 41.4]] },
+  { id: 9106, name: 'Lazio', parent_id: 9003, zone: 'Centro', ring: [[11.6, 42.4], [11.85, 42.1], [12.3, 41.75], [12.65, 41.4], [13.25, 41.3], [13.75, 41.25], [13.9, 41.65], [13.6, 42], [13.3, 42.4], [13.2, 42.8], [12.5, 42.75], [12, 42.7]] },
+  { id: 9107, name: 'Toscana', parent_id: 9003, zone: 'Centro', ring: [[10.05, 44.05], [10.3, 43.55], [10.55, 42.95], [11.1, 42.4], [11.6, 42.45], [11.9, 42.75], [12.2, 43.2], [12.2, 43.6], [11.8, 43.95], [11.4, 44.2], [10.8, 44.3], [10.2, 44.3]] },
+  { id: 9108, name: 'Lombardia', parent_id: 9004, zone: 'Nord', ring: [[8.7, 45.3], [8.45, 45.7], [8.95, 46], [9.35, 46.5], [10.1, 46.65], [10.5, 46.5], [10.55, 46], [10.75, 45.7], [11, 45.2], [10.6, 44.95], [9.7, 45], [9.1, 44.8], [8.75, 44.95]] },
+]
+
+/** Demo regions: one per hotspot cluster; coarse outlines (rings closed), shaped like `GET /api/regions/:id`. */
+const MOCK_REGIONS: RegionFeature[] = MOCK_REGION_DEFS.map(({ id, name, parent_id, zone, ring }) => ({
+  type: 'Feature',
+  id,
+  geometry: { type: 'Polygon', coordinates: [[...ring, ring[0]]] },
+  properties: { id, name, level: 2, country: 'ITA', parent_id, path: `${ITALY} › ${zone}` },
+}))
+
+const MIN_REGION_QUERY = 2
+const MAX_REGION_QUERY = 100
+const MAX_REGION_RESULTS = 20
+
+/** Lower-case, accents dropped: the API's `name_norm`. */
+const normalize = (s: string) => s.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase()
+
+/** `GET /api/regions?q=` over `regions`: 2–100 chars, case- and accent-insensitive, prefix matches first, then substring, sorted by name, max 20. */
+export function matchRegions(regions: readonly Region[], q: string): Region[] {
+  if (q.length < MIN_REGION_QUERY || q.length > MAX_REGION_QUERY) {
+    throw new Error(`q must be ${MIN_REGION_QUERY}-${MAX_REGION_QUERY} characters: "${q}"`)
+  }
+  const needle = normalize(q)
+  const byName = (a: Region, b: Region) => a.name.localeCompare(b.name)
+  const prefix: Region[] = []
+  const inside: Region[] = []
+  for (const r of regions) {
+    const at = normalize(r.name).indexOf(needle)
+    if (at === 0) prefix.push(r)
+    else if (at > 0) inside.push(r)
+  }
+  return [...prefix.sort(byName), ...inside.sort(byName)].slice(0, MAX_REGION_RESULTS)
+}
+
+function mockRegionFeature(id: number): RegionFeature {
+  const feature = MOCK_REGIONS.find((r) => r.id === id)
+  if (!feature) throw new Error(`region not found: ${id}`)
+  return feature
+}
+
+export function mockSearchRegions(q: string): Promise<Region[]> {
+  return delay(matchRegions(MOCK_REGIONS.map((r) => r.properties), q))
+}
+
+export function mockRegion(id: number): Promise<RegionFeature> {
+  return delay(mockRegionFeature(id))
 }
 
 export function mockHotspots(q: ApiQuery): Promise<HotspotCollection> {
@@ -213,6 +275,7 @@ const PATTERN_YEARS = 14
 
 function patternInArea(c: PatternCell, q: PatternQuery) {
   if (q.min_probability !== undefined && c.probability < q.min_probability) return false
+  if (q.region !== undefined) return inGeometry([c.lon, c.lat], mockRegionFeature(q.region).geometry)
   if (q.polygon) return inPolygon([c.lon, c.lat], JSON.parse(q.polygon))
   if (q.lat !== undefined && q.lon !== undefined && q.radius_km !== undefined) return haversineKm(q.lat, q.lon, c.lat, c.lon) <= q.radius_km
   return true

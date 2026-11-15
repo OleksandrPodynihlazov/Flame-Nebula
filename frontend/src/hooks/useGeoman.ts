@@ -69,6 +69,17 @@ function drop(slot: ShapeSlot) {
 
 const MODE_EVENTS = 'pm:globaldrawmodetoggled pm:globaleditmodetoggled pm:globaldragmodetoggled pm:globalremovalmodetoggled'
 
+/** Turns every active geoman mode off; true when one was on. Only if on: disabling an inactive mode makes Leaflet log "wrong listener type". */
+function disableActiveModes(map: L.Map): boolean {
+  const pm = map.pm
+  const wasActive = [pm.globalDrawModeEnabled(), pm.globalEditModeEnabled(), pm.globalDragModeEnabled(), pm.globalRemovalModeEnabled()]
+  if (wasActive[0]) pm.disableDraw()
+  if (wasActive[1]) pm.disableGlobalEditMode()
+  if (wasActive[2]) pm.disableGlobalDragMode()
+  if (wasActive[3]) pm.disableGlobalRemovalMode()
+  return wasActive.some(Boolean)
+}
+
 /**
  * Geoman draw tools (polygon, rectangle, circle, edit, drag, remove) bound to `filters.area`.
  * `area` is the source of truth: the map shape follows it; drawing a shape or ending an edit reports a new one.
@@ -109,6 +120,14 @@ export function useGeoman(area: Area | null, onAreaChange: (area: Area | null) =
       }
     }
 
+    // Esc leaves whichever tool is active; otherwise Tab lands on geoman's hidden "Cancel" link.
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return
+      const target = e.target
+      if (target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return
+      if (disableActiveModes(map)) e.preventDefault()
+    }
+
     map.pm.setGlobalOptions({ allowSelfIntersection: false, snappable: false, pathOptions: SHAPE_STYLE })
     map.pm.addControls({
       position,
@@ -128,18 +147,15 @@ export function useGeoman(area: Area | null, onAreaChange: (area: Area | null) =
     map.on('pm:create', onCreate)
     map.on('pm:remove', onRemove)
     map.on(MODE_EVENTS, onModeToggle)
+    document.addEventListener('keydown', onKeyDown)
 
     return () => {
       map.off('pm:create', onCreate)
       map.off('pm:remove', onRemove)
       map.off(MODE_EVENTS, onModeToggle)
-      // Turn modes off only if on: disabling an inactive mode makes Leaflet log "wrong listener type".
-      const pm = map.pm
-      if (pm.globalDrawModeEnabled()) pm.disableDraw()
-      if (pm.globalEditModeEnabled()) pm.disableGlobalEditMode()
-      if (pm.globalDragModeEnabled()) pm.disableGlobalDragMode()
-      if (pm.globalRemovalModeEnabled()) pm.disableGlobalRemovalMode()
-      pm.removeControls()
+      document.removeEventListener('keydown', onKeyDown)
+      disableActiveModes(map)
+      map.pm.removeControls()
       drop(shapeRef)
       onModeToggle()
     }
