@@ -30,8 +30,11 @@ test('Show non-fire points adds the hidden points to the total', async ({ page }
   await expect.poll(() => statTotal(page)).toBeGreaterThan(0);
   const hiddenTotal = await statTotal(page);
 
-  // Off by default: the stats say how many are left out.
-  await expect(page.getByTestId('hidden-non-fire')).toContainText('non-fire');
+  // The mock data has non_fire points; a DB without confidence rows (every point
+  // unscored, by_class.non_fire = {}) hides none, so the line is absent there.
+  const hiddenLine = page.getByTestId('hidden-non-fire');
+  const hidesSome = (await hiddenLine.count()) > 0;
+  if (hidesSome) await expect(hiddenLine).toContainText('non-fire');
 
   await page.getByRole('button', { name: 'Filters' }).click();
   const toggle = page.getByRole('switch', { name: /Show non-fire points/ });
@@ -39,8 +42,13 @@ test('Show non-fire points adds the hidden points to the total', async ({ page }
   await toggle.click();
   await expect(toggle).toBeChecked();
 
-  await expect.poll(() => statTotal(page)).toBeGreaterThan(hiddenTotal);
-  await expect(page.getByTestId('hidden-non-fire')).toHaveCount(0);
+  if (hidesSome) {
+    await expect.poll(() => statTotal(page)).toBeGreaterThan(hiddenTotal);
+  } else {
+    await expect(stats).toHaveAttribute('aria-busy', 'false');
+    expect(await statTotal(page)).toBe(hiddenTotal);
+  }
+  await expect(hiddenLine).toHaveCount(0);
 
   await toggle.click();
   await expect.poll(() => statTotal(page)).toBe(hiddenTotal);
