@@ -12,6 +12,8 @@ export interface Bounds {
 export interface View {
   bbox: string
   cell: number | null
+  /** Whole zoom level of the view (floored), for the grid that stands in for points. */
+  zoom: number
 }
 
 /** Share of the view added beyond each edge, so a short pan already has data. */
@@ -44,11 +46,35 @@ export function cellForZoom(zoom: number): number {
   return best
 }
 
+/**
+ * Single points only when the zoom really is SINGLE_DOT_ZOOM or more (the map snaps to 0.25 steps, so 8.5
+ * must not count as 9: twice the area, far more points). Floor for the grid cell too: it equals the old
+ * rounded choice at whole zooms, and a fractional zoom gets the cell of the zoom below, which is at most
+ * as many cells as the view needs, and keeps the set of distinct URLs small.
+ */
 export function viewFor(bounds: Bounds, zoom: number): View | null {
   const bbox = bboxParam(bounds)
   if (bbox === null) return null
-  const z = Math.round(zoom)
-  return { bbox, cell: z >= SINGLE_DOT_ZOOM ? null : cellForZoom(z) }
+  const z = Math.floor(zoom)
+  return { bbox, cell: z >= SINGLE_DOT_ZOOM ? null : cellForZoom(z), zoom: z }
+}
+
+/** The grid endpoint refuses more cells than this in one request (docs/contracts.md). */
+export const GRID_MAX_CELLS = 20000
+
+/**
+ * Cell size for the grid shown instead of single points in a view that holds too many: the same ~64 px
+ * rule as the normal grid (`cellForZoom(zoom)`), coarsened to the next bigger size in CELLS only while the
+ * box (bbox area / cell², an upper bound of the non-empty cells) would exceed GRID_MAX_CELLS. An unreadable
+ * bbox gets the cell of the zoom below SINGLE_DOT_ZOOM.
+ */
+export function fallbackCell(bbox: string, zoom: number): number {
+  const [west, south, east, north] = bbox.split(',').map(Number)
+  const wanted = cellForZoom(zoom)
+  for (const c of CELLS.filter((size) => size >= wanted).reverse()) {
+    if (Math.ceil((east - west) / c) * Math.ceil((north - south) / c) <= GRID_MAX_CELLS) return c
+  }
+  return cellForZoom(SINGLE_DOT_ZOOM - 1)
 }
 
 /** The grid cell holding a point: [[south, west], [north, east]] (Leaflet order). */

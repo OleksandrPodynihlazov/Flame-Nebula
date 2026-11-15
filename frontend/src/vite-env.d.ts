@@ -9,4 +9,6 @@ interface ImportMetaEnv {
    * hotspots, grid, stats, calendar, selection-summary, patterns, pattern-summary.
    */
   readonly VITE_MOCK_FAIL?: string
+  /** Mock `/hotspots?bbox=` row cap (dev server only): more points in view → 400 like the API. Unset → 20000. */
+  readonly VITE_MOCK_BBOX_CAP?: string
 }

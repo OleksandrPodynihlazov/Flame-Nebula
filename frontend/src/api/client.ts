@@ -13,6 +13,7 @@ import type {
   SelectionSummaryResponse,
   StatsResponse,
 } from '../types/api'
+import { HttpError } from './errors'
 import {
   mockCalendar,
   mockGrid,
@@ -51,7 +52,7 @@ async function getJson<T, Q extends ApiQuery | PatternQuery = ApiQuery>(
 ): Promise<T> {
   if (USE_MOCKS) return mock(q)
   const res = await fetch(`/api/${path}?${toSearchParams(q)}`, { signal })
-  if (!res.ok) throw new Error(await errorMessage(res))
+  if (!res.ok) throw new HttpError(res.status, await errorMessage(res))
   return (await res.json()) as T
 }
 

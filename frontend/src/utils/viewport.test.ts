@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CELLS, bboxParam, cellBounds, cellForZoom, viewFor } from './viewport'
+import { CELLS, GRID_MAX_CELLS, bboxParam, cellBounds, cellForZoom, fallbackCell, viewFor } from './viewport'
 
 describe('bboxParam', () => {
   it('pads 10% per side and rounds outward to 0.01°', () => {
@@ -39,9 +39,20 @@ describe('cellForZoom', () => {
 describe('viewFor', () => {
   const italy = { west: 6, south: 36, east: 19, north: 48 }
   it('asks for a grid below zoom 9 and for points from zoom 9', () => {
-    expect(viewFor(italy, 6)).toEqual({ bbox: bboxParam(italy), cell: 1 })
-    expect(viewFor(italy, 8.6)?.cell).toBeNull()
+    expect(viewFor(italy, 6)).toEqual({ bbox: bboxParam(italy), cell: 1, zoom: 6 })
     expect(viewFor(italy, 9)?.cell).toBeNull()
+  })
+
+  it('floors the zoom: 8.5 and 8.75 still ask for a grid, 9 and 9.25 for points', () => {
+    expect(viewFor(italy, 8.5)?.cell).toBe(0.25)
+    expect(viewFor(italy, 8.75)?.cell).toBe(0.25)
+    expect(viewFor(italy, 9)?.cell).toBeNull()
+    expect(viewFor(italy, 9.25)?.cell).toBeNull()
+  })
+
+  it('keeps the grid cell of whole zooms and gives fractional zooms the cell of the zoom below', () => {
+    for (let z = 0; z < 9; z++) expect(viewFor(italy, z)?.cell).toBe(cellForZoom(z))
+    expect(viewFor(italy, 6.75)?.cell).toBe(cellForZoom(6))
   })
 })
 
@@ -55,5 +66,33 @@ describe('cellBounds', () => {
       [-1, -1],
       [0, 0],
     ])
+  })
+})
+
+describe('fallbackCell', () => {
+  const cellsIn = (bbox: string, c: number) => {
+    const [w, s, e, n] = bbox.split(',').map(Number)
+    return Math.ceil((e - w) / c) * Math.ceil((n - s) / c)
+  }
+
+  it('is the cell of the normal grid at that zoom when the view is small enough', () => {
+    for (const z of [9, 10, 11, 12]) expect(fallbackCell('14.00,37.00,14.50,37.40', z)).toBe(cellForZoom(z))
+    expect(fallbackCell('14.00,37.00,14.50,37.40', 10)).toBe(0.1)
+    expect(fallbackCell('14.00,37.00,14.50,37.40', 11)).toBe(0.05)
+  })
+
+  it('coarsens to the next bigger size only while the view exceeds the 20000-cell limit', () => {
+    const bbox = '0.00,0.00,10.00,5.50'
+    expect(cellsIn(bbox, 0.05)).toBeGreaterThan(GRID_MAX_CELLS)
+    expect(fallbackCell(bbox, 11)).toBe(0.1)
+    expect(cellsIn(bbox, 0.1)).toBeLessThanOrEqual(GRID_MAX_CELLS)
+  })
+
+  it('never goes finer than the wanted cell', () => {
+    expect(fallbackCell('14.00,37.00,14.01,37.01', 9)).toBe(cellForZoom(9))
+  })
+
+  it('uses the cell of zoom 8 when the bbox cannot be read', () => {
+    expect(fallbackCell('not,a,bbox,here', 9)).toBe(cellForZoom(8))
   })
 })

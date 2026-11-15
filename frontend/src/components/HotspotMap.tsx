@@ -213,14 +213,37 @@ function ViewportLayer({
   totalLoading: boolean;
   fitOptions?: FitBoundsOptions;
 }) {
-  const { data, loading, error, reload } = useViewportData(query);
+  const { data, loading, error, fallback, reload } = useViewportData(query);
   // Old view's data is drawn dimmed until the new view arrives; a failed request draws nothing.
   useHotspotLayer(data, loading && data !== null, mobile);
   return (
     <>
       <MapProgress loading={loading} />
       <MapStatus {...status} loading={loading} error={error} onRetry={reload} mobile={mobile} />
+      {fallback && error === null && <DenseNote mobile={mobile} />}
     </>
+  );
+}
+
+/** Quiet note (not an error) while grid groups stand in for single dots in a view with too many hotspots. */
+function DenseNote({ mobile }: { mobile: boolean }) {
+  return (
+    <div
+      role="status"
+      data-testid="map-dense-note"
+      className={cn(
+        FLOAT_PANEL,
+        "pointer-events-none absolute z-[1000] w-max -translate-x-1/2 px-3 py-1.5 text-center text-xs text-muted-foreground",
+        mobile
+          ? // Between the left and right control columns, below the status chip.
+          "left-1/2 top-[4.25rem] max-w-[calc(100%-8rem)]"
+          : "top-3 max-w-[min(28rem,calc(100%-var(--panel-inset,0px)-9rem))] lg:top-[10px]",
+      )}
+      // Centred in the part of the map the side panel leaves free.
+      style={mobile ? undefined : { left: "calc((100% - var(--panel-inset, 0px)) / 2)" }}
+    >
+      Too many hotspots to show one by one. Showing groups — zoom in for single dots.
+    </div>
   );
 }
 
