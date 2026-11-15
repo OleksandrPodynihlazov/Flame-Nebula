@@ -6,6 +6,7 @@ import calendarRouter from "./routes/calendar.js";
 import regionsRouter from "./routes/regions.js";
 import patternsRouter from "./routes/patterns.js";
 import summaryRouter from "./routes/summary.js";
+import harmonizedRouter from "./routes/harmonized.js";
 import { errorHandler } from "./lib/errors.js";
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -19,6 +20,7 @@ app.use("/api", calendarRouter);
 app.use("/api", regionsRouter);
 app.use("/api", patternsRouter);
 app.use("/api", summaryRouter);
+app.use("/api", harmonizedRouter);
 
 app.use((req, res) => {
   res.status(404).json({ error: `not found: ${req.path}` });
