@@ -82,9 +82,9 @@ File `data/processed/confidence/<Country>/hotspot_confidence.csv` (one per count
 | `reasons` | text | `L1:static;L3:xsensor:snpp;L6:effis:123:450ha` — human-readable evidence |
 | `worldview_url` | text | NASA Worldview link: detection day vs 10 days earlier, swipe compare |
 
-Suggested API use ([3] owner decides): add `confidence_score`, `confidence_class`, `confidence_reasons`, `worldview_url`
-to `GET /api/hotspots` feature properties via `LEFT JOIN hotspot_confidence USING (satellite, acq_date, acq_time, latitude, longitude)`;
-optional filter `min_confidence=<0-100>` and `exclude_non_fire=true`. Missing join row → properties are `null`.
+Adopted by [3] (API): the 4 fields are in `GET /api/hotspots` properties through the view `hotspots_with_confidence`
+(`db/init/views-init.sql`), and non_fire points are hidden by **default**, `include_non_fire=true` shows them (instead of the
+opt-in `exclude_non_fire` first suggested here). Missing join row → the fields are `null`. `min_confidence`: not yet.
 
 ## [2] db/ schema
 
@@ -163,6 +163,7 @@ Shared query params (area + filters):
 | `daynight` | `D` / `N` | Optional |
 | `type` | `0` | Optional, comma list |
 | `sensor` | `MODIS` or `MODIS,VIIRS` | Optional, comma list. Matches `instrument` in [2] / `sensor` in [1] |
+| `include_non_fire` | `true` | Optional, `true` / `false` (else 400). Default `false`: points whose [1b] class is `non_fire:*` (volcano, static source, offshore, urban) are left out of `/hotspots`, `/hotspots/grid`, `/hotspots.csv`, `/calendar` and the `/stats` totals. Unscored points (no [1b] row) are always kept |
 | `bbox` | `6.50,36.50,18.75,47.10` | Optional visible map area `west,south,east,north` in degrees: 4 numbers, `-180 ≤ west < east ≤ 180`, `-90 ≤ south < north ≤ 90`, else 400. No antimeridian wrap. ANDed with every other filter, including `region` / `polygon` / circle. SQL `latitude BETWEEN … AND longitude BETWEEN …` (uses the `(latitude, longitude)` index) |
 
 `region` cannot be combined with `polygon` or a circle → 400 `Send one area: region, polygon or circle`. If `polygon` and a circle are both sent, the polygon wins (the frontend never sends both).
@@ -170,8 +171,8 @@ Unknown `region` id → 400. No area given → all loaded data (currently Europe
 
 | Method + path | Returns |
 |---|---|
-| `GET /api/hotspots` | GeoJSON `FeatureCollection` of points; properties = CSV columns |
-| `GET /api/stats` | `{ "total": 6689, "frp_sum": 184532.7, "by_type": { "0": 6473, ... }, "by_daynight": { "D": 5821, "N": 868 } }`. `frp_sum`: summed FRP (MW), 1 decimal; rows with no FRP add 0 |
+| `GET /api/hotspots` | GeoJSON `FeatureCollection` of points; properties = CSV columns + `confidence_score` (0–100), `confidence_class`, `confidence_reasons`, `worldview_url` from [1b], each `null` when the point is not scored |
+| `GET /api/stats` | `{ "total": 6689, "frp_sum": 184532.7, "by_type": { "0": 6473, ... }, "by_daynight": { "D": 5821, "N": 868 }, "by_class": { "confirmed": 2100, "likely": 1900, "unverified": 2300, "doubtful": 170, "unscored": 0, "non_fire": { "static": 180, "volcano": 3, "offshore": 9, "urban": 27 } } }`. `frp_sum`: summed FRP (MW), 1 decimal; rows with no FRP add 0. `total`, `frp_sum`, `by_type`, `by_daynight` follow `include_non_fire`; **`by_class` always counts every matching point, the hidden non_fire ones included**, so the UI can say what was left out. `unscored` = no [1b] row. Zero counts are left out; `non_fire` is always present (`{}` when empty) |
 | `GET /api/calendar` | `{ "days": [ { "date": "2008-08-14", "count": 42, "frp": 1290.4 }, ... ] }`. `frp`: summed FRP (MW) of the day, 1 decimal |
 | `GET /api/hotspots/grid` | Hotspots counted per grid cell, for the zoomed-out map. See below |
 | `GET /api/hotspots.csv` | CSV download, same columns as [1] |
@@ -195,6 +196,11 @@ Concurrency (`/api/hotspots` and `/api/hotspots.csv`), two separate classes: wit
 
 Cache: the gateway caches `200` answers of every `GET /api/...` except `/api/health` for 10 minutes, keyed by path + query string (`X-Cache-Status: MISS` / `HIT` / …). After loading new data, clear it (`docs/deploy.md`). Clients should send identical query strings for identical views (the frontend rounds `bbox` to 0.01° and picks `cell` from a fixed set).
 
+Confidence source: the data endpoints read the view `hotspots_with_confidence` (= `hotspots` LEFT JOIN `hotspot_confidence`
+on the natural key, `db/init/views-init.sql`). A DB without the view (created before it; init scripts only run on an empty
+volume) is read as plain `hotspots`: the 4 fields are `null`, nothing is excluded, `by_class` is all `unscored`. The API
+re-checks every 30 s, so applying the view needs no restart (`docs/data-sources.md` → *Fire confidence*).
+
 Owner may change these; update this table first.
 
 ### Frontend requirements for [3]
@@ -214,14 +220,15 @@ Requests: all endpoints accept every shared param from the table above, with the
 | `sensor` | `MODIS`, `VIIRS` or `MODIS,VIIRS` | Always sent. Absent → all sensors. Counts are raw sums, not harmonized (method TBD) |
 | `bbox` | `5.33,35.11,17.34,47.12` | Map requests only (`/hotspots` from zoom 9, `/hotspots/grid` below): visible bounds + 10 % per side, rounded outward to 0.01°. Never sent to stats, calendar, CSV, or the selection card's `/hotspots` |
 | `cell` | `1` | `/hotspots/grid` only: `90 / 2^zoom` snapped to 10, 5, 2, 1, 0.5, 0.25, 0.1, 0.05, 0.02, 0.01 |
+| `include_non_fire` | `true` | Only while "show excluded" is on; then on every data request (stats, calendar, grid, hotspots, CSV), so the views stay consistent. Absent → non_fire hidden |
 
 Responses:
 
 | Endpoint | Frontend expects |
 |---|---|
-| `GET /api/hotspots` | `FeatureCollection`, coordinates `[lon, lat]`. `properties` use the [1] column names and types (not [2]): `sensor`, `acq_time` as 4-digit string, `confidence` as integer. Only `frp` and `confidence` may be `null`. No match → `"features": []` |
+| `GET /api/hotspots` | `FeatureCollection`, coordinates `[lon, lat]`. `properties` use the [1] column names and types (not [2]): `sensor`, `acq_time` as 4-digit string, `confidence` as integer. Only `frp` and `confidence` may be `null`, plus the 4 `confidence_*` / `worldview_url` fields (null = not scored). No match → `"features": []` |
 | `GET /api/hotspots/grid` | Shape as above. No match → `"cells": []` |
-| `GET /api/stats` | Shape as above. No match → `{ "total": 0, "frp_sum": 0, "by_type": {}, "by_daynight": {} }` |
+| `GET /api/stats` | Shape as above. No match → `{ "total": 0, "frp_sum": 0, "by_type": {}, "by_daynight": {}, "by_class": { "non_fire": {} } }` |
 | `GET /api/calendar` | Days sorted by `date` ascending; days with count 0 omitted. No match → `{ "days": [] }` |
 | `GET /api/hotspots.csv` | `Content-Type: text/csv`, `Content-Disposition: attachment; filename="hotspots_<from>_<to>.csv"` |
 
