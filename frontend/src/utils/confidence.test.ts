@@ -8,6 +8,7 @@ import {
   dotRadius,
   orderDots,
   reasonPhrases,
+  sensorConfidence,
   type ConfidenceTier,
 } from './confidence'
 
@@ -107,5 +108,19 @@ describe('reasonPhrases', () => {
     expect(reasonPhrases('')).toEqual([])
     expect(reasonPhrases('L1:static;L1:static')).toEqual(['Known industrial site'])
     expect(reasonPhrases('L1:static;L1:volcano;L1:offshore;L1:urban')).toHaveLength(3)
+  })
+})
+
+describe('sensorConfidence (the satellite\'s own confidence, one line for both sensors)', () => {
+  it('MODIS: the percentage', () => {
+    expect(sensorConfidence({ confidence: 72, confidence_level: 'nominal' })).toBe('72%')
+  })
+  it('VIIRS: no percentage, so the class', () => {
+    expect(sensorConfidence({ confidence: null, confidence_level: 'nominal' })).toBe('Nominal')
+    expect(sensorConfidence({ confidence: null, confidence_level: 'high' })).toBe('High')
+    expect(sensorConfidence({ confidence: null, confidence_level: 'low' })).toBe('Low')
+  })
+  it('neither: a dash, never "—%"', () => {
+    expect(sensorConfidence({ confidence: null, confidence_level: null })).toBe('—')
   })
 })

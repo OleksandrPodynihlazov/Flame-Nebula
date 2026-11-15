@@ -120,3 +120,11 @@ export function reasonPhrases(reasons: string | null | undefined): string[] {
   }
   return out.slice(0, MAX_REASONS)
 }
+
+/** The satellite's own detection confidence in one line for both sensors: MODIS gives a percentage, VIIRS only a
+ * class (low / nominal / high), so the class is shown when there is no number. Not the fire-confidence score. */
+export function sensorConfidence(p: Pick<HotspotProperties, 'confidence' | 'confidence_level'>): string {
+  if (p.confidence !== null) return `${p.confidence}%`
+  if (p.confidence_level) return p.confidence_level[0].toUpperCase() + p.confidence_level.slice(1)
+  return '—'
+}
