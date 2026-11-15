@@ -1,4 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { SearchIcon } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { fetchRegion, searchRegions } from '../api/client'
 import type { Area, Region } from '../types/api'
 import { italyFirst } from '../utils/regions'
@@ -104,17 +106,7 @@ export function RegionSearch({ area, onSelect }: Props) {
     <div className="relative min-w-0 flex-1 lg:w-56 lg:flex-none xl:w-64">
       <label className="relative block">
         <span className="sr-only">Search region</span>
-        <svg
-          className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-500"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <circle cx="11" cy="11" r="7" />
-          <path strokeLinecap="round" d="m20 20-3.5-3.5" />
-        </svg>
+        <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
         <input
           type="search"
           role="combobox"
@@ -138,9 +130,10 @@ export function RegionSearch({ area, onSelect }: Props) {
             setError(null)
           }}
           onKeyDown={onKeyDown}
-          className={`w-full rounded-lg border bg-slate-800/80 py-1.5 pl-8 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-500 [&::-webkit-search-cancel-button]:hidden ${
-            selected && !editing ? 'border-orange-500/60 pr-7 font-medium' : 'border-slate-700 pr-2.5'
-          }`}
+          className={cn(
+            'h-11 w-full rounded-lg border bg-card pl-8 text-sm text-ellipsis text-foreground outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 lg:h-9 [&::-webkit-search-cancel-button]:hidden',
+            selected && !editing ? 'border-primary/60 pr-8 font-medium' : 'border-input pr-2.5',
+          )}
         />
       </label>
 

@@ -1,4 +1,4 @@
-import { ALL_TYPES, FIRE_TYPES, MONTHS, MONTHS_FULL, SENSORS } from '../constants/fire'
+import { ALL_TYPES, DEFAULT_FILTERS, FIRE_TYPES, MONTHS, MONTHS_FULL, SENSORS } from '../constants/fire'
 import type { ApiQuery, FireType, Filters, Month, Sensor } from '../types/api'
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -68,4 +68,16 @@ export function toggleMonthPatch(f: Filters, month: Month): Partial<Filters> {
 export function toggleDatePatch(f: Filters, date: string): Partial<Filters> {
   if (f.date === date) return { date: null }
   return { month: (Number(date.slice(5, 7)) - 1) as Month, date }
+}
+
+const sameMembers = <T,>(a: readonly T[], b: readonly T[]) => a.length === b.length && a.every((x) => b.includes(x))
+
+/** How many of fire type, pass, hide noise and sensors differ from DEFAULT_FILTERS (the Filters button badge). */
+export function countChangedFilters(f: Filters): number {
+  return [
+    !sameMembers(f.types, DEFAULT_FILTERS.types),
+    f.daynight !== DEFAULT_FILTERS.daynight,
+    f.hideNoise !== DEFAULT_FILTERS.hideNoise,
+    !sameMembers(f.sensors, DEFAULT_FILTERS.sensors),
+  ].filter(Boolean).length
 }

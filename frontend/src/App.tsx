@@ -1,4 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
+import { ChevronRight, CircleAlert, SlidersHorizontal } from 'lucide-react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
 import { downloadCsv } from './api/client'
 import { BurnCalendar } from './components/BurnCalendar'
 import { CompareBars } from './components/compare/CompareBars'
@@ -75,9 +78,10 @@ export default function App() {
     : (calendar.error ?? stats.error ?? (compare ? (second.calendar.error ?? second.stats.error) : null))
 
   const errorBanner = error && (
-    <p role="alert" className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
-      Could not load data: {error}
-    </p>
+    <Alert variant="destructive" className="border-destructive/40">
+      <CircleAlert aria-hidden="true" />
+      <AlertDescription>Could not load data: {error}</AlertDescription>
+    </Alert>
   )
 
   const calendarView = (
@@ -184,8 +188,8 @@ export default function App() {
 
   if (!isDesktop) {
     return (
-      <div className="flex h-dvh flex-col overflow-hidden bg-slate-950 font-sans text-slate-100 antialiased">
-        <header className="z-30 flex h-14 shrink-0 items-center gap-3 border-b border-slate-800 bg-slate-900/95 px-3">
+      <div className="flex h-dvh flex-col overflow-hidden bg-background font-sans text-foreground antialiased">
+        <header className="z-30 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-background px-3">
           <Brand year={filters.year} sensors={sensors} isDemo={isDemo} compare={compare} scope={scope} />
           <SearchField area={filters.area} onAreaChange={setArea} />
         </header>
@@ -193,20 +197,20 @@ export default function App() {
         <main className="relative flex min-h-0 flex-1 flex-col">
           <HotspotMap {...mapProps} mobile>
             <div className="absolute top-3 right-3 z-[1001] flex flex-col items-end gap-2">
-              <button
+              <Button
                 type="button"
+                variant="secondary"
+                size="icon"
                 onClick={() => setFiltersOpen((o) => !o)}
                 aria-expanded={filtersOpen}
                 aria-label="Filters"
-                className="flex h-[34px] w-[34px] items-center justify-center rounded-lg border border-slate-700/80 bg-slate-900/90 text-slate-100 shadow-xl backdrop-blur-md"
+                className="size-11 border-border shadow-md backdrop-blur-sm"
               >
-                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 5h18M6 12h12M10 19h4" />
-                </svg>
-              </button>
+                <SlidersHorizontal aria-hidden="true" />
+              </Button>
               {filtersOpen && (
-                <div className="w-64 rounded-xl border border-slate-700/80 bg-slate-900/95 p-3 shadow-xl backdrop-blur-md">
-                  <FilterControls {...controls} stacked hideYear patternMonth={patternMonth} />
+                <div className="w-64 rounded-lg border border-border bg-popover p-3 text-popover-foreground shadow-md backdrop-blur-sm">
+                  <FilterControls {...controls} hideYear patternMonth={patternMonth} />
                 </div>
               )}
             </div>
@@ -249,14 +253,14 @@ export default function App() {
   const panelWidth = Math.min(PANEL_WIDTH, Math.round(window.innerWidth * 0.48))
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-slate-950 font-sans text-slate-100 antialiased">
+    <div className="flex h-dvh flex-col overflow-hidden bg-background font-sans text-foreground antialiased">
       <TopBar {...controls} isDemo={isDemo} scope={scope} patternMonth={patternMonth} />
 
       <main className="relative flex-1 overflow-hidden">
         <HotspotMap {...mapProps} rightInset={panelOpen ? panelWidth : 0} />
 
         <aside
-          className={`absolute inset-y-0 right-0 z-[1100] flex transition-transform duration-200 ${panelOpen ? '' : 'translate-x-full'}`}
+          className={`absolute inset-y-0 right-0 z-[1100] flex motion-safe:transition-transform motion-safe:duration-200 ${panelOpen ? '' : 'translate-x-full'}`}
           style={{ width: panelWidth }}
           aria-label="Statistics"
         >
@@ -266,13 +270,11 @@ export default function App() {
             aria-expanded={panelOpen}
             aria-label={panelOpen ? 'Hide statistics' : 'Show statistics'}
             data-testid="panel-toggle"
-            className="absolute top-1/2 -left-7 flex h-16 w-7 -translate-y-1/2 items-center justify-center rounded-l-lg border border-r-0 border-slate-700/80 bg-slate-900/95 text-slate-300 shadow-xl backdrop-blur-md hover:text-white"
+            className="absolute top-1/2 -left-7 flex h-16 w-7 -translate-y-1/2 items-center justify-center rounded-l-lg border border-r-0 border-border bg-card text-muted-foreground shadow-md outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <svg className={`h-4 w-4 transition-transform ${panelOpen ? '' : 'rotate-180'}`} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" d="m9 6 6 6-6 6" />
-            </svg>
+            <ChevronRight className={`size-4 motion-safe:transition-transform ${panelOpen ? '' : 'rotate-180'}`} aria-hidden="true" />
           </button>
-          <section className="flex h-full w-full flex-col gap-4 overflow-y-auto border-l border-slate-800 bg-slate-950/95 p-5 backdrop-blur-md">
+          <section className="flex h-full w-full flex-col gap-4 overflow-y-auto border-l border-border bg-background p-5">
             {errorBanner}
             {isPatterns ? (
               <>
