@@ -1,5 +1,7 @@
 -- Regions (geoBoundaries CGAZ ADM0-2) and the region of every hotspot.
 -- Idempotent: ingest/load_regions.py applies it on every run, after `hotspots` exists.
+-- Must be safe to re-run: deploy applies every file on every deploy (infra/apply-db-schema.sh).
+-- Use IF NOT EXISTS / CREATE OR REPLACE and explicit index names; never DROP TABLE, TRUNCATE, DELETE or ALTER ... DROP.
 -- Design: docs/superpowers/specs/2026-11-14-region-filter-design.md §2.
 
 CREATE TABLE IF NOT EXISTS regions (

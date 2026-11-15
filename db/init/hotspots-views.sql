@@ -1,3 +1,5 @@
+-- Must be safe to re-run: deploy applies every file on every deploy (infra/apply-db-schema.sh).
+-- Use IF NOT EXISTS / CREATE OR REPLACE and explicit index names; never DROP TABLE, TRUNCATE, DELETE or ALTER ... DROP.
 -- Canonical per-hotspot fields (research/02 §C): MODIS and VIIRS reduced to one form, in one place, below the API.
 -- Owner: harmonization. Runs after hotspots-init.sql on a fresh DB (files run in alphabetical order);
 -- harmonize/canonical.py re-applies this file on an existing DB. `hotspots` itself stays raw (decision I2).
@@ -7,6 +9,11 @@
 --                     low < 30 <= nominal < 80 <= high (MODIS Fire User Guide C6.1, Table 11).
 --   confidence_pct    the raw MODIS number 0-100; NULL for VIIRS (it has no percentage).
 --   platform          terra | aqua | snpp | noaa20 | noaa21, from every satellite spelling (archive and API).
+--
+-- DROP + CREATE, not CREATE OR REPLACE: `h.*` is expanded when the view is created, so a column added to `hotspots`
+-- lands in the middle of the view's column list, which OR REPLACE refuses. The deploy applies each file in one
+-- transaction, so readers never see the view missing. DROP fails (and stops the deploy) if another view is built on
+-- this one; then switch to CREATE OR REPLACE or recreate the dependent view here too.
 DROP VIEW IF EXISTS hotspots_canonical;
 CREATE VIEW hotspots_canonical AS
 SELECT h.*,
