@@ -6,7 +6,7 @@ import { useMap } from 'react-leaflet'
 import { HotspotPopup } from '../components/HotspotPopup'
 import { FIRE_TYPES, SENSORS, typeMeta } from '../constants/fire'
 import type { FireType, HotspotProperties, Sensor } from '../types/api'
-import { abbreviateCount, bubbleHeatColor, bubbleRadius, bubbleShare, drawOrder, topmostAt } from '../utils/clusters'
+import { abbreviateCount, bubbleHeatColor, bubbleRadius, bubbleShare, drawOrder, labelFontSize, minBubbleRadius, topmostAt } from '../utils/clusters'
 import { cellBounds } from '../utils/viewport'
 import { HOTSPOT_PANE } from './useGeoman'
 import type { MapData } from './useViewportData'
@@ -63,10 +63,15 @@ function drawBubble(ctx: CanvasRenderingContext2D, b: Hit, t: Extract<Target, { 
   ctx.lineWidth = 1
   ctx.strokeStyle = STROKE
   ctx.stroke()
-  ctx.fillStyle = INK
-  ctx.font = `600 ${b.r >= 18 ? 12 : 11}px ${BUBBLE_FONT_FAMILY}`
+  ctx.font = `600 ${labelFontSize(t.label, b.r)}px ${BUBBLE_FONT_FAMILY}`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
+  // Halo in the body colour: digits stay crisp where the bubble's own outline or a neighbour's glow crosses them.
+  ctx.lineWidth = 2
+  ctx.lineJoin = 'round'
+  ctx.strokeStyle = t.fill
+  ctx.strokeText(t.label, b.x, b.y + 0.5)
+  ctx.fillStyle = INK
   ctx.fillText(t.label, b.x, b.y + 0.5)
 }
 
@@ -152,7 +157,9 @@ class HotspotCanvasLayer extends L.Layer {
   }
 
   setMobile(mobile: boolean) {
+    if (mobile === this.mobile) return
     this.mobile = mobile
+    this.redraw()
   }
 
   private redraw = () => {
@@ -192,7 +199,7 @@ class HotspotCanvasLayer extends L.Layer {
       const maxCount = data.cells.reduce((m, c) => Math.max(m, c.count), 0)
       for (const c of data.cells) {
         const { x, y } = map.latLngToContainerPoint([c.lat, c.lon])
-        const r = bubbleRadius(c.count, maxR)
+        const r = bubbleRadius(c.count, maxR, minBubbleRadius(this.mobile))
         if (!onCanvas(x, y, r)) continue
         // A NULL type (FIRMS API rows have none) is drawn as vegetation, the common case.
         const type = c.type ?? 0
