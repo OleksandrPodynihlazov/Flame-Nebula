@@ -32,7 +32,7 @@ export function buildGrid(year: number, cal: CalendarResponse): CalendarGrid {
   })
   return { counts, monthTotals, monthFrp: monthFrp.map((v) => Math.round(v * 10) / 10), total, maxDay, peakMonth: peak }
 }
-export const RAMP = ['#1e293b', '#4a2a12', '#8a3f0f', '#c2540a', '#ea580c', '#f97316', '#fdba74'] as const
+export const RAMP = ['#1a1f29', '#4a1208', '#8e1f0b', '#d2400f', '#ff7a1a', '#ffb43c', '#ffe7a3'] as const
 
 export function rampIndex(count: number, max: number): number {
   if (count <= 0 || max <= 0) return 0

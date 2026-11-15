@@ -16,7 +16,8 @@ interface Props {
 const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
 const SWIPE_PX = 40
 
-const textOn = (idx: number) => (idx >= RAMP.length - 2 ? 'text-slate-950' : 'text-slate-100')
+// Dark text from heat-4 up: white on #ff7a1a is only ~2.5:1.
+const textOn = (idx: number) => (idx >= 4 ? 'text-slate-950' : 'text-slate-100')
 
 function Chevron({ dir }: { dir: 'left' | 'right' }) {
   return (
