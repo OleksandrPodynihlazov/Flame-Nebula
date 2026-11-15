@@ -71,7 +71,8 @@ export function usePatternLayer(
           [c.lat - HALF, c.lon - HALF],
           [c.lat + HALF, c.lon + HALF],
         ],
-        { ...style(c), renderer, pane },
+        // pmIgnore: geoman's edit, drag and remove tools must not grab pattern cells.
+        { ...style(c), renderer, pane, pmIgnore: true } as L.PolylineOptions,
       )
       const html = patternTooltip(c, monthName)
       if (mobile) {
