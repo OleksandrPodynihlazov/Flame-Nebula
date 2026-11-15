@@ -14,6 +14,8 @@ interface Props {
   loading?: boolean
   footer?: ReactNode
   format?: (v: number) => string
+  /** Test id of the chart; other charts reuse this component and must not match `compare-bars`. */
+  testId?: string
 }
 
 const AXIS = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
@@ -26,7 +28,7 @@ function niceMax(n: number): number {
 }
 
 /** Grouped bars: one group per category, one bar per series. Plain DOM, scales to its container. */
-export function CompareBars({ title, categories, series, loading = false, footer, format = (v) => v.toLocaleString() }: Props) {
+export function CompareBars({ title, categories, series, loading = false, footer, format = (v) => v.toLocaleString(), testId = 'compare-bars' }: Props) {
   const max = niceMax(Math.max(0, ...series.flatMap((s) => s.values)))
   const ticks = [max, max / 2, 0]
 
@@ -34,7 +36,7 @@ export function CompareBars({ title, categories, series, loading = false, footer
     <div
       className="flex flex-col gap-4 border-t border-border pt-4"
       aria-busy={loading}
-      data-testid="compare-bars"
+      data-testid={testId}
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <h2 className="text-sm font-semibold text-foreground">{title}</h2>

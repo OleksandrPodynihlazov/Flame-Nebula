@@ -25,7 +25,8 @@ export function HarmonizedHistory({ label, months, loading, year }: Props) {
   const points = useMemo(() => yearlySeries(months ?? []), [months])
   const picked = useMemo(() => yearVsMedian(points, year), [points, year])
 
-  if (!loading && points.length === 0) return null
+  // No card until there is a series: an empty card while loading would flash, then vanish on servers without data.
+  if (points.length === 0) return null
 
   const footer = (
     <div className="flex flex-col gap-1 text-xs text-muted-foreground" data-testid="harmonized-footer">
@@ -55,6 +56,7 @@ export function HarmonizedHistory({ label, months, loading, year }: Props) {
           { label: 'Harmonized (S-NPP units)', color: COMPARE_COLORS.b, values: points.map((p) => p.count) },
         ]}
         footer={footer}
+        testId="harmonized-bars"
       />
     </div>
   )
