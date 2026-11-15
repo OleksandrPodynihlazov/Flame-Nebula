@@ -3,7 +3,8 @@ import { useEffect } from 'react'
 import { useMap } from 'react-leaflet'
 import type { Area } from '../types/api'
 
-const STYLE: L.PathOptions = { color: '#fb923c', weight: 2, fillColor: '#f97316', fillOpacity: 0.06, interactive: false }
+/** Mirrors --flare (outline) and --primary (fill); the drawn shapes in useGeoman use the same. */
+const STYLE: L.PathOptions = { color: '#ffc24b', weight: 2, fillColor: '#ff6a1a', fillOpacity: 0.08, interactive: false }
 const CREDIT = 'Boundaries: <a href="https://www.geoboundaries.org" target="_blank" rel="noreferrer">geoBoundaries</a>'
 
 /**

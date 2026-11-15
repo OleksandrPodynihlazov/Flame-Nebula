@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { SearchIcon } from 'lucide-react'
+import { SearchIcon, XIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { fetchRegion, searchRegions } from '../api/client'
 import type { Area, Region } from '../types/api'
@@ -143,21 +143,21 @@ export function RegionSearch({ area, onSelect }: Props) {
           onClick={() => onSelect(null)}
           aria-label={`Clear region ${selected.name}`}
           data-testid="region-clear"
-          className="absolute top-1/2 right-1 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded text-sm leading-none text-slate-400 hover:bg-slate-700 hover:text-white"
+          className="absolute top-1/2 right-1 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <span aria-hidden="true">×</span>
+          <XIcon className="size-3.5" aria-hidden="true" />
         </button>
       )}
 
       {(showList || picking || (error && !open)) && (
-        <div className="absolute top-full right-0 left-0 z-[1100] mt-1 overflow-hidden rounded-lg border border-slate-700 bg-slate-900/95 text-xs shadow-xl backdrop-blur-md lg:right-auto lg:min-w-72">
-          {picking && <p className="px-3 py-2 text-slate-400">Loading outline…</p>}
-          {error && <p role="alert" className="px-3 py-2 text-rose-300">{error}</p>}
+        <div className="absolute top-full right-0 left-0 z-[1100] mt-1 overflow-hidden rounded-lg border border-border bg-popover text-xs text-popover-foreground shadow-md lg:right-auto lg:min-w-72">
+          {picking && <p className="px-3 py-2 text-muted-foreground">Loading outline…</p>}
+          {error && <p role="alert" className="px-3 py-2 text-destructive">{error}</p>}
           {!picking && showList && status === 'done' && results.length === 0 && (
-            <p className="px-3 py-2 text-slate-400">No region matches “{query}”. Names use local spelling (Sicilia, Toscana).</p>
+            <p className="px-3 py-2 text-muted-foreground">No region matches “{query}”. Names use local spelling (Sicilia, Toscana).</p>
           )}
           {!picking && showList && results.length > 0 && (
-            <ul id={listId} role="listbox" aria-label="Regions" className={`max-h-72 overflow-y-auto py-1 ${status === 'loading' ? 'opacity-60' : ''}`}>
+            <ul id={listId} role="listbox" aria-label="Regions" className={cn('max-h-72 overflow-y-auto p-1', status === 'loading' && 'opacity-60')}>
               {results.map((r, i) => (
                 <li
                   key={r.id}
@@ -167,10 +167,13 @@ export function RegionSearch({ area, onSelect }: Props) {
                   onMouseDown={(e) => e.preventDefault()}
                   onMouseEnter={() => setActive(i)}
                   onClick={() => pick(r)}
-                  className={`flex cursor-pointer items-baseline justify-between gap-3 px-3 py-1.5 ${i === active ? 'bg-slate-800 text-white' : 'text-slate-200'}`}
+                  className={cn(
+                    'flex cursor-pointer items-baseline justify-between gap-3 rounded-md px-2.5 py-2 text-foreground lg:py-1.5',
+                    i === active && 'bg-accent text-accent-foreground',
+                  )}
                 >
                   <span className="truncate font-medium">{r.name}</span>
-                  <span className="shrink-0 truncate text-[11px] text-slate-500">{r.path || 'Country'}</span>
+                  <span className="shrink-0 truncate text-[11px] text-muted-foreground">{r.path || 'Country'}</span>
                 </li>
               ))}
             </ul>

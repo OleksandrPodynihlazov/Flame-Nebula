@@ -6,8 +6,8 @@ import { useMap } from 'react-leaflet'
 import { HotspotPopup } from '../components/HotspotPopup'
 import { FIRE_TYPES, SENSORS, typeMeta } from '../constants/fire'
 import type { FireType, HotspotProperties, Sensor } from '../types/api'
-import { abbreviateCount, bubbleRadius } from '../utils/clusters'
-import { cellBounds } from '../utils/viewport'
+import { bubbleHeatColor, bubbleLabel, bubbleRadius, bubbleShare, cellPixelSize, type BubbleLabel } from '../utils/clusters'
+import { cellBounds, cellCenter } from '../utils/viewport'
 import { HOTSPOT_PANE } from './useGeoman'
 import type { MapData } from './useViewportData'
 
@@ -15,12 +15,16 @@ import type { MapData } from './useViewportData'
 const PADDING = 0.25
 /** Extra px around a dot or bubble that still counts as a hit. */
 const HIT_SLOP = 3
-const STROKE = '#020617'
+/** Mirrors --background (dot and bubble outline) and the dark ink on bubble fills (--primary-foreground). */
+const STROKE = '#070a0f'
+const INK = '#0a0602'
+/** Bubbles from this share of the view's biggest cell get a soft glow. Static: nothing animates. */
+const GLOW_FROM = 0.75
 const DIM_OPACITY = '0.6'
 const BUBBLE_FONT_FAMILY = '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace'
 
 type Target =
-  | { kind: 'cell'; lat: number; lon: number; cell: number; type: FireType; label: string }
+  | { kind: 'cell'; lat: number; lon: number; cell: number; type: FireType; fill: string; glow: boolean; label: BubbleLabel | null }
   | { kind: 'dot'; p: HotspotProperties }
 
 /** A drawn shape in container px, kept for hit testing until the next redraw. */
@@ -45,27 +49,26 @@ function drawDot(ctx: CanvasRenderingContext2D, d: Hit, type: FireType | null, s
   ctx.globalAlpha = 1
 }
 
-/** Bubble: soft halo, solid body in the cell's most common type color, count in dark text. */
-function drawBubble(ctx: CanvasRenderingContext2D, b: Hit, type: FireType, label: string) {
-  const color = FIRE_TYPES[type].color
-  ctx.beginPath()
-  ctx.arc(b.x, b.y, b.r + 4, 0, Math.PI * 2)
-  ctx.globalAlpha = 0.22
-  ctx.fillStyle = color
-  ctx.fill()
+/** Bubble: solid body (heat scale for vegetation, type colour otherwise), thin dark outline, count in dark ink. */
+function drawBubble(ctx: CanvasRenderingContext2D, b: Hit, t: Extract<Target, { kind: 'cell' }>) {
   ctx.beginPath()
   ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2)
-  ctx.globalAlpha = 0.92
+  ctx.fillStyle = t.fill
+  if (t.glow) {
+    ctx.shadowColor = t.fill
+    ctx.shadowBlur = 14
+  }
   ctx.fill()
-  ctx.globalAlpha = 1
-  ctx.lineWidth = 1.5
+  ctx.shadowBlur = 0
+  ctx.lineWidth = 1
   ctx.strokeStyle = STROKE
   ctx.stroke()
-  ctx.fillStyle = STROKE
-  ctx.font = `600 ${b.r >= 18 ? 12 : 11}px ${BUBBLE_FONT_FAMILY}`
+  if (!t.label) return
+  ctx.fillStyle = INK
+  ctx.font = `600 ${t.label.fontPx}px ${BUBBLE_FONT_FAMILY}`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  ctx.fillText(label, b.x, b.y + 0.5)
+  ctx.fillText(t.label.text, b.x, b.y + 0.5)
 }
 
 /**
@@ -185,14 +188,27 @@ class HotspotCanvasLayer extends L.Layer {
     const dots: Hit[] = []
     const bubbles: Hit[] = []
     if (data.kind === 'grid') {
-      // Neighbor bubbles must not overlap: at most half a cell wide on screen (Web Mercator, 256 px tiles).
-      const maxR = (data.cell / 360) * 256 * 2 ** map.getZoom() / 2
+      // Bubbles sit at cell centres, are capped to the cell's on-screen size, and scale with the busiest cell in view.
+      const cellPx = cellPixelSize(data.cell, map.getZoom())
+      const maxCount = data.cells.reduce((m, c) => Math.max(m, c.count), 0)
       for (const c of data.cells) {
-        const { x, y } = map.latLngToContainerPoint([c.lat, c.lon])
-        const r = bubbleRadius(c.count, maxR)
+        const centre = cellCenter(c.lat, c.lon, data.cell)
+        const { x, y } = map.latLngToContainerPoint([centre.lat, centre.lon])
+        const r = bubbleRadius(c.count, maxCount, cellPx)
         if (!onCanvas(x, y, r)) continue
         // A NULL type (FIRMS API rows have none) is drawn as vegetation, the common case.
-        const target: Target = { kind: 'cell', lat: c.lat, lon: c.lon, cell: data.cell, type: c.type ?? 0, label: abbreviateCount(c.count) }
+        const type = c.type ?? 0
+        const share = bubbleShare(c.count, maxCount)
+        const target: Target = {
+          kind: 'cell',
+          lat: centre.lat,
+          lon: centre.lon,
+          cell: data.cell,
+          type,
+          fill: type === 0 ? bubbleHeatColor(share) : FIRE_TYPES[type].color,
+          glow: share >= GLOW_FROM,
+          label: bubbleLabel(c.count, r),
+        }
         bubbles.push({ x, y, r, target })
       }
     } else {
@@ -204,9 +220,11 @@ class HotspotCanvasLayer extends L.Layer {
     }
 
     dots.sort((a, b) => b.r - a.r)
+    // Biggest first, so a glowing bubble never paints over a neighbour's body.
+    bubbles.sort((a, b) => b.r - a.r)
     ctx.translate(pad.x, pad.y)
     for (const d of dots) if (d.target.kind === 'dot') drawDot(ctx, d, d.target.p.type, d.target.p.sensor)
-    for (const b of bubbles) if (b.target.kind === 'cell') drawBubble(ctx, b, b.target.type, b.target.label)
+    for (const b of bubbles) if (b.target.kind === 'cell') drawBubble(ctx, b, b.target)
     // Bubbles are drawn last, so they win hit tests (searched from the end).
     this.hits = [...dots, ...bubbles]
   }

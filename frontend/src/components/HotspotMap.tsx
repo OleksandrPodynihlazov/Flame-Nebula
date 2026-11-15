@@ -1,5 +1,7 @@
-import "leaflet/dist/leaflet.css";
 import { useState, type CSSProperties, type ReactNode } from "react";
+import { RotateCcw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import type { ControlPosition, FitBoundsOptions } from "leaflet";
 import { MapContainer, TileLayer, ZoomControl, useMap } from "react-leaflet";
 import { COMPARE_COLORS } from "../constants/compare";
@@ -9,8 +11,9 @@ import { useHotspotLayer } from "../hooks/useHotspotLayer";
 import { usePatternLayer } from "../hooks/usePatternLayer";
 import { useViewportData } from "../hooks/useViewportData";
 import type { ApiQuery, Area, MapView, PatternCell, SelectionSummaryResponse, Sensor } from "../types/api";
+import { FLOAT_PANEL } from "./floating";
 import { MapLayersButton } from "./MapLayersButton";
-import { MapLegend, SideLegend } from "./MapLegend";
+import { MapLegend, MobileLegend } from "./MapLegend";
 import { RegionOutline } from "./RegionOutline";
 import { SelectionPanel } from "./SelectionPanel";
 import { SwipeCompare } from "./compare/SwipeCompare";
@@ -26,6 +29,41 @@ function DrawTools({
 }) {
   useGeoman(area, onAreaChange, position);
   return null;
+}
+
+function StatusChip({
+  error,
+  pulsing,
+  mobile,
+  fitOptions,
+  testId,
+  children,
+}: {
+  error: boolean;
+  pulsing: boolean;
+  mobile: boolean;
+  fitOptions?: FitBoundsOptions;
+  testId?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      data-testid={testId}
+      className={cn(
+        FLOAT_PANEL,
+        "absolute top-3 z-[1000] flex h-11 items-center gap-2 pl-3 lg:top-[10px] lg:h-9",
+        error && "border-destructive/60",
+        mobile ? "left-3 max-w-[calc(100%-4.5rem)]" : "left-[54px] max-w-[calc(100%-4rem)]",
+      )}
+    >
+      <span
+        aria-hidden="true"
+        className={cn("size-2 shrink-0 rounded-full", error ? "bg-destructive" : "bg-primary", pulsing && "animate-pulse")}
+      />
+      {children}
+      <ResetView options={fitOptions} />
+    </div>
+  );
 }
 
 function MapStatus({
@@ -46,27 +84,24 @@ function MapStatus({
   fitOptions?: FitBoundsOptions;
 }) {
   return (
-    <div
-      className={`absolute top-3 z-[1000] flex items-center gap-2 rounded-lg border bg-slate-900/90 px-3 py-1.5 shadow-xl backdrop-blur-md ${
-        error ? "border-rose-500/60" : "border-slate-700/80"
-      } ${mobile ? "left-3 max-w-[calc(100%-4.5rem)]" : "left-12 max-w-[calc(100%-4rem)]"}`}
-    >
-      <span
-        className={`h-2 w-2 shrink-0 rounded-full ${error ? "bg-rose-500" : "bg-orange-500"} ${
-          loading || totalLoading ? "animate-pulse" : ""
-        }`}
-      />
+    <StatusChip error={error !== null} pulsing={loading || totalLoading} mobile={mobile} fitOptions={fitOptions}>
       {error ? (
-        <span role="alert" data-testid="map-error" className="truncate text-xs font-medium text-rose-200" title={error}>
+        <span role="alert" data-testid="map-error" className="truncate text-xs font-medium text-destructive" title={error}>
           Map: {error}
         </span>
       ) : (
-        <span className="truncate text-xs font-medium text-slate-100" aria-live="polite">
-          {label} · {totalLoading || total === null ? "loading…" : `${total.toLocaleString()} hotspots`}
+        <span className="truncate text-xs text-muted-foreground" aria-live="polite">
+          {label} ·{" "}
+          {totalLoading || total === null ? (
+            "loading…"
+          ) : (
+            <>
+              <span className="font-mono font-medium text-foreground tabular-nums">{total.toLocaleString()}</span> hotspots
+            </>
+          )}
         </span>
       )}
-      <ResetView options={fitOptions} />
-    </div>
+    </StatusChip>
   );
 }
 
@@ -91,9 +126,10 @@ function PatternLayer({ side, pane, mobile }: { side: PatternSide; pane: string;
 
 function PatternLabel({ side }: { side: PatternSide }) {
   return (
-    <span className="font-medium text-slate-100">
-      <span className="font-semibold">{MONTHS_FULL[side.month - 1]}</span>
-      <span className="text-slate-400"> · {side.loading || side.cells === null ? "…" : `${side.cells.length.toLocaleString()} cells`}</span>
+    <span className="text-muted-foreground">
+      <span className="font-medium text-foreground">{MONTHS_FULL[side.month - 1]}</span>
+      {" · "}
+      <span className="font-mono tabular-nums">{side.loading || side.cells === null ? "…" : `${side.cells.length.toLocaleString()} cells`}</span>
     </span>
   );
 }
@@ -101,24 +137,17 @@ function PatternLabel({ side }: { side: PatternSide }) {
 function PatternStatus({ side, mobile, fitOptions }: { side: PatternSide; mobile: boolean; fitOptions?: FitBoundsOptions }) {
   const text = side.loading || side.cells === null ? "loading…" : `${side.cells.length.toLocaleString()} cells burned ≥12 of 14 years`;
   return (
-    <div
-      className={`absolute top-3 z-[1000] flex items-center gap-2 rounded-lg border bg-slate-900/90 px-3 py-1.5 shadow-xl backdrop-blur-md ${
-        side.error ? "border-rose-500/60" : "border-slate-700/80"
-      } ${mobile ? "left-3 max-w-[calc(100%-4.5rem)]" : "left-12 max-w-[calc(100%-4rem)]"}`}
-      data-testid="pattern-status"
-    >
-      <span className={`h-2 w-2 shrink-0 rounded-full ${side.error ? "bg-rose-500" : "bg-red-600"} ${side.loading ? "animate-pulse" : ""}`} />
+    <StatusChip error={side.error !== null} pulsing={side.loading} mobile={mobile} fitOptions={fitOptions} testId="pattern-status">
       {side.error ? (
-        <span role="alert" className="truncate text-xs font-medium text-rose-200" title={side.error}>
+        <span role="alert" className="truncate text-xs font-medium text-destructive" title={side.error}>
           Patterns: {side.error}
         </span>
       ) : (
-        <span className="truncate text-xs font-medium text-slate-100" aria-live="polite">
+        <span className="truncate text-xs text-muted-foreground" aria-live="polite">
           Patterns · {MONTHS_FULL[side.month - 1]} · {text}
         </span>
       )}
-      <ResetView options={fitOptions} />
-    </div>
+    </StatusChip>
   );
 }
 
@@ -131,9 +160,10 @@ function CompareLayer({ query, pane, mobile }: { query: ApiQuery; pane: string; 
 
 function CompareLabel({ year, total, loading }: CompareView["a"]) {
   return (
-    <span className="font-medium text-slate-100">
-      <span className="font-mono font-semibold">{year}</span>
-      <span className="text-slate-400"> · {loading || total === null ? "…" : total.toLocaleString()}</span>
+    <span className="text-muted-foreground">
+      <span className="font-mono font-medium text-foreground tabular-nums">{year}</span>
+      {" · "}
+      <span className="font-mono tabular-nums">{loading || total === null ? "…" : total.toLocaleString()}</span>
     </span>
   );
 }
@@ -160,13 +190,16 @@ function ViewportLayer({
 function ResetView({ options }: { options?: FitBoundsOptions }) {
   const map = useMap();
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="sm"
       onClick={() => map.fitBounds(ITALY_BOUNDS, options)}
-      className="ml-1 shrink-0 whitespace-nowrap text-[11px] text-slate-400 underline decoration-slate-600 hover:text-white"
+      className="h-full shrink-0 rounded-l-none rounded-r-[7px] px-3 text-muted-foreground max-lg:w-11 max-lg:px-0 lg:mr-1 lg:h-7 lg:rounded-lg lg:px-2"
     >
-      Reset view
-    </button>
+      <RotateCcw data-icon="inline-start" aria-hidden="true" />
+      <span className="max-lg:sr-only">Reset view</span>
+    </Button>
   );
 }
 
@@ -224,7 +257,7 @@ export function HotspotMap({
 }: Props) {
   const showPatterns = view === "patterns" && patterns !== null;
   const comparing = showPatterns ? patterns.b !== null : compare !== null;
-  const [legendOpen, setLegendOpen] = useState(!mobile);
+  const [legendOpen, setLegendOpen] = useState(false);
   const fitOptions: FitBoundsOptions | undefined = mobile
     ? { paddingTopLeft: [0, 48], paddingBottomRight: [0, 96] }
     : { paddingTopLeft: [24, 24], paddingBottomRight: [rightInset + 24, 24] };
@@ -309,27 +342,19 @@ export function HotspotMap({
       </MapContainer>
 
       {mobile ? (
-        <SideLegend
-          open={legendOpen}
-          onToggle={() => setLegendOpen((o) => !o)}
-          sensors={sensors}
-          patterns={showPatterns}
-        />
+        <div className="absolute top-16 left-3 z-[1000] flex flex-col items-start gap-2">
+          {onViewChange && <MapLayersButton view={view} onChange={onViewChange} menuSide="right" />}
+          <MobileLegend sensors={sensors} patterns={showPatterns} />
+        </div>
       ) : (
-        <MapLegend
-          open={legendOpen}
-          onToggle={() => setLegendOpen((o) => !o)}
-          sensors={sensors}
-          patterns={showPatterns}
-        />
-      )}
-
-      {onViewChange && (
-        <MapLayersButton
-          view={view}
-          onChange={onViewChange}
-          className={mobile ? "top-14 left-3 flex-col items-start" : "bottom-8 right-[calc(var(--panel-inset,0px)+0.75rem)] flex-row-reverse"}
-        />
+        <>
+          <MapLegend open={legendOpen} onToggle={() => setLegendOpen((o) => !o)} sensors={sensors} patterns={showPatterns} />
+          {onViewChange && (
+            <div className="absolute right-[calc(var(--panel-inset,0px)+10px)] bottom-9 z-[1000]">
+              <MapLayersButton view={view} onChange={onViewChange} menuSide="left" />
+            </div>
+          )}
+        </>
       )}
 
       {area && !compare && !showPatterns && (

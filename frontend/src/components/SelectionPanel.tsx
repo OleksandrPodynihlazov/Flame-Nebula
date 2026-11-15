@@ -1,9 +1,14 @@
 import { useMemo, useState, type ReactNode } from 'react'
+import { ChevronDown, ChevronUp, X } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Separator } from '@/components/ui/separator'
+import { cn } from '@/lib/utils'
 import { USE_MOCKS, downloadBlob, fetchHotspots } from '../api/client'
 import { ALL_TYPES, FIRE_TYPES, MONTHS, MONTHS_FULL } from '../constants/fire'
 import type { ApiQuery, Area, SelectionSummaryResponse } from '../types/api'
 import { selectionGeoJson } from '../utils/selectionExport'
 import { formatAreaKm2, selectionSummary } from '../utils/selectionSummary'
+import { FLOAT_PANEL } from './floating'
 
 type CircleArea = Extract<Area, { kind: 'circle' }>
 
@@ -32,8 +37,8 @@ function shortDate(iso: string): string {
 function Row({ label, children, testId }: { label: string; children: ReactNode; testId?: string }) {
   return (
     <>
-      <dt className="text-slate-400">{label}</dt>
-      <dd className="text-right font-mono text-slate-100" data-testid={testId}>
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="text-right font-mono text-foreground tabular-nums" data-testid={testId}>
         {children}
       </dd>
     </>
@@ -78,13 +83,13 @@ function CircleInputs({ area, onAreaChange }: { area: CircleArea; onAreaChange: 
   }
 
   return (
-    <fieldset className="border-t border-slate-800/80 pt-2.5">
+    <fieldset className="flex flex-col gap-1.5">
       <legend className="sr-only">Circle center and radius</legend>
       <div className="grid grid-cols-3 gap-2">
         {FIELDS.map((f) => {
           const invalid = parsed[f.key] === null
           return (
-            <label key={f.key} className="flex min-w-0 flex-col gap-1 text-[11px] text-slate-400">
+            <label key={f.key} className="flex min-w-0 flex-col gap-1 text-xs text-muted-foreground">
               {f.label}
               <input
                 type="text"
@@ -98,16 +103,17 @@ function CircleInputs({ area, onAreaChange }: { area: CircleArea; onAreaChange: 
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') commit()
                 }}
-                className={`w-full min-w-0 rounded-md border bg-slate-950/70 px-2 py-1.5 font-mono text-xs text-slate-100 focus:outline-none focus:ring-1 ${
-                  invalid ? 'border-rose-500 focus:ring-rose-500' : 'border-slate-700 focus:ring-orange-500'
-                }`}
+                className={cn(
+                  'h-11 w-full min-w-0 rounded-md border bg-background/60 px-2 font-mono text-xs text-foreground tabular-nums outline-none focus-visible:ring-2 lg:h-8',
+                  invalid ? 'border-destructive focus-visible:ring-destructive/50' : 'border-input focus-visible:ring-ring',
+                )}
               />
             </label>
           )
         })}
       </div>
       {errors.length > 0 && (
-        <ul id="circle-input-errors" aria-live="polite" className="mt-1.5 text-[11px] text-rose-300">
+        <ul id="circle-input-errors" aria-live="polite" className="text-xs text-destructive">
           {errors.map((f) => (
             <li key={f.key}>{f.error}</li>
           ))}
@@ -116,9 +122,6 @@ function CircleInputs({ area, onAreaChange }: { area: CircleArea; onAreaChange: 
     </fieldset>
   )
 }
-
-const BUTTON =
-  'flex flex-1 items-center justify-center rounded-lg border px-2 py-1.5 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-orange-500 disabled:opacity-60'
 
 export function SelectionPanel({ area, summary, loading, error, query, fileTag, downloading, onDownloadCsv, onAreaChange }: Props) {
   const [expanded, setExpanded] = useState(false)
@@ -153,7 +156,10 @@ export function SelectionPanel({ area, summary, loading, error, query, fileTag, 
       aria-label="Selected area"
       data-testid="selection-panel"
       aria-busy={loading}
-      className="absolute top-14 right-14 left-12 z-20 flex max-h-[calc(100%-4.5rem)] flex-col overflow-hidden rounded-xl border border-slate-700/80 bg-slate-900/90 shadow-xl backdrop-blur-md lg:right-[calc(var(--panel-inset,0px)+0.75rem)] lg:left-auto lg:w-64"
+      className={cn(
+        FLOAT_PANEL,
+        'absolute top-16 right-16 left-[68px] z-20 flex max-h-[calc(100%-5rem)] flex-col overflow-hidden lg:top-[10px] lg:right-[calc(var(--panel-inset,0px)+10px)] lg:left-auto lg:max-h-[calc(100%-6rem)] lg:w-72',
+      )}
     >
       <div className="flex items-stretch lg:hidden">
         <button
@@ -162,34 +168,38 @@ export function SelectionPanel({ area, summary, loading, error, query, fileTag, 
           aria-expanded={expanded}
           aria-controls="selection-details"
           data-testid="selection-toggle"
-          className="flex min-w-0 flex-1 items-center justify-between gap-3 py-2 pr-1 pl-3 text-xs text-slate-200 transition-colors hover:bg-slate-800/60"
+          className="flex min-h-11 min-w-0 flex-1 items-center justify-between gap-3 py-2 pr-1 pl-3 text-xs text-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
         >
           <span className="flex min-w-0 items-center gap-2">
-            <span className="h-2 w-2 shrink-0 rounded-full bg-orange-500" />
+            <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-primary" />
             <span className="truncate font-medium">
               {area.kind === 'region' && <>{area.name} · </>}
-              <span className="font-mono">{countText}</span> hotspots · <span className="font-mono">{areaText}</span>
+              <span className="font-mono tabular-nums">{countText}</span> hotspots · <span className="font-mono tabular-nums">{areaText}</span>
             </span>
           </span>
-          <span className="text-[10px] text-slate-400">{expanded ? '▲' : '▼'}</span>
+          {expanded ? (
+            <ChevronUp className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          ) : (
+            <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          )}
         </button>
         <button
           type="button"
           onClick={() => onAreaChange(null)}
           aria-label="Clear selection"
           data-testid="selection-clear-compact"
-          className="flex min-h-8 min-w-8 shrink-0 items-center justify-center px-2 text-base leading-none text-slate-400 transition-colors hover:bg-slate-800/60 hover:text-white focus:outline-none focus-visible:ring-1 focus-visible:ring-orange-500"
+          className="flex min-h-11 min-w-11 shrink-0 items-center justify-center text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
         >
-          <span aria-hidden="true">×</span>
+          <X className="size-4" aria-hidden="true" />
         </button>
       </div>
 
-      <h2 className="hidden items-center gap-2 px-3 pt-2.5 text-xs font-semibold text-slate-200 lg:flex">
-        <span className="h-2 w-2 shrink-0 rounded-full bg-orange-500" />
+      <h2 className="hidden items-start gap-2 px-3 pt-3 text-sm font-medium text-foreground lg:flex">
+        <span aria-hidden="true" className="mt-1.5 size-2 shrink-0 rounded-full bg-primary" />
         {area.kind === 'region' ? (
           <span className="min-w-0" data-testid="selection-region">
             <span className="block truncate">{area.name}</span>
-            {area.path && <span className="block truncate text-[10px] font-normal text-slate-400">{area.path}</span>}
+            {area.path && <span className="block truncate text-xs font-normal text-muted-foreground">{area.path}</span>}
           </span>
         ) : (
           'Selected area'
@@ -198,9 +208,9 @@ export function SelectionPanel({ area, summary, loading, error, query, fileTag, 
 
       <div
         id="selection-details"
-        className={`${expanded ? 'flex' : 'hidden'} flex-col gap-2.5 overflow-y-auto px-3 pt-2 pb-3 lg:flex ${loading ? 'opacity-60' : ''}`}
+        className={cn('flex-col gap-3 overflow-y-auto px-3 pt-2 pb-3 lg:flex', expanded ? 'flex' : 'hidden', loading && 'opacity-60')}
       >
-        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[11px]">
+        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
           <Row label="Area" testId="selection-area">
             {areaText}
           </Row>
@@ -225,69 +235,72 @@ export function SelectionPanel({ area, summary, loading, error, query, fileTag, 
         </dl>
 
         {error && !loading && (
-          <p role="alert" className="text-[11px] text-rose-300" data-testid="selection-error">
+          <p role="alert" className="text-xs text-destructive" data-testid="selection-error">
             {error}
           </p>
         )}
 
         {geoJsonError && (
-          <p role="alert" className="text-[11px] text-rose-300" data-testid="selection-export-error">
+          <p role="alert" className="text-xs text-destructive" data-testid="selection-export-error">
             GeoJSON: {geoJsonError}
           </p>
         )}
 
         {s.count === 0 && !loading && !error && (
-          <p className="text-[11px] text-slate-400" data-testid="selection-empty">
+          <p className="text-xs text-muted-foreground" data-testid="selection-empty">
             No hotspots in this area
           </p>
         )}
 
         {s.count > 0 && (
-          <ul className="flex flex-col gap-1 border-t border-slate-800/80 pt-2 text-[11px]" aria-label="Hotspots by type">
-            {ALL_TYPES.filter((t) => s.byType[t] > 0).map((t) => (
-              <li key={t} className="flex items-center justify-between gap-2">
-                <span className="flex items-center gap-2 text-slate-300">
-                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: FIRE_TYPES[t].color }} />
-                  {FIRE_TYPES[t].label}
-                </span>
-                <span className="font-mono text-slate-100">{fmt(s.byType[t])}</span>
-              </li>
-            ))}
-          </ul>
+          <>
+            <Separator />
+            <ul className="flex flex-col gap-1 text-xs" aria-label="Hotspots by type">
+              {ALL_TYPES.filter((t) => s.byType[t] > 0).map((t) => (
+                <li key={t} className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-2 text-muted-foreground">
+                    <span aria-hidden="true" className="size-2 shrink-0 rounded-full" style={{ background: FIRE_TYPES[t].color }} />
+                    {FIRE_TYPES[t].label}
+                  </span>
+                  <span className="font-mono text-foreground tabular-nums">{fmt(s.byType[t])}</span>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
 
         {area.kind === 'circle' && (
-          <CircleInputs key={`${area.lat}|${area.lon}|${area.radiusKm}`} area={area} onAreaChange={onAreaChange} />
+          <>
+            <Separator />
+            <CircleInputs key={`${area.lat}|${area.lon}|${area.radiusKm}`} area={area} onAreaChange={onAreaChange} />
+          </>
         )}
 
-        <div className="flex gap-2 border-t border-slate-800/80 pt-2.5">
-          <button
+        <Separator />
+        <div className="flex gap-2">
+          <Button
             type="button"
             onClick={onDownloadCsv}
             disabled={downloading}
             data-testid="selection-download-csv"
-            className={`${BUTTON} border-orange-600 bg-orange-600 text-white hover:bg-orange-500`}
+            className="flex-1 max-lg:h-11"
           >
             {downloading ? 'Preparing…' : 'CSV'}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="outline"
             onClick={() => void downloadGeoJson()}
             disabled={loading || error !== null || exporting}
             aria-busy={exporting}
             data-testid="selection-download-geojson"
-            className={`${BUTTON} border-slate-700 bg-slate-800/80 text-slate-100 hover:bg-slate-800`}
+            className="flex-1 max-lg:h-11"
           >
             {exporting ? 'Preparing…' : 'GeoJSON'}
-          </button>
-          <button
-            type="button"
-            onClick={() => onAreaChange(null)}
-            data-testid="selection-clear"
-            className={`${BUTTON} border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800/60 hover:text-white`}
-          >
+          </Button>
+          <Button type="button" variant="ghost" onClick={() => onAreaChange(null)} data-testid="selection-clear" className="flex-1 max-lg:h-11">
             Clear
-          </button>
+          </Button>
         </div>
       </div>
     </section>
