@@ -18,7 +18,7 @@ FIRMS CSV ─▶ harmonize/ ─▶ data/processed/*.csv ─▶ db/ (Postgres + a
 | `harmonize/` | Python 3.12, venv + pip, `requirements.txt` | Clean/merge raw FIRMS CSVs into the processed CSV |
 | `db/` | PostgreSQL 17 | Schema, load script, aggregate views |
 | `api/` | Node 20, Express, plain JavaScript | HTTP endpoints over the DB |
-| `web/` | React, plain JavaScript | Map, area picker, calendar, stats, CSV download. The frontend code lives in `frontend/` (Vite + React). |
+| `frontend/` | Vite, React 19, TypeScript, Tailwind v4, shadcn/ui | Map, area picker, calendar, stats, CSV download. Theme tokens in `frontend/src/index.css`; UI primitives in `frontend/src/components/ui/`. |
 | `data/` | — | `raw/` and `processed/`, both gitignored |
 | `docs/` | Markdown | Specs everyone follows |
 | `e2e/` | Playwright, plain JavaScript | DevOps: tests against the live site and the PR stack |

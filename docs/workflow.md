@@ -3,7 +3,7 @@
 ## Git
 
 1. Update: `git switch main && git pull`.
-2. Branch: `git switch -c <module>/<feature>` — module = folder (`harmonize`, `db`, `api`, `web`, `docs`).
+2. Branch: `git switch -c <module>/<feature>` — module = folder (`harmonize`, `db`, `api`, `frontend`, `e2e`, `infra`, `docs`).
 3. Commit with Conventional Commits, scope = module:
    - `feat(web): add calendar heatmap`
    - `fix(api): reject radius_km <= 0`
