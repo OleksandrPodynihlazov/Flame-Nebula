@@ -13,6 +13,8 @@ interface Props {
   /** Month or day selected, e.g. "Aug 2008"; null for the full year. */
   scope: string | null
   loading: boolean
+  /** Non-fire points the API left out of the total; 0 or undefined shows nothing. */
+  hiddenNonFire?: number
 }
 
 /** Metrics side by side, split by vertical hairlines. Pair with `Metric`. */
@@ -85,7 +87,7 @@ function dayNightFooter(day: number, total: number) {
   return total > 0 ? <DayNightBar dayPct={Math.round((day / total) * 100)} /> : null
 }
 
-export function StatCards({ stats, grid, scope, loading }: Props) {
+export function StatCards({ stats, grid, scope, loading, hiddenNonFire = 0 }: Props) {
   const total = stats?.total ?? 0
   const day = stats?.by_daynight.D ?? 0
   const night = stats?.by_daynight.N ?? 0
@@ -118,6 +120,11 @@ export function StatCards({ stats, grid, scope, loading }: Props) {
           )}
         </Metric>
       </Readout>
+      {hiddenNonFire > 0 && (
+        <p className="text-xs text-muted-foreground" data-testid="hidden-non-fire">
+          {hiddenNonFire.toLocaleString('en')} non-fire {hiddenNonFire === 1 ? 'point' : 'points'} hidden
+        </p>
+      )}
     </div>
   )
 }

@@ -293,7 +293,7 @@ export default function App() {
                 {sideA && sideB ? (
                   <CompareStats a={sideA} b={sideB} />
                 ) : (
-                  <StatCards stats={stats.data} grid={grid} scope={filters.month === null && filters.date === null ? null : selectionLabel(filters)} loading={stats.loading} />
+                  <StatCards stats={stats.data} grid={grid} scope={filters.month === null && filters.date === null ? null : selectionLabel(filters)} loading={stats.loading} hiddenNonFire={filters.showNonFire ? 0 : Object.values(stats.data?.by_class?.non_fire ?? {}).reduce((sum, n) => sum + n, 0)} />
                 )}
                 {emptyState}
                 {compareChart || calendarView}
