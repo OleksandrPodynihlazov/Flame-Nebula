@@ -1,3 +1,4 @@
+import type { Format } from '@number-flow/react'
 import type { ReactNode } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
@@ -5,7 +6,8 @@ import { COMPARE_COLORS, type CompareSide } from '../../constants/compare'
 import { MONTHS_FULL } from '../../constants/fire'
 import type { StatsResponse } from '../../types/api'
 import type { CalendarGrid } from '../../utils/calendar'
-import { formatMW, peakIndex } from '../../utils/compare'
+import { peakIndex } from '../../utils/compare'
+import { AnimatedNumber } from '../AnimatedNumber'
 import { DIM, Delta, FIGURE, Metric, Readout, SrLoading, UNIT } from '../StatCards'
 
 export interface CompareSideData {
@@ -25,11 +27,8 @@ function YearTag({ side, year }: { side: CompareSide; year: number }) {
   )
 }
 
-/** "1.2K MW" as a figure and its unit. */
-function splitMW(mw: number): [string, string] {
-  const [figure, unit] = formatMW(mw).split(' ')
-  return [figure, unit]
-}
+/** Same options as `formatMW`, so the animated figure reads like the static one ("540.9K"). */
+const COMPACT: Format = { notation: 'compact', maximumFractionDigits: 1 }
 
 function metrics(d: CompareSideData) {
   const peak = d.grid ? peakIndex(d.grid.monthFrp) : null
@@ -62,10 +61,14 @@ export function CompareStats({ a, b }: { a: CompareSideData; b: CompareSideData 
                       <Skeleton className="h-[30px] w-20" />
                     ) : (
                       <>
-                        <span className={cn(FIGURE, 'text-3xl leading-none')} data-testid="stat-frp" title={m.frp === undefined ? undefined : `${m.frp.toLocaleString('en-US')} MW`}>
-                          {m.frp === undefined ? '—' : splitMW(m.frp)[0]}
-                        </span>
-                        {m.frp !== undefined && <span className={UNIT}>{splitMW(m.frp)[1]}</span>}
+                        {m.frp === undefined ? (
+                          <span className={cn(FIGURE, 'text-3xl leading-none')} data-testid="stat-frp">—</span>
+                        ) : (
+                          <span title={`${m.frp.toLocaleString('en-US')} MW`}>
+                            <AnimatedNumber className={cn(FIGURE, 'text-3xl leading-none')} testId="stat-frp" value={m.frp} format={COMPACT} />
+                          </span>
+                        )}
+                        {m.frp !== undefined && <span className={UNIT}>MW</span>}
                         {o && <Delta from={o.frp} to={m.frp} testId="compare-delta" />}
                       </>
                     )}
@@ -78,9 +81,11 @@ export function CompareStats({ a, b }: { a: CompareSideData; b: CompareSideData 
                       <Skeleton className="h-5 w-14" />
                     ) : (
                       <>
-                        <span className={cn(FIGURE, 'text-xl leading-none')} data-testid="stat-total">
-                          {m.total === undefined ? '—' : m.total.toLocaleString('en-US')}
-                        </span>
+                        {m.total === undefined ? (
+                          <span className={cn(FIGURE, 'text-xl leading-none')} data-testid="stat-total">—</span>
+                        ) : (
+                          <AnimatedNumber className={cn(FIGURE, 'text-xl leading-none')} testId="stat-total" value={m.total} />
+                        )}
                         {o && <Delta from={o.total} to={m.total} />}
                       </>
                     )}
@@ -121,12 +126,17 @@ export function CompareMiniStats({ a, b }: { a: CompareSideData; b: CompareSideD
                   </>
                 ) : (
                   <>
-                    <span className="truncate text-sm font-semibold tracking-tight text-foreground tabular-nums" data-testid="stat-frp">
-                      {m.frp === undefined ? '—' : formatMW(m.frp).replace(' MW', '')} {o && <Delta from={o.frp} to={m.frp} testId="compare-delta" />}
+                    <span className="truncate text-sm font-semibold tracking-tight text-foreground tabular-nums">
+                      {m.frp === undefined ? (
+                        <span data-testid="stat-frp">—</span>
+                      ) : (
+                        <AnimatedNumber testId="stat-frp" value={m.frp} format={COMPACT} />
+                      )}{' '}
+                      {o && <Delta from={o.frp} to={m.frp} testId="compare-delta" />}
                     </span>
                     <span className="truncate text-sm font-semibold text-foreground">{m.peak ? m.peak.name.slice(0, 3) : '—'}</span>
-                    <span className="truncate text-sm font-semibold tracking-tight text-foreground tabular-nums" data-testid="stat-total">
-                      {m.total === undefined ? '—' : m.total.toLocaleString()}
+                    <span className="truncate text-sm font-semibold tracking-tight text-foreground tabular-nums">
+                      {m.total === undefined ? <span data-testid="stat-total">—</span> : <AnimatedNumber testId="stat-total" value={m.total} />}
                     </span>
                   </>
                 )}
