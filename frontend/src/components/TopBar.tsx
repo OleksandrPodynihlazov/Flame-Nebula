@@ -16,7 +16,7 @@ import type { Area, DayNight, FireType, Filters, Sensor } from '../types/api'
 import { RegionSearch } from './RegionSearch'
 
 import { defaultCompareYears } from '../utils/compare'
-import { activeSensors, countChangedFilters, sensorAvailable, yearPatch } from '../utils/filters'
+import { countChangedFilters, sensorAvailable, sensorAvailableIn, sensorYears, yearPatch } from '../utils/filters'
 
 /** The map's own panes and controls use z-indexes up to 1100, so overlays portaled to <body> must sit above them. */
 const OVERLAY_Z = 'z-[1200]'
@@ -156,11 +156,12 @@ export function SearchField({ area, onAreaChange }: { area: Area | null; onAreaC
 }
 
 /** Fire type, pass, hide noise and sensors: the filters that live in the desktop popover and the phone panel. */
-export function FilterFields({ filters, onChange }: Pick<Props, 'filters' | 'onChange'>) {
+export function FilterFields({ filters, onChange, compare }: Pick<Props, 'filters' | 'onChange' | 'compare'>) {
   const noiseId = useId()
   const sensorsLabelId = useId()
   const typeValue = filters.types.length === ALL_TYPES.length ? 'all' : String(filters.types[0])
-  const sensors = activeSensors(filters)
+  const years = sensorYears(filters, compare)
+  const sensors = filters.sensors.filter((s) => sensorAvailableIn(s, years))
 
   const setType = (v: string) => {
     if (v === 'all') return onChange({ types: ALL_TYPES })
@@ -170,7 +171,7 @@ export function FilterFields({ filters, onChange }: Pick<Props, 'filters' | 'onC
 
   const toggleSensor = (s: Sensor) => {
     const next = filters.sensors.includes(s) ? filters.sensors.filter((x) => x !== s) : [...filters.sensors, s]
-    if (next.some((x) => sensorAvailable(x, filters.year))) onChange({ sensors: next })
+    if (next.some((x) => sensorAvailableIn(x, years))) onChange({ sensors: next })
   }
 
   const toggleNoise = () => {
@@ -222,7 +223,8 @@ export function FilterFields({ filters, onChange }: Pick<Props, 'filters' | 'onC
         </span>
         <div className="flex items-center gap-4">
           {ALL_SENSORS.map((s) => {
-            const available = sensorAvailable(s, filters.year)
+            const available = sensorAvailableIn(s, years)
+            const partial = available && !years.every((y) => sensorAvailable(s, y))
             const checked = available && filters.sensors.includes(s)
             const isLast = checked && sensors.length === 1
             const meta = SENSORS[s]
@@ -230,7 +232,9 @@ export function FilterFields({ filters, onChange }: Pick<Props, 'filters' | 'onC
               ? `${s} has data for ${meta.from}–${meta.to} only`
               : isLast
                 ? 'At least one sensor must stay selected'
-                : `${s} · ${meta.pixel} pixels`
+                : partial
+                  ? `${s} has data for ${meta.from}–${meta.to}; the other year uses the rest`
+                  : `${s} · ${meta.pixel} pixels`
             return (
               <label
                 key={s}
@@ -359,7 +363,7 @@ export function FilterControls({
         <YearFields filters={filters} onChange={onChange} compare={compare} onCompareChange={onCompareChange} stacked />
       )}
       <Separator />
-      <FilterFields filters={filters} onChange={onChange} />
+      <FilterFields filters={filters} onChange={onChange} compare={compare} />
       <CsvButton onDownload={onDownload} downloading={downloading} compare={compare} className="h-11 w-full lg:h-9" />
       {/* Touch has no hover tooltip, so the reason for the disabled button is written out. */}
       {compare !== null && <p className="text-xs text-muted-foreground">CSV export works on one year. Turn compare off first.</p>}
@@ -402,7 +406,7 @@ function BarControls({
           </Button>
         </PopoverTrigger>
         <PopoverContent align="end" sideOffset={8} className={cn('w-72 gap-3 p-3', OVERLAY_Z)}>
-          <FilterFields filters={filters} onChange={onChange} />
+          <FilterFields filters={filters} onChange={onChange} compare={compare} />
         </PopoverContent>
       </Popover>
       <CsvButton onDownload={onDownload} downloading={downloading} compare={compare} />

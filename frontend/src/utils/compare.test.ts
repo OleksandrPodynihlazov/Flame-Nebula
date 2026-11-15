@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_FILTERS, YEARS } from '../constants/fire'
 import { defaultCompareYears, filtersForYear, formatMW, formatPct, pctChange, peakIndex } from './compare'
+import { selectionQuery } from './filters'
+import type { Filters } from '../types/api'
 
 describe('defaultCompareYears', () => {
   it('compares the year with the latest one', () => {
@@ -65,5 +67,13 @@ describe('peakIndex', () => {
 
   it('has no peak when everything is zero', () => {
     expect(peakIndex([0, 0])).toBeNull()
+  })
+})
+
+describe('compare sides with VIIRS checked', () => {
+  it('asks year B (2012+) for MODIS and VIIRS, and year A (before 2012) for MODIS only', () => {
+    const f = { ...DEFAULT_FILTERS, year: 2008, sensors: ['MODIS', 'VIIRS'] as Filters['sensors'] }
+    expect(selectionQuery(filtersForYear(f, 2020)).sensor).toBe('MODIS,VIIRS')
+    expect(selectionQuery(filtersForYear(f, 2008)).sensor).toBe('MODIS')
   })
 })

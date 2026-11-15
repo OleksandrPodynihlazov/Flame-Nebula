@@ -1,3 +1,4 @@
+import type { CompareYears } from '../constants/compare'
 import { ALL_TYPES, DEFAULT_FILTERS, FIRE_TYPES, MONTHS, MONTHS_FULL, SENSORS } from '../constants/fire'
 import type { ApiQuery, FireType, Filters, Month, Sensor } from '../types/api'
 
@@ -17,6 +18,15 @@ export function activeTypes(f: Filters): FireType[] {
 
 export function sensorAvailable(s: Sensor, year: number): boolean {
   return year >= SENSORS[s].from && year <= SENSORS[s].to
+}
+
+/** Years the filters apply to: both sides in compare mode, otherwise the single year. */
+export function sensorYears(f: Filters, compare: CompareYears | null): number[] {
+  return compare ? [compare.a, compare.b] : [f.year]
+}
+
+export function sensorAvailableIn(s: Sensor, years: readonly number[]): boolean {
+  return years.some((y) => sensorAvailable(s, y))
 }
 
 export function activeSensors(f: Filters): Sensor[] {
