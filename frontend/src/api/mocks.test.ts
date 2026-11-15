@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { Region } from '../types/api'
 import { inGeometry } from '../utils/area'
-import { matchRegions, mockHotspots, mockRegion, mockSearchRegions, mockStats, parseMockFail } from './mocks'
+import { HttpError, isTooManyInView } from './errors'
+import { checkBboxCap, matchRegions, mockHotspots, mockRegion, mockSearchRegions, mockStats, parseMockFail } from './mocks'
 
 const region = (id: number, name: string): Region => ({ id, name, level: 2, country: 'ITA', parent_id: null, path: '' })
 const REGIONS = [region(1, 'Toscana'), region(2, 'Sicilia'), region(3, 'Basilicata'), region(4, 'Sardegna'), region(5, 'Trentino-Alto Adige')]
@@ -81,5 +82,27 @@ describe('parseMockFail', () => {
     expect(parseMockFail(undefined).size).toBe(0)
     expect(parseMockFail('').size).toBe(0)
     expect(parseMockFail(' , ').size).toBe(0)
+  })
+})
+
+describe('checkBboxCap', () => {
+  it('passes up to the cap and rejects above it with the contract 400', () => {
+    expect(() => checkBboxCap(50, 50)).not.toThrow()
+    let caught: unknown
+    try {
+      checkBboxCap(51, 50)
+    } catch (err) {
+      caught = err
+    }
+    expect(caught).toBeInstanceOf(HttpError)
+    expect((caught as HttpError).status).toBe(400)
+    expect((caught as HttpError).message).toBe('Too many hotspots in view (more than 50). Zoom in.')
+    expect(isTooManyInView(caught)).toBe(true)
+  })
+
+  it('mockHotspots with a bbox answers while under the default cap of 20000', async () => {
+    const { features } = await mockHotspots({ from: '2008-01-01', to: '2008-12-31', sensor: 'MODIS', bbox: '6,36,19,48' })
+    expect(features.length).toBeGreaterThan(0)
+    expect(features.length).toBeLessThanOrEqual(20000)
   })
 })

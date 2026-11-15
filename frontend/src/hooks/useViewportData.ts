@@ -2,20 +2,26 @@ import type L from 'leaflet'
 import { useCallback, useEffect, useState } from 'react'
 import { useMap } from 'react-leaflet'
 import { fetchGrid, fetchHotspots } from '../api/client'
+import { isTooManyInView } from '../api/errors'
 import type { ApiQuery, GridCell, HotspotFeature } from '../types/api'
-import { viewFor, type View } from '../utils/viewport'
+import { fallbackCell, viewFor, type View } from '../utils/viewport'
 import { useDebouncedValue } from './useDebouncedValue'
 
 /** Wait this long after the map stops moving before asking the API. */
 export const VIEW_DEBOUNCE_MS = 300
 
-export type MapData = { kind: 'grid'; cell: number; cells: GridCell[] } | { kind: 'points'; features: HotspotFeature[] }
+export type MapData =
+  /** `fallback`: single points were wanted but the view holds too many, so these are grid cells. */
+  | { kind: 'grid'; cell: number; cells: GridCell[]; fallback?: true }
+  | { kind: 'points'; features: HotspotFeature[] }
 
 export interface ViewportData {
   /** What to draw; null = nothing (first load, filters changed, failed request). */
   data: MapData | null
   loading: boolean
   error: string | null
+  /** True while grid cells stand in for single points because the view holds too many. */
+  fallback: boolean
   /** Asks again for the same view and query, e.g. after an error. */
   reload: () => void
 }
@@ -34,7 +40,15 @@ function currentView(map: L.Map): View | null {
 
 function load(q: ApiQuery, view: View, signal: AbortSignal): Promise<MapData> {
   if (view.cell === null) {
-    return fetchHotspots({ ...q, bbox: view.bbox }, signal).then((fc) => ({ kind: 'points', features: fc.features }))
+    return fetchHotspots({ ...q, bbox: view.bbox }, signal)
+      .then((fc): MapData => ({ kind: 'points', features: fc.features }))
+      .catch((err: unknown) => {
+        if (signal.aborted || !isTooManyInView(err)) throw err
+        const cell = fallbackCell(view.bbox, view.zoom)
+        return fetchGrid({ ...q, bbox: view.bbox, cell }, signal).then(
+          (g): MapData => ({ kind: 'grid', cell, cells: g.cells, fallback: true }),
+        )
+      })
   }
   const cell = view.cell
   return fetchGrid({ ...q, bbox: view.bbox, cell }, signal).then((g) => ({ kind: 'grid', cell, cells: g.cells }))
@@ -98,9 +112,15 @@ export function useViewportData(query: ApiQuery): ViewportData {
     return () => ctrl.abort()
   }, [requestQueryKey, view, nonce])
 
-  if (view === null) return { data: null, loading: false, error: null, reload }
+  if (view === null) return { data: null, loading: false, error: null, fallback: false, reload }
   const loading = settled?.key !== key
   // Old data stays only while the same query loads a new view (pan / zoom); never across filters.
   const data = settled?.queryKey === queryKey ? settled.data : null
-  return { data, loading, error: loading ? null : (settled?.error ?? null), reload }
+  return {
+    data,
+    loading,
+    error: loading ? null : (settled?.error ?? null),
+    fallback: data?.kind === 'grid' && data.fallback === true,
+    reload,
+  }
 }

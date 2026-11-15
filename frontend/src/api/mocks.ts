@@ -18,6 +18,7 @@ import type {
   Sensor,
   StatsResponse,
 } from '../types/api'
+import { HttpError, TOO_MANY_IN_VIEW_PREFIX } from './errors'
 import { SENSORS } from '../constants/fire'
 import { haversineKm, inGeometry, inPolygon } from '../utils/area'
 import { summarizeFeatures } from '../utils/selectionSummary'
@@ -39,6 +40,15 @@ export function parseMockFail(raw: string | undefined): Set<string> {
 }
 
 // VITE_MOCK_FAIL only on the dev server, so a production build never fails on purpose.
+const DEFAULT_MOCK_BBOX_CAP = 20000
+// VITE_MOCK_BBOX_CAP only on the dev server, like the other VITE_MOCK_* vars; a small cap (e.g. 50) tests the dense-view fallback.
+const MOCK_BBOX_CAP = (import.meta.env.DEV ? envCount(import.meta.env.VITE_MOCK_BBOX_CAP) : null) ?? DEFAULT_MOCK_BBOX_CAP
+
+/** Like the API's `HOTSPOTS_BBOX_MAX_ROWS`: more points in a map view than `cap` → 400 (docs/contracts.md). */
+export function checkBboxCap(count: number, cap: number): void {
+  if (count > cap) throw new HttpError(400, `${TOO_MANY_IN_VIEW_PREFIX} (more than ${cap}). Zoom in.`)
+}
+
 const MOCK_FAIL = import.meta.env.DEV ? parseMockFail(import.meta.env.VITE_MOCK_FAIL) : new Set<string>()
 const MONTH_WEIGHTS = [3, 3, 4, 5, 5, 8, 16, 22, 12, 9, 7, 6]
 const TYPE_WEIGHTS: [FireType, number][] = [[0, 967], [1, 1], [2, 30], [3, 2]]
@@ -235,7 +245,15 @@ export function mockRegion(id: number): Promise<RegionFeature> {
 }
 
 export function mockHotspots(q: ApiQuery): Promise<HotspotCollection> {
-  return delay({ type: 'FeatureCollection', features: filter(q) }, 'hotspots')
+  const features = filter(q)
+  if (q.bbox) {
+    try {
+      checkBboxCap(features.length, MOCK_BBOX_CAP)
+    } catch (err) {
+      return Promise.reject(err)
+    }
+  }
+  return delay({ type: 'FeatureCollection', features }, 'hotspots')
 }
 
 /** Same grouping as the API: floor(lat / cell), floor(lon / cell); type = most common, lowest on a tie. */
