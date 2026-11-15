@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_FILTERS } from '../constants/fire'
-import { clearedFilters, countChangedFilters, filterSummary, toggleDatePatch, toggleMonthPatch, yearPatch } from './filters'
+import { clearedFilters, countChangedFilters, filterSummary, sensorAvailableIn, sensorYears, toggleDatePatch, toggleMonthPatch, yearPatch } from './filters'
 
 describe('toggleMonthPatch', () => {
   it('selects a month and clears the day', () => {
@@ -80,5 +80,21 @@ describe('filterSummary', () => {
   it('names a region and non-default sensors', () => {
     const area = { kind: 'region' as const, id: 9, name: 'Sardegna', path: '', geometry: { type: 'Polygon' as const, coordinates: [] } }
     expect(filterSummary({ ...DEFAULT_FILTERS, year: 2020, sensors: ['VIIRS'], hideNoise: true, area })).toBe('Full year 2020 · Noise hidden · VIIRS · Sardegna')
+  })
+})
+
+describe('sensorAvailableIn', () => {
+  it('single year 2008: VIIRS unavailable', () => {
+    expect(sensorAvailableIn('VIIRS', sensorYears(DEFAULT_FILTERS, null))).toBe(false)
+  })
+
+  it('compare 2008 vs 2020: VIIRS available', () => {
+    expect(sensorAvailableIn('VIIRS', sensorYears(DEFAULT_FILTERS, { a: 2008, b: 2020 }))).toBe(true)
+  })
+
+  it('compare 2005 vs 2008: VIIRS unavailable, MODIS available', () => {
+    const years = sensorYears(DEFAULT_FILTERS, { a: 2005, b: 2008 })
+    expect(sensorAvailableIn('VIIRS', years)).toBe(false)
+    expect(sensorAvailableIn('MODIS', years)).toBe(true)
   })
 })
