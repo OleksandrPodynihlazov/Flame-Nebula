@@ -9,9 +9,32 @@ export function bubbleShare(count: number, maxCount: number): number {
   return Math.sqrt(Math.min(1, Math.max(0, count) / maxCount))
 }
 
-/** Bubble radius in px: grows with √count, clamped to 10–32, and to `max` when that is smaller (never under 10). */
-export function bubbleRadius(count: number, max = 32): number {
-  return Math.max(10, Math.min(32, max, 8 + Math.sqrt(Math.max(0, count))))
+/** Smallest bubble radius in px that still holds a readable count: bigger on touch screens, where fingers and thumbs-size text rule. */
+export function minBubbleRadius(mobile: boolean): number {
+  return mobile ? 12 : 11
+}
+
+/**
+ * Bubble radius in px: grows with √count, clamped to 32 and to `max` when that is smaller, but never under `floor`.
+ * The floor wins over `max`: neighbours may overlap, bubbles stay at their real positions.
+ */
+export function bubbleRadius(count: number, max = 32, floor = 10): number {
+  return Math.max(floor, Math.min(32, max, 8 + Math.sqrt(Math.max(0, count))))
+}
+
+/** Glyph advance of the monospace label font, in em. */
+const MONO_GLYPH_EM = 0.6
+/** Free space kept between the text and the circle edge, per side. */
+const LABEL_PADDING = 2
+
+/** Label font size in px: 12 for 1–2 chars, 11 for 3, 10 for 4+, shrunk (down to 9) until the text fits inside a circle of radius `r`. */
+export function labelFontSize(text: string, r: number): number {
+  const widest = text.length <= 2 ? 12 : text.length === 3 ? 11 : 10
+  const room = 2 * r - 2 * LABEL_PADDING
+  for (let size = widest; size > 9; size--) {
+    if (text.length * MONO_GLYPH_EM * size <= room) return size
+  }
+  return 9
 }
 
 /** Biggest first, so smaller bubbles (and their numbers) are painted on top. Returns a new array. */
