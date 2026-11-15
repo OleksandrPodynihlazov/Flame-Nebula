@@ -1,5 +1,5 @@
 import { pool } from "../db.js";
-import { hotspotsSource } from "../lib/confidence.js";
+import { confidenceJoin, hotspotsSource } from "../lib/confidence.js";
 import {
   DEFAULT_BBOX_MAX_ROWS,
   DEFAULT_MAX_ROWS,
@@ -17,11 +17,14 @@ const CAPS = {
 };
 
 // Field names and types follow docs/contracts.md [1] (what the frontend expects),
-// not the DB schema [2]: instrument → sensor, acq_time 105 → "0105", confidence '76' → 76.
+// not the DB schema [2]: instrument → sensor, acq_time 105 → "0105".
+// Rows come from the harmonization view hotspots_canonical (db/init/hotspots-views.sql), which already
+// reduces both sensors to one form: confidence_level low/nominal/high for MODIS and VIIRS, confidence_pct =
+// raw MODIS 0-100 (VIIRS has none). Aliased as `hotspots` so the shared WHERE builder keeps working.
 // brightness, scan, track and version are not part of the contract, so they are not selected.
-// confidence_*: from hotspot_confidence (contract [1b]); null when the point is not scored, or when the DB
-// has no hotspots_with_confidence view yet (lib/confidence.js).
-const SELECT_HOTSPOTS = `
+// confidence_score / _class / _reasons, worldview_url: fire confidence (contract [1b]), joined in by
+// confidenceJoin() (lib/confidence.js); null when the point is not scored or the DB has no confidence table.
+export const SELECT_HOTSPOTS = `
   SELECT id,
          latitude,
          longitude,
@@ -31,13 +34,14 @@ const SELECT_HOTSPOTS = `
          satellite,
          daynight,
          frp,
-         CASE WHEN confidence ~ '^[0-9]+$' THEN confidence::int END AS confidence,
-         type`;
-const CONFIDENCE_COLUMNS = {
-  true: "confidence_score, confidence_class, confidence_reasons, worldview_url",
-  false: "NULL::smallint AS confidence_score, NULL::text AS confidence_class, NULL::text AS confidence_reasons, " +
-    "NULL::text AS worldview_url",
-};
+         confidence_pct AS confidence,
+         confidence_level,
+         type,
+         confidence_score,
+         confidence_class,
+         confidence_reasons,
+         worldview_url
+    FROM hotspots_canonical AS hotspots`;
 
 async function queryHotspots(filters) {
   const source = await hotspotsSource(pool);
@@ -45,8 +49,7 @@ async function queryHotspots(filters) {
   const { cap, message } = rowCapFor(filters, CAPS);
   // Fetch one row past the cap to tell "exactly at the cap" from "over it"; never truncate silently.
   const { rows } = await pool.query(
-    `${SELECT_HOTSPOTS}, ${CONFIDENCE_COLUMNS[source.confidence]} FROM ${source.from} ${where} ` +
-      `ORDER BY acq_date, acq_time, id LIMIT $${params.length + 1}`,
+    `${SELECT_HOTSPOTS} ${confidenceJoin(source)} ${where} ORDER BY acq_date, acq_time, id LIMIT $${params.length + 1}`,
     [...params, cap + 1]
   );
   if (rows.length > cap) throw httpError(message);
@@ -68,7 +71,8 @@ export async function getHotspots(filters) {
 }
 
 // GET /api/hotspots.csv → the same rows as CSV (columns from docs/contracts.md [1]).
-const CSV_COLUMNS = ["id", "latitude", "longitude", "acq_date", "acq_time", "sensor", "satellite", "daynight", "frp", "confidence", "type"];
+export const CSV_COLUMNS = ["id", "latitude", "longitude", "acq_date", "acq_time", "sensor", "satellite", "daynight", "frp",
+  "confidence", "confidence_level", "type"];
 
 function csvCell(value) {
   if (value === null || value === undefined) return "";

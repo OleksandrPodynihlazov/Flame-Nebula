@@ -1,5 +1,20 @@
+import { patternColor } from '../utils/patterns'
 import { ALL_TYPES, FIRE_TYPES, SENSORS, UNCLASSIFIED } from '../constants/fire'
 import type { Sensor } from '../types/api'
+
+function PatternLegendList() {
+  return (
+    <div className="space-y-2 text-[11px] text-slate-300">
+      <div className="h-2.5 w-44 rounded-full" style={{ background: `linear-gradient(90deg, ${patternColor(0)}, ${patternColor(0.5)}, ${patternColor(1)})` }} />
+      <div className="flex w-44 justify-between font-mono text-[10px] text-slate-400">
+        <span>12/14</span>
+        <span>13/14</span>
+        <span>14/14</span>
+      </div>
+      <p className="max-w-44 text-slate-400">Years this 0.1° cell burned in the month (S-NPP, 2012–2025). Only cells that burned in at least 12 years are shown.</p>
+    </div>
+  )
+}
 
 function LegendList({ sensors }: { sensors: Sensor[] }) {
   return (
@@ -41,7 +56,14 @@ function LegendList({ sensors }: { sensors: Sensor[] }) {
   )
 }
 
-export function MapLegend({ open, onToggle, sensors }: { open: boolean; onToggle: () => void; sensors: Sensor[] }) {
+interface LegendProps {
+  open: boolean
+  onToggle: () => void
+  sensors: Sensor[]
+  patterns?: boolean
+}
+
+export function MapLegend({ open, onToggle, sensors, patterns = false }: LegendProps) {
   return (
     <div className="absolute bottom-5 left-3 z-20 max-w-[240px] overflow-hidden rounded-xl border border-slate-700/80 bg-slate-900/90 shadow-xl backdrop-blur-md">
       <button
@@ -50,19 +72,19 @@ export function MapLegend({ open, onToggle, sensors }: { open: boolean; onToggle
         aria-expanded={open}
         className="flex w-full items-center justify-between gap-4 px-3 py-2 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-800/60"
       >
-        FIRMS hotspot types
+        {patterns ? 'Recurring fire' : 'FIRMS hotspot types'}
         <span className="text-[10px] text-slate-400">{open ? '▼' : '▲'}</span>
       </button>
       {open && (
         <div className="border-t border-slate-800/80 px-3 pt-1 pb-2.5">
-          <LegendList sensors={sensors} />
+          {patterns ? <PatternLegendList /> : <LegendList sensors={sensors} />}
         </div>
       )}
     </div>
   )
 }
 
-export function SideLegend({ open, onToggle, sensors }: { open: boolean; onToggle: () => void; sensors: Sensor[] }) {
+export function SideLegend({ open, onToggle, sensors, patterns = false }: LegendProps) {
   return (
     <div
       className={`absolute top-1/2 left-0 z-[1000] flex -translate-y-1/2 items-center transition-transform duration-200 ${
@@ -70,8 +92,8 @@ export function SideLegend({ open, onToggle, sensors }: { open: boolean; onToggl
       }`}
     >
       <div className="rounded-r-xl border border-l-0 border-slate-700/80 bg-slate-900/90 px-3 py-2.5 shadow-xl backdrop-blur-md">
-        <p className="mb-2 text-[11px] font-semibold text-slate-200">FIRMS hotspot types</p>
-        <LegendList sensors={sensors} />
+        <p className="mb-2 text-[11px] font-semibold text-slate-200">{patterns ? 'Recurring fire' : 'FIRMS hotspot types'}</p>
+        {patterns ? <PatternLegendList /> : <LegendList sensors={sensors} />}
       </div>
       <button
         type="button"

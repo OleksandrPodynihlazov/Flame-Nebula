@@ -28,6 +28,27 @@ export function resetSourceCache() {
   checkedAt = 0;
 }
 
+// /api/hotspots reads the harmonization view hotspots_canonical (db/init/hotspots-views.sql), which is dropped
+// and recreated on every deploy, so no view may be built on it. The confidence columns are joined in the query
+// instead. Same natural key as hotspots_with_confidence (db/init/views-init.sql); keep the two in sync.
+// The key columns are renamed inside the subquery, so the unqualified names in buildWhere (latitude, acq_date...)
+// and ORDER BY stay unambiguous; `hotspots.` keeps pointing at the main source.
+const CONFIDENCE_JOIN = `
+  LEFT JOIN (SELECT satellite AS conf_satellite, acq_date AS conf_acq_date, acq_time AS conf_acq_time,
+                    latitude AS conf_latitude, longitude AS conf_longitude,
+                    score AS confidence_score, class AS confidence_class, reasons AS confidence_reasons, worldview_url
+               FROM hotspot_confidence) AS conf
+         ON conf.conf_satellite = hotspots.satellite AND conf.conf_acq_date = hotspots.acq_date
+        AND conf.conf_acq_time = hotspots.acq_time AND conf.conf_latitude = hotspots.latitude
+        AND conf.conf_longitude = hotspots.longitude`;
+// No confidence table yet: the same 4 columns, all NULL, so the response shape never changes.
+const NO_CONFIDENCE_JOIN = `
+  LEFT JOIN (SELECT NULL::smallint AS confidence_score, NULL::text AS confidence_class,
+                    NULL::text AS confidence_reasons, NULL::text AS worldview_url) AS conf ON false`;
+
+// JOIN clause adding confidence_score / _class / _reasons / worldview_url to a source aliased `hotspots`.
+export const confidenceJoin = (source) => (source.confidence ? CONFIDENCE_JOIN : NO_CONFIDENCE_JOIN);
+
 // SQL condition hiding non-fire points. A point without a score (NULL class) is kept.
 export const NOT_NON_FIRE = "(confidence_class IS NULL OR NOT starts_with(confidence_class, 'non_fire'))";
 

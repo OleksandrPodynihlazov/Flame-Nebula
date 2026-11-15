@@ -12,13 +12,27 @@ services:
     image: postgres:17-alpine
     restart: unless-stopped
     logging: *logging
+    # Defaults (128MB shared_buffers, 4MB work_mem) push a 2+ GB DB to disk; sized for the 8 GB VPS, override in .env.
+    # The official entrypoint still runs db/init on an empty volume when the command starts with "postgres".
+    command:
+      - postgres
+      - -c
+      - shared_buffers=${PG_SHARED_BUFFERS:-1GB}
+      - -c
+      - work_mem=${PG_WORK_MEM:-16MB}
+      - -c
+      - effective_cache_size=${PG_EFFECTIVE_CACHE_SIZE:-3GB}
+      - -c
+      - maintenance_work_mem=${PG_MAINTENANCE_WORK_MEM:-256MB}
+    # Parallel queries use /dev/shm; Docker's 64 MB default fails with "could not resize shared memory segment".
+    shm_size: 512mb
     environment:
       POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
     volumes:
       - pgdata:/var/lib/postgresql/data
-      # Runs only on first start of an EMPTY volume (CI, new laptops). An existing DB needs the change applied by hand.
+      # Postgres runs these only on an EMPTY volume; infra/apply-db-schema.sh re-applies them on every deploy.
       - ./db/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]

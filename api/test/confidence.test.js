@@ -4,6 +4,7 @@ import {
   NOT_NON_FIRE, PLAIN, WITH_CONFIDENCE, byClass, hotspotsSource, isNonFire, resetSourceCache,
 } from "../lib/confidence.js";
 import { buildGridQuery, buildWhere, parseFilters } from "../lib/query.js";
+import { buildSummaryQuery } from "../lib/summary.js";
 
 const bad = (query, re) =>
   assert.throws(() => parseFilters(query), (e) => e.status === 400 && re.test(e.message));
@@ -42,6 +43,17 @@ test("grid reads the source it is given, with the same non_fire rule", () => {
   const scored = buildGridQuery(f, 1, WITH_CONFIDENCE);
   assert.match(scored.text, /FROM hotspots_with_confidence AS hotspots/);
   assert.ok(scored.text.includes(NOT_NON_FIRE));
+});
+
+test("selection summary reads the source it is given, with the same non_fire rule", () => {
+  const f = parseFilters({ from: "2008-01-01" });
+  const plain = buildSummaryQuery(f);
+  assert.match(plain.text, /FROM hotspots\s/);
+  assert.ok(!plain.text.includes(NOT_NON_FIRE));
+  const scored = buildSummaryQuery(f, WITH_CONFIDENCE);
+  assert.match(scored.text, /FROM hotspots_with_confidence AS hotspots/);
+  assert.ok(scored.text.includes(NOT_NON_FIRE));
+  assert.ok(!buildSummaryQuery(parseFilters({ include_non_fire: "true" }), WITH_CONFIDENCE).text.includes(NOT_NON_FIRE));
 });
 
 test("hotspotsSource: view present -> view, missing -> plain hotspots; re-checked after 30 s", async () => {

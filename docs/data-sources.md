@@ -45,10 +45,16 @@ Expect `total: 131700 inserted …; 0 file(s) failed` (all MODIS Italy, ~9 s). A
 (`git checkout` leaves ignored files alone), and so does the `pgdata` volume. Loading is a one-time manual step, not part of
 `infra/deploy.sh`. Because it is idempotent, adding it to the deploy would also be safe.
 
-**When the schema changes** (e.g. `type` becomes nullable, a column is added):
-- Editing `db/init/hotspots-init.sql` does **not** change an existing database. Postgres runs init scripts only on an empty
-  volume, and `--create-table` skips an existing table. Apply the change explicitly, once per DB (laptop, VPS), as an
-  idempotent statement, e.g. `ALTER TABLE hotspots ALTER COLUMN type DROP NOT NULL;` or `ADD COLUMN IF NOT EXISTS …`.
+**When the schema changes** (e.g. `type` becomes nullable, a column is added, a view or index is added):
+- Postgres runs `db/init/*.sql` only on an empty volume, and `--create-table` skips an existing table. So every deploy
+  runs `infra/apply-db-schema.sh`, which applies **all** `db/init/*.sql` in alphabetical order (one transaction per file,
+  `ON_ERROR_STOP`) before the new API starts. A failing file stops the deploy. CI applies them a second time to prove it.
+- So write the change **into `db/init/*.sql`, idempotently**: `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS
+  <explicit name>` (an unnamed index gets a new name on every run = a duplicate index), `ADD COLUMN IF NOT EXISTS`,
+  `ALTER COLUMN … DROP NOT NULL`, `CREATE OR REPLACE VIEW` (or `DROP VIEW IF EXISTS` + `CREATE VIEW` when columns move).
+  Never `DROP TABLE`, `TRUNCATE`, `DELETE` or `ALTER … DROP` there: it would run against the live data on every deploy.
+- A big new index on a big table (the VPS has millions of rows) locks writes while it builds, during the deploy.
+- On a laptop: `bash infra/apply-db-schema.sh` does the same as the deploy.
 - Or rebuild, since the data is fully reproducible from `data/raw` in seconds:
   `docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "DROP TABLE hotspots CASCADE"'`
   (CASCADE also drops the harmonization views), then the load command above and the *Harmonize* commands below.
@@ -121,6 +127,7 @@ After loading MODIS **and** S-NPP (`--sensor viirs-snpp --years 2012-2025` in th
 Each step rebuilds its own tables/views from scratch, so re-running is safe. Total ~20 s.
 
 ```sh
+python3 harmonize/canonical.py       # view hotspots_canonical: confidence_level / platform for both sensors
 python3 harmonize/coverage_table.py   # coverage: satellite × day ok/partial/missing (known gaps, research/07 §6)
 python3 harmonize/static_mask.py      # static_mask + view hotspots_flagged
 python3 harmonize/calibrate.py        # calibration + views calibration_chain, harmonized_monthly; prints the factors
@@ -145,11 +152,9 @@ Per-hotspot score, class and evidence (contract [1b]); the API serves them and h
 (contract [3], `include_non_fire`). Computed **offline** on a laptop (downloads land cover, burned area, EFFIS, Landsat);
 the server only needs the finished CSV and the load step.
 
-1. Once per DB that existed before the confidence view (laptop, VPS; a fresh volume gets it from `db/init/`):
-   ```sh
-   docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < db/init/views-init.sql
-   ```
-   Idempotent. Without it the API still works: the confidence fields are `null` and nothing is hidden.
+1. Table `hotspot_confidence` and view `hotspots_with_confidence` come from `db/init/views-init.sql`, which every deploy
+   applies (`infra/apply-db-schema.sh`). On a laptop with an older DB run `bash infra/apply-db-schema.sh` once. Without
+   them the API still works: the confidence fields are `null` and nothing is hidden.
 2. On a laptop, after the country's raw points are in `hotspots`: `python3 harmonize/confidence/run.py run --countries Italy`
    (needs `pip install -r harmonize/requirements.txt`; L7 needs `EARTHDATA_TOKEN`, else it is `n/a`).
 3. Load (copy `data/processed/confidence/<Country>/hotspot_confidence.csv` to the server first):

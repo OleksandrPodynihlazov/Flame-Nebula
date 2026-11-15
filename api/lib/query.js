@@ -252,6 +252,14 @@ export function buildWhere(f, { confidence = false, hideNonFire = true } = {}) {
   }
 
   if (f.polygon) {
+    // Bounding box of the vertices first, inclusive, so a point on the outline is never dropped. It lets the
+    // planner use the (latitude, longitude) btree, also where the point GiST index is missing.
+    const lons = f.polygon.map(([x]) => x);
+    const lats = f.polygon.map(([, y]) => y);
+    conds.push(
+      `latitude BETWEEN ${add(Math.min(...lats))} AND ${add(Math.max(...lats))}` +
+        ` AND longitude BETWEEN ${add(Math.min(...lons))} AND ${add(Math.max(...lons))}`
+    );
     const text = "(" + f.polygon.map(([x, y]) => `(${x},${y})`).join(",") + ")";
     conds.push(`point(longitude, latitude) <@ ${add(text)}::polygon`);
   }

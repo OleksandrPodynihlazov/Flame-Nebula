@@ -10,7 +10,7 @@ echo "VITE_USE_MOCKS=true" > .env.local
 npm run dev
 ```
 
-`VITE_USE_MOCKS=true` serves `src/api/mocks.ts` instead of the API. Without it, `/api` is proxied to `http://localhost:3000`. Restart `npm run dev` after changing `.env.local`.
+`VITE_USE_MOCKS=true` serves `src/api/mocks.ts` instead of the API. Without it, `/api` is proxied to `API_PROXY_TARGET` (default `http://localhost:3000`; set `http://localhost:8090` to use the `docker compose` stack through the gateway). Restart `npm run dev` after changing `.env.local`.
 
 `npm run build` and `npm run lint` must pass before a PR.
 

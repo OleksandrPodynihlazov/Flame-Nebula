@@ -30,7 +30,7 @@ No API or contract change.
 
 ## Selection card
 
-Computed in the browser from the `/api/hotspots` features already loaded for the map (one pure function, `utils/selectionSummary.ts`, so the API can take it over later).
+Numbers from `GET /api/selection-summary` (contracts.md [3]), aggregated in SQL; the browser adds only the area (`utils/selectionSummary.ts`). Hidden in compare mode, and not requested there.
 
 | Field | Rule |
 |---|---|
@@ -42,7 +42,7 @@ Computed in the browser from the `/api/hotspots` features already loaded for the
 | FRP (MW) | sum, mean, max. Skip `null`. All null → `—` |
 | Peak | busiest month and busiest day. Tie → earliest |
 | First / last | earliest and latest `acq_date` |
-| Export | **CSV** (existing download, area included) · **GeoJSON** (dots + the shape as one `FeatureCollection`, made in the browser; circle exported as a 64-point polygon with `radius_km` in its properties) |
+| Export | **CSV** (existing download, area included) · **GeoJSON** (dots + the shape as one `FeatureCollection`, made in the browser; circle exported as a 64-point polygon with `radius_km` in its properties). The dots are fetched from `/api/hotspots` only on click (button shows `Preparing…`; an API error such as the row cap shows under the buttons) |
 
 Zero hotspots → card shows area and "No hotspots in this area" and hides the other rows. Exports stay enabled (empty file is valid).
 
@@ -70,7 +70,7 @@ Pin exact versions in `frontend/package.json`.
 
 ## Tests
 
-- Unit (pure functions): summary math — empty, all FRP null, ties, single point.
+- Unit (pure functions): summary math — empty, all FRP null, ties, single point. API: `api/test/summary.test.js`. Parity with the old per-dot summary: `frontend/src/utils/selectionSummary.parity.test.ts` and `e2e/tests/contract-api.spec.js` (summary vs the same area's `/api/hotspots` dots).
 - e2e (`e2e/tests/area-select.spec.js`): draw a rectangle (two clicks) on the map → card shows area > 0 → total hotspots on the stat card drops → Clear restores the full count. Runs against mocks (`VITE_USE_MOCKS=true` is the Dockerfile default, so mocks make no `/api` request). When the real API ships, add a check that `/api/hotspots` requests contain `polygon=`.
 
 ## Done when

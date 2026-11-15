@@ -1,9 +1,23 @@
-import type { ApiError, ApiQuery, CalendarResponse, GridResponse, HotspotCollection, StatsResponse } from '../types/api'
-import { mockCalendar, mockGrid, mockHotspots, mockStats } from './mocks'
+import type {
+  ApiError,
+  ApiQuery,
+  CalendarResponse,
+  GridResponse,
+  HotspotCollection,
+  PatternQuery,
+  PatternsResponse,
+  PatternSummaryResponse,
+  Region,
+  RegionFeature,
+  RegionsResponse,
+  SelectionSummaryResponse,
+  StatsResponse,
+} from '../types/api'
+import { mockCalendar, mockGrid, mockHotspots, mockPatternSummary, mockPatterns, mockSelectionSummary, mockStats } from './mocks'
 
 export const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true'
 
-export function toSearchParams(q: ApiQuery): URLSearchParams {
+export function toSearchParams(q: ApiQuery | PatternQuery): URLSearchParams {
   const p = new URLSearchParams()
   for (const [k, v] of Object.entries(q)) if (v !== undefined && v !== '') p.set(k, String(v))
   return p
@@ -19,10 +33,10 @@ async function errorMessage(res: Response): Promise<string> {
   return `HTTP ${res.status}`
 }
 
-async function getJson<T>(
+async function getJson<T, Q extends ApiQuery | PatternQuery = ApiQuery>(
   path: string,
-  q: ApiQuery,
-  mock: (q: ApiQuery) => Promise<T>,
+  q: Q,
+  mock: (q: Q) => Promise<T>,
   signal?: AbortSignal,
 ): Promise<T> {
   if (USE_MOCKS) return mock(q)
@@ -37,10 +51,37 @@ export const fetchHotspots = (q: ApiQuery, signal?: AbortSignal) =>
 export const fetchGrid = (q: ApiQuery, signal?: AbortSignal) =>
   getJson<GridResponse>('hotspots/grid', q, mockGrid, signal)
 
+export const fetchPatterns = (q: PatternQuery, signal?: AbortSignal) =>
+  getJson<PatternsResponse, PatternQuery>('patterns', q, mockPatterns, signal)
+
+export const fetchPatternSummary = (q: PatternQuery, signal?: AbortSignal) =>
+  getJson<PatternSummaryResponse, PatternQuery>('patterns/summary', q, mockPatternSummary, signal)
+
 export const fetchStats = (q: ApiQuery, signal?: AbortSignal) => getJson<StatsResponse>('stats', q, mockStats, signal)
 
 export const fetchCalendar = (q: ApiQuery, signal?: AbortSignal) =>
   getJson<CalendarResponse>('calendar', q, mockCalendar, signal)
+
+export const fetchSelectionSummary = (q: ApiQuery, signal?: AbortSignal) =>
+  getJson<SelectionSummaryResponse>('selection-summary', q, mockSelectionSummary, signal)
+
+/**
+ * `GET /api/regions?q=` — name search, 2–100 chars, prefix matches first, max 20.
+ * Mock mode has no regions, so it returns none.
+ */
+export async function searchRegions(q: string, signal?: AbortSignal): Promise<Region[]> {
+  if (USE_MOCKS) return []
+  const res = await fetch(`/api/regions?${new URLSearchParams({ q })}`, { signal })
+  if (!res.ok) throw new Error(await errorMessage(res))
+  return ((await res.json()) as RegionsResponse).regions
+}
+
+/** `GET /api/regions/:id` — the region with its simplified outline. */
+export async function fetchRegion(id: number, signal?: AbortSignal): Promise<RegionFeature> {
+  const res = await fetch(`/api/regions/${id}`, { signal })
+  if (!res.ok) throw new Error(await errorMessage(res))
+  return (await res.json()) as RegionFeature
+}
 
 export const csvUrl = (q: ApiQuery) => `/api/hotspots.csv?${toSearchParams(q)}`
 

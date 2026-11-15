@@ -4,6 +4,7 @@ import { useMap } from 'react-leaflet'
 import { fetchGrid, fetchHotspots } from '../api/client'
 import type { ApiQuery, GridCell, HotspotFeature } from '../types/api'
 import { viewFor, type View } from '../utils/viewport'
+import { useDebouncedValue } from './useDebouncedValue'
 
 /** Wait this long after the map stops moving before asking the API. */
 export const VIEW_DEBOUNCE_MS = 300
@@ -39,7 +40,8 @@ function load(q: ApiQuery, view: View, signal: AbortSignal): Promise<MapData> {
 
 /**
  * Hotspots for the visible map area only: grid cells below SINGLE_DOT_ZOOM, single points from it.
- * Asks again VIEW_DEBOUNCE_MS after the map stops; a newer view or query aborts the older request.
+ * Asks again VIEW_DEBOUNCE_MS after the map stops or the query last changed; a newer view or query aborts
+ * the older request.
  * Data from another query (other filters / area) is never returned, and a failed request returns
  * no data, so the map never shows old dots under a new label.
  */
@@ -67,22 +69,30 @@ export function useViewportData(query: ApiQuery): ViewportData {
 
   const queryKey = JSON.stringify(query)
   const key = JSON.stringify([queryKey, view])
+  // Filter changes wait like map moves do, so quick clicks (e.g. sensor on/off/on) load once.
+  const requestQueryKey = useDebouncedValue(queryKey, VIEW_DEBOUNCE_MS)
 
   useEffect(() => {
     if (view === null) return
+    const requestKey = JSON.stringify([requestQueryKey, view])
     const ctrl = new AbortController()
-    load(JSON.parse(queryKey) as ApiQuery, view, ctrl.signal)
+    load(JSON.parse(requestQueryKey) as ApiQuery, view, ctrl.signal)
       .then((data) => {
         // Mocks ignore the signal: a superseded answer must never replace a newer one.
-        if (!ctrl.signal.aborted) setSettled({ key, queryKey, data, error: null })
+        if (!ctrl.signal.aborted) setSettled({ key: requestKey, queryKey: requestQueryKey, data, error: null })
       })
       .catch((err: unknown) => {
         if (!ctrl.signal.aborted) {
-          setSettled({ key, queryKey, data: null, error: err instanceof Error ? err.message : String(err) })
+          setSettled({
+            key: requestKey,
+            queryKey: requestQueryKey,
+            data: null,
+            error: err instanceof Error ? err.message : String(err),
+          })
         }
       })
     return () => ctrl.abort()
-  }, [key, queryKey, view])
+  }, [requestQueryKey, view])
 
   if (view === null) return { data: null, loading: false, error: null }
   const loading = settled?.key !== key

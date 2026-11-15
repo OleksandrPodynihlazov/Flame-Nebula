@@ -1,8 +1,8 @@
+-- Must be safe to re-run: deploy applies every file on every deploy (infra/apply-db-schema.sh).
 -- Fire confidence next to every hotspot (docs/contracts.md [1b], [3]). Does not touch `hotspots`.
--- File name sorts after hotspots-init.sql and regions-init.sql: Postgres runs init scripts in name order,
--- and the view needs the `hotspots` table.
--- Idempotent: also safe to apply by hand on an existing DB (init scripts only run on an empty volume):
---   docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < db/init/views-init.sql
+-- File name sorts after hotspots-init.sql, hotspots-views.sql and regions-init.sql (files run in byte order),
+-- and the view needs the `hotspots` table. Not built on hotspots_canonical: that view is dropped and recreated
+-- on every deploy, which fails while another view depends on it (/api/hotspots joins confidence in the query).
 
 -- Same DDL as harmonize/confidence/sql/hotspot_confidence.sql (load_db.py applies that one if the table is
 -- missing). Keep the two identical.
@@ -25,9 +25,12 @@ CREATE TABLE IF NOT EXISTS hotspot_confidence (
 CREATE INDEX IF NOT EXISTS hotspot_confidence_class ON hotspot_confidence (class);
 
 -- Every hotspot, with its confidence when scored (NULLs when not). The API reads this view as
--- `hotspots_with_confidence AS hotspots`, so its SQL keeps using the `hotspots.` prefix.
+-- `hotspots_with_confidence AS hotspots` (stats, calendar, grid), so its SQL keeps using the `hotspots.` prefix.
 -- Join key = the loader's natural key (unique in both tables), so the join never duplicates a row.
-CREATE OR REPLACE VIEW hotspots_with_confidence AS
+-- DROP + CREATE, not CREATE OR REPLACE: `h.*` is expanded at creation, so a column added to `hotspots` would land
+-- in the middle of the column list, which OR REPLACE refuses. Nothing is built on this view, so DROP is safe.
+DROP VIEW IF EXISTS hotspots_with_confidence;
+CREATE VIEW hotspots_with_confidence AS
 SELECT h.*,
        c.score         AS confidence_score,
        c.class         AS confidence_class,
