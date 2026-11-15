@@ -12,11 +12,13 @@ import type {
   HotspotCollection,
   HotspotFeature,
   LonLat,
+  SelectionSummaryResponse,
   Sensor,
   StatsResponse,
 } from '../types/api'
 import { SENSORS } from '../constants/fire'
 import { haversineKm, inPolygon } from '../utils/area'
+import { summarizeFeatures } from '../utils/selectionSummary'
 
 /** Positive integer from an env value, else null. */
 function envCount(raw: string | undefined): number | null {
@@ -268,4 +270,9 @@ export function mockPatternSummary(q: PatternQuery): Promise<PatternSummaryRespo
     }
   })
   return delay({ months })
+}
+
+/** Same numbers as the API, computed from the filtered dots (the browser summary the endpoint replaced). */
+export function mockSelectionSummary(q: ApiQuery): Promise<SelectionSummaryResponse> {
+  return delay(summarizeFeatures(filter(q)))
 }

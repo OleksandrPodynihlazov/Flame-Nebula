@@ -14,13 +14,19 @@ Every merge to `main` runs the **Deploy** workflow (`.github/workflows/deploy.ym
 merge to main ─▶ Deploy workflow ─▶ ssh VPS ─▶ infra/deploy.sh <sha> ─▶ /api/health reports <sha> ─▶ smoke job   (e2e job runs in parallel)
 ```
 
-`infra/deploy.sh` checks out the commit, runs `docker compose up -d --build`, then `infra/sync-gateway.sh`, and waits up to 90 s for `/api/health` to return that commit's sha as `version`. If it never does, the job fails and saves container logs to `deploy-failure.log` in the repo dir on the VPS (CI output is public, so logs are not printed). The smoke job then checks the public URL.
+`infra/deploy.sh` checks out the commit, starts `db` and runs `infra/apply-db-schema.sh` (applies every `db/init/*.sql`, see below), runs `docker compose up -d --build`, then `infra/sync-gateway.sh`, and waits up to 90 s for `/api/health` to return that commit's sha as `version`. If it never does, the job fails and saves container logs to `deploy-failure.log` in the repo dir on the VPS (CI output is public, so logs are not printed). The smoke job then checks the public URL.
 
 `gateway.conf` and `htpasswd` are bind-mounted as single files. A checkout or edit replaces the file, but the running container keeps the old copy and `compose up` does not recreate it. `infra/sync-gateway.sh` compares checksums on the host and in the container, and force-recreates `gateway` if they differ. After changing `htpasswd` on the VPS by hand, run `bash infra/sync-gateway.sh`.
 
+**DB schema.** Postgres runs `db/init/*.sql` only when the `pgdata` volume is empty, so a live DB never picks up a new table, view or index by itself (this once left `/api/hotspots` returning 500 for three deploys). `infra/apply-db-schema.sh` therefore applies every `db/init/*.sql` on every deploy, in alphabetical order, one transaction per file, with `ON_ERROR_STOP`; it logs `==> db schema: applied <file>`. A failing file stops the deploy before the new API starts, and only psql's `ERROR:` line is printed (no row values: CI output is public). Every file must be safe to re-run: see `docs/data-sources.md`, *When the schema changes*. CI runs the script once more on its freshly initialised DB, so a file that is not re-runnable fails the PR.
+
+**Postgres memory.** The `db` service starts with `shared_buffers=1GB`, `work_mem=16MB`, `effective_cache_size=3GB`, `maintenance_work_mem=256MB` and `shm_size: 512mb` (parallel queries need more than Docker's 64 MB `/dev/shm`). Override with `PG_SHARED_BUFFERS`, `PG_WORK_MEM`, `PG_EFFECTIVE_CACHE_SIZE`, `PG_MAINTENANCE_WORK_MEM` in `.env`; a change restarts `db` on the next deploy.
+
+The API logs every 5xx as one JSON line, e.g. `{"level":"error","method":"GET","path":"/api/hotspots","status":500,"message":"relation \"hotspots_canonical\" does not exist","code":"42P01"}` (`code` = Postgres SQLSTATE or `null`). The response body stays `{"error":"internal error"}`.
+
 The e2e job starts alongside deploy: it installs Chromium, polls `/api/health` (up to 6 min) until it reports this commit's sha, then runs the Playwright suite in `e2e/` against the public URL. Its HTML report is a downloadable artifact on the Actions run.
 
-PRs into `main` run **CI** (`.github/workflows/ci.yml`): build the whole stack, wait for health, then run the e2e suite without `@prod` tests.
+PRs into `main` run **CI** (`.github/workflows/ci.yml`): build the whole stack, wait for health, re-apply `db/init/*.sql`, then run the e2e suite without `@prod` tests.
 
 Changes that touch only Markdown or `docs/` skip CI and Deploy.
 Frontend checks run only when `frontend/` changes.

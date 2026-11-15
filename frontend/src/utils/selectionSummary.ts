@@ -1,5 +1,5 @@
 import turfArea from '@turf/area'
-import type { Area, DayNight, FireType, HotspotFeature, Month } from '../types/api'
+import type { Area, DayNight, FireType, HotspotFeature, Month, SelectionSummaryResponse } from '../types/api'
 
 export interface SelectionSummary {
   areaKm2: number
@@ -35,54 +35,73 @@ export function formatAreaKm2(km2: number, locale?: string): string {
     : Math.round(km2).toLocaleString(locale)
 }
 
-export function selectionSummary(area: Area, features: readonly HotspotFeature[]): SelectionSummary {
-  const km2 = areaKm2(area)
-  const byType: Record<FireType, number> = { 0: 0, 1: 0, 2: 0, 3: 0 }
-  const byDaynight: Record<DayNight, number> = { D: 0, N: 0 }
-  const months = new Array<number>(12).fill(0)
+/**
+ * `GET /api/selection-summary` from already loaded dots: what mocks answer, with the API's rules
+ * (FRP over non-null values; busiest `YYYY-MM` month and day, ties to the earliest; no zero counts).
+ */
+export function summarizeFeatures(features: readonly HotspotFeature[]): SelectionSummaryResponse {
+  const res: SelectionSummaryResponse = {
+    total: features.length,
+    frp: null,
+    peak_month: null,
+    peak_day: null,
+    first: null,
+    last: null,
+    by_type: {},
+    by_daynight: {},
+  }
   const days = new Map<string, number>()
   let frpSum = 0
   let frpCount = 0
   let frpMax = -Infinity
-  let firstDate: string | null = null
-  let lastDate: string | null = null
 
   for (const { properties: p } of features) {
-    if (p.type !== null) byType[p.type]++
-    byDaynight[p.daynight]++
+    if (p.type !== null) res.by_type[`${p.type}`] = (res.by_type[`${p.type}`] ?? 0) + 1
+    res.by_daynight[p.daynight] = (res.by_daynight[p.daynight] ?? 0) + 1
     if (p.frp !== null) {
       frpSum += p.frp
       frpCount++
       frpMax = Math.max(frpMax, p.frp)
     }
-    const m = Number(p.acq_date.slice(5, 7)) - 1
-    if (isMonth(m)) months[m]++
     days.set(p.acq_date, (days.get(p.acq_date) ?? 0) + 1)
-    if (firstDate === null || p.acq_date < firstDate) firstDate = p.acq_date
-    if (lastDate === null || p.acq_date > lastDate) lastDate = p.acq_date
   }
+  if (frpCount > 0) res.frp = { sum: frpSum, mean: frpSum / frpCount, max: frpMax }
 
-  let peakMonth: SelectionSummary['peakMonth'] = null
-  months.forEach((count, m) => {
-    if (count > 0 && isMonth(m) && (peakMonth === null || count > peakMonth.count)) peakMonth = { month: m, count }
-  })
-
-  let peakDay: SelectionSummary['peakDay'] = null
-  for (const date of [...days.keys()].sort()) {
+  const months = new Map<string, number>()
+  const sorted = [...days.keys()].sort()
+  for (const date of sorted) {
     const count = days.get(date) ?? 0
-    if (peakDay === null || count > peakDay.count) peakDay = { date, count }
+    months.set(date.slice(0, 7), (months.get(date.slice(0, 7)) ?? 0) + count)
+    if (res.peak_day === null || count > res.peak_day.count) res.peak_day = { date, count }
   }
+  for (const [month, count] of months) {
+    if (res.peak_month === null || count > res.peak_month.count) res.peak_month = { month, count }
+  }
+  res.first = sorted[0] ?? null
+  res.last = sorted[sorted.length - 1] ?? null
+  return res
+}
 
+/** The card's numbers: the API summary (null = none loaded yet) plus the area, which only the shape decides. */
+export function selectionSummary(area: Area, res: SelectionSummaryResponse | null): SelectionSummary {
+  const km2 = areaKm2(area)
+  const count = res?.total ?? 0
+  const month = res?.peak_month ? Number(res.peak_month.month.slice(5, 7)) - 1 : NaN
   return {
     areaKm2: km2,
-    count: features.length,
-    densityPer1000Km2: km2 > 0 ? (features.length / km2) * 1000 : null,
-    byType,
-    byDaynight,
-    frp: frpCount > 0 ? { sum: frpSum, mean: frpSum / frpCount, max: frpMax } : null,
-    peakMonth,
-    peakDay,
-    firstDate,
-    lastDate,
+    count,
+    densityPer1000Km2: km2 > 0 ? (count / km2) * 1000 : null,
+    byType: {
+      0: res?.by_type['0'] ?? 0,
+      1: res?.by_type['1'] ?? 0,
+      2: res?.by_type['2'] ?? 0,
+      3: res?.by_type['3'] ?? 0,
+    },
+    byDaynight: { D: res?.by_daynight.D ?? 0, N: res?.by_daynight.N ?? 0 },
+    frp: res?.frp ?? null,
+    peakMonth: res?.peak_month && isMonth(month) ? { month, count: res.peak_month.count } : null,
+    peakDay: res?.peak_day ?? null,
+    firstDate: res?.first ?? null,
+    lastDate: res?.last ?? null,
   }
 }

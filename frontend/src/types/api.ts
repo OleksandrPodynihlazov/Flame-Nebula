@@ -161,6 +161,21 @@ export interface StatsResponse {
   by_daynight: Partial<Record<DayNight, number>>
 }
 
+/** `GET /api/selection-summary`: the selection card's numbers, aggregated by the API. */
+export interface SelectionSummaryResponse {
+  total: number
+  /** Over non-null `frp` values only; null when none has one. */
+  frp: { sum: number; mean: number; max: number } | null
+  /** Busiest month (`YYYY-MM`) and day; ties go to the earliest. */
+  peak_month: { month: string; count: number } | null
+  peak_day: { date: string; count: number } | null
+  first: string | null
+  last: string | null
+  /** Zero counts and NULL type / daynight are left out. */
+  by_type: Partial<Record<`${FireType}`, number>>
+  by_daynight: Partial<Record<DayNight, number>>
+}
+
 export interface CalendarDay {
   date: string
   count: number

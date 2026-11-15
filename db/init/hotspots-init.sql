@@ -1,4 +1,7 @@
-CREATE TABLE hotspots (
+-- Must be safe to re-run: deploy applies every file on every deploy (infra/apply-db-schema.sh).
+-- Use IF NOT EXISTS / CREATE OR REPLACE and explicit index names; never DROP TABLE, TRUNCATE, DELETE or ALTER ... DROP.
+
+CREATE TABLE IF NOT EXISTS hotspots (
   id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   latitude    DOUBLE PRECISION NOT NULL,
   longitude   DOUBLE PRECISION NOT NULL,
@@ -16,6 +19,8 @@ CREATE TABLE hotspots (
   type        SMALLINT                   -- 0-3; NULL in NRT/API files (they have no type)
 );
 
-CREATE INDEX ON hotspots (acq_date);
-CREATE INDEX ON hotspots (instrument, acq_date);
-CREATE INDEX ON hotspots (latitude, longitude);
+-- Explicit names = the names Postgres gave the old unnamed indexes, so existing DBs get no duplicates.
+CREATE INDEX IF NOT EXISTS hotspots_acq_date_idx ON hotspots (acq_date);
+CREATE INDEX IF NOT EXISTS hotspots_instrument_acq_date_idx ON hotspots (instrument, acq_date);
+CREATE INDEX IF NOT EXISTS hotspots_latitude_longitude_idx ON hotspots (latitude, longitude);
+-- hotspots_natural_key (unique) is created by ingest/load_hotspots.py, hotspots_point_gist by regions-init.sql.

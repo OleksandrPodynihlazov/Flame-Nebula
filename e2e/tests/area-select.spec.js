@@ -1,5 +1,6 @@
 'use strict';
 
+const fs = require('node:fs/promises');
 const { test, expect } = require('@playwright/test');
 
 // docs/area-select.md. PR CI builds the frontend with VITE_USE_MOCKS=true, so
@@ -56,6 +57,17 @@ test('drawing a rectangle filters the dashboard and Clear restores it', async ({
   const areaTotal = await statTotal(page);
   expect(areaTotal).toBeGreaterThan(0);
   await expect(page.getByTestId('selection-count')).toHaveText(areaTotal.toLocaleString('en-US'));
+
+  // GeoJSON loads the area's dots only on click: every counted dot plus the shape.
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByTestId('selection-download-geojson').click(),
+  ]);
+  const geojson = JSON.parse(await fs.readFile(await download.path(), 'utf8'));
+  expect(geojson.type).toBe('FeatureCollection');
+  expect(geojson.features).toHaveLength(areaTotal + 1);
+  expect(geojson.features.at(-1).properties.selection).toBe(true);
+  await expect(page.getByTestId('selection-download-geojson')).toHaveText('GeoJSON');
 
   await page.getByTestId('selection-clear').click();
   await expect(panel).toBeHidden();
