@@ -91,3 +91,29 @@ body {
     transition: right 200ms;
   }
 }
+
+.pattern-tooltip.leaflet-tooltip,
+.leaflet-popup-content .pattern-tip {
+  font-size: 12px;
+  line-height: 1.45;
+}
+.pattern-tooltip.leaflet-tooltip {
+  background: rgb(15 23 42 / 0.95);
+  border: 1px solid rgb(51 65 85);
+  color: rgb(226 232 240);
+  border-radius: 8px;
+  padding: 8px 10px;
+  box-shadow: 0 10px 25px rgb(0 0 0 / 0.4);
+}
+.pattern-tooltip.leaflet-tooltip-top::before {
+  border-top-color: rgb(51 65 85);
+}
+.pattern-tip-title {
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.pattern-tip-muted {
+  margin-top: 2px;
+  font-size: 11px;
+  opacity: 0.6;
+}

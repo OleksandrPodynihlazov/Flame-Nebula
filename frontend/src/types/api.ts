@@ -51,6 +51,49 @@ export interface Filters {
   daynight: DayNight | null
 }
 
+/** Map layer: single detections or recurring monthly patterns. */
+export type MapView = 'spots' | 'patterns'
+
+/** One 0.1° cell of `fire_patterns` for a month; lat/lon = cell centre. */
+export interface PatternCell {
+  lat: number
+  lon: number
+  years_burned: number
+  years_observed: number
+  /** years_burned / years_observed, 0–1. */
+  probability: number
+  /** Median detections in that month, over the years it burned. */
+  median_count: number
+}
+
+export interface PatternsResponse {
+  month: number
+  cells: PatternCell[]
+}
+
+export interface PatternMonth {
+  month: number
+  cells: number
+  likely: number
+  max_probability: number
+}
+
+export interface PatternSummaryResponse {
+  months: PatternMonth[]
+}
+
+/** Query for /api/patterns(/summary): the area only, plus the month (1–12) for /api/patterns. */
+export interface PatternQuery {
+  month?: number
+  /** Hide cells below this probability (0–1). */
+  min_probability?: number
+  lat?: number
+  lon?: number
+  radius_km?: number
+  polygon?: string
+  region?: number
+}
+
 export interface ApiQuery {
   from: string
   to: string
