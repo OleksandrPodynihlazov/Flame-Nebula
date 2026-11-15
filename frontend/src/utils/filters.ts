@@ -75,9 +75,16 @@ export function toggleMonthPatch(f: Filters, month: Month): Partial<Filters> {
   return f.month === month && f.date === null ? { month: null, date: null } : { month, date: null }
 }
 
+const dateSelection = (date: string): Partial<Filters> => ({ month: (Number(date.slice(5, 7)) - 1) as Month, date })
+
+/** Phone: a day lives inside its month, so unselecting the day returns to that month. */
 export function toggleDatePatch(f: Filters, date: string): Partial<Filters> {
-  if (f.date === date) return { date: null }
-  return { month: (Number(date.slice(5, 7)) - 1) as Month, date }
+  return f.date === date ? { date: null } : dateSelection(date)
+}
+
+/** Desktop: clicking the selected day again clears the whole selection (full year). */
+export function toggleDayPatch(f: Filters, date: string): Partial<Filters> {
+  return f.date === date ? { month: null, date: null } : dateSelection(date)
 }
 
 const sameMembers = <T,>(a: readonly T[], b: readonly T[]) => a.length === b.length && a.every((x) => b.includes(x))

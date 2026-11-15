@@ -3,16 +3,16 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { MONTHS_FULL } from '../constants/fire'
-import type { Sensor, StatsResponse } from '../types/api'
+import type { StatsResponse } from '../types/api'
 import type { CalendarGrid } from '../utils/calendar'
 import { pctChange } from '../utils/compare'
 
 interface Props {
   stats: StatsResponse | null
   grid: CalendarGrid | null
-  scope: string
+  /** Month or day selected, e.g. "Aug 2008"; null for the full year. */
+  scope: string | null
   loading: boolean
-  sensors: Sensor[]
 }
 
 /** Metrics side by side, split by vertical hairlines. Pair with `Metric`. */
@@ -72,7 +72,7 @@ export function Delta({ from, to, testId, compact = false }: { from: number | un
 
 function DayNightBar({ dayPct }: { dayPct: number }) {
   return (
-    <span aria-hidden="true" className="flex h-1 w-full gap-px overflow-hidden rounded-full">
+    <span role="img" aria-label={`${dayPct}% by day`} title={`${dayPct}% by day`} className="flex h-1 w-full gap-px overflow-hidden rounded-full">
       <span className="bg-flare" style={{ width: `${dayPct}%` }} />
       <span className="flex-1 bg-compare-a" />
     </span>
@@ -89,17 +89,11 @@ function DayNight({ day, night }: { day: number; night: number }) {
   )
 }
 
-function dayNightFooter(day: number, total: number, withText = true) {
-  const dayPct = total ? Math.round((day / total) * 100) : 0
-  return (
-    <span className="flex flex-col gap-1.5">
-      {total > 0 && <DayNightBar dayPct={dayPct} />}
-      {withText && <span>{total ? `${dayPct}% by day` : '\u00a0'}</span>}
-    </span>
-  )
+function dayNightFooter(day: number, total: number) {
+  return total > 0 ? <DayNightBar dayPct={Math.round((day / total) * 100)} /> : null
 }
 
-export function StatCards({ stats, grid, scope, loading, sensors }: Props) {
+export function StatCards({ stats, grid, scope, loading }: Props) {
   const total = stats?.total ?? 0
   const day = stats?.by_daynight.D ?? 0
   const night = stats?.by_daynight.N ?? 0
@@ -111,14 +105,8 @@ export function StatCards({ stats, grid, scope, loading, sensors }: Props) {
   return (
     <div className={cn('flex shrink-0 flex-col gap-3', loading && !first && DIM)} aria-busy={loading}>
       {first && <SrLoading />}
-      <p className="flex items-center gap-2 text-xs text-muted-foreground">
-        <Badge variant="outline" className="font-mono text-foreground">
-          {scope}
-        </Badge>
-        <span>{sensors.join(' + ')}</span>
-      </p>
       <Readout className="grid-cols-[1fr_0.9fr_1.3fr]">
-        <Metric label="Hotspots" footer={<span className="block truncate">detections</span>}>
+        <Metric label={scope ? `Hotspots · ${scope}` : 'Hotspots'}>
           {first ? (
             <Skeleton className="h-[30px] w-20" />
           ) : (
@@ -127,7 +115,7 @@ export function StatCards({ stats, grid, scope, loading, sensors }: Props) {
             </span>
           )}
         </Metric>
-        <Metric label="Peak month" footer={peak ? <span className="block truncate font-mono tabular-nums">{peak.count.toLocaleString('en-US')} in year</span> : <span>&nbsp;</span>}>
+        <Metric label="Peak month">
           {peakFirst ? <Skeleton className="h-5 w-24" /> : <span className="text-xl leading-none font-semibold text-foreground">{peak ? MONTHS_FULL[peak.month] : none}</span>}
         </Metric>
         <Metric label="Day / night" footer={dayNightFooter(day, total)}>
@@ -169,7 +157,7 @@ export function MiniStats({ stats, grid, loading }: Omit<Props, 'scope' | 'senso
         <Metric label="Peak month" className="px-3">
           {peakFirst ? <Skeleton className="h-4 w-10" /> : <span className="text-base leading-none font-semibold text-foreground">{peak ? MONTHS_FULL[peak.month].slice(0, 3) : none}</span>}
         </Metric>
-        <Metric label="Day / night" className="px-3" footer={dayNightFooter(day, total, false)}>
+        <Metric label="Day / night" className="px-3" footer={dayNightFooter(day, total)}>
           {first ? (
             <Skeleton className="h-4 w-20" />
           ) : (

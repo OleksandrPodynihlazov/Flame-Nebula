@@ -61,10 +61,7 @@ export function BurnCalendar({ grid, filters, sensors, loading, onSelectMonth, o
     <section className="flex flex-col gap-4 border-t border-border pt-4" aria-label="Burning activity calendar">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-foreground">
-            Burning activity calendar <span className="font-mono font-normal text-muted-foreground">· {filters.year}</span>
-          </h2>
-          <p className="text-xs text-muted-foreground">Hotspots per day (UTC). Select a day or a month to filter the map.</p>
+          <h2 className="text-sm font-semibold text-foreground">Burning activity</h2>
           {sensors.length > 1 && (
             <p className="mt-1 text-xs text-flare">MODIS + VIIRS raw counts added together, not harmonized. VIIRS detects more, smaller fires.</p>
           )}
@@ -79,7 +76,7 @@ export function BurnCalendar({ grid, filters, sensors, loading, onSelectMonth, o
       <div className={cn('flex flex-col', dimmed && DIM)} aria-busy={loading}>
         {first && <SrLoading />}
         <div ref={gridRef} className="flex flex-col gap-px" role="grid" aria-label={`Hotspots per day, ${filters.year}`} onKeyDown={onGridKeyDown}>
-          <div className={`grid ${COLS} gap-px pb-1 font-mono text-[10px] text-muted-foreground`} role="row">
+          <div className={`grid ${COLS} gap-px pb-1 text-[10px] text-muted-foreground tabular-nums`} role="row">
             <span role="columnheader" />
             {DAYS.map((d) => (
               <span key={d} role="columnheader" className="text-center">
@@ -103,7 +100,7 @@ export function BurnCalendar({ grid, filters, sensors, loading, onSelectMonth, o
                   data-cal="month"
                   data-month={m}
                   className={cn(
-                    'rounded-[2px] px-1 text-left font-mono text-[11px] transition-colors',
+                    'rounded-[2px] px-1 text-left text-[11px] transition-colors',
                     FOCUS_RING,
                     monthSelected ? 'text-foreground ring-1 ring-flare' : 'text-muted-foreground hover:text-foreground',
                   )}
@@ -161,21 +158,9 @@ export function BurnCalendar({ grid, filters, sensors, loading, onSelectMonth, o
       </div>
 
       <CalendarTooltip gridRef={gridRef} grid={grid} year={filters.year} selectedDate={filters.date} />
-      <RampLegend max={grid?.maxDay ?? 0} total={grid?.total ?? 0} loading={first} />
+      <HeatLegend max={grid?.maxDay ?? 0} unit="day" loading={first} />
       {first ? <BusiestDaysSkeleton /> : grid && grid.total > 0 && <BusiestDays grid={grid} filters={filters} onSelectDate={onSelectDate} />}
     </section>
-  )
-}
-
-function RampLegend({ max, total, loading }: { max: number; total: number; loading: boolean }) {
-  return (
-    <div className="flex flex-col gap-1.5 text-xs text-muted-foreground">
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <HeatLegend max={max} unit="day" loading={loading} />
-        {loading ? <Skeleton className="h-3 w-24" /> : <span className="font-mono tabular-nums">Year total {total.toLocaleString('en-US')}</span>}
-      </div>
-      <p>Dark cell: no detections that day. Blank: no such date.</p>
-    </div>
   )
 }
 
@@ -201,9 +186,7 @@ function BusiestDays({ grid, filters, onSelectDate }: { grid: CalendarGrid; filt
   const top = days[0].count
   return (
     <div className="flex flex-col gap-1 border-t border-border pt-3">
-      <h3 className="mb-1 text-xs text-muted-foreground">
-        Busiest days <span className="font-mono">· {month === null ? filters.year : `${MONTHS[month]} ${filters.year}`}</span>
-      </h3>
+      <h3 className="mb-1 text-xs text-muted-foreground">Busiest days</h3>
       <ul className="flex flex-col">
         {days.map(({ date, count }) => (
           <li key={date}>
@@ -216,7 +199,7 @@ function BusiestDays({ grid, filters, onSelectDate }: { grid: CalendarGrid; filt
                 filters.date === date && 'ring-1 ring-flare',
               )}
             >
-              <span className="font-mono text-xs text-foreground">{dayLabel(date, MONTHS)}</span>
+              <span className="text-xs text-foreground">{dayLabel(date, MONTHS)}</span>
               <span className="h-1.5 rounded-full bg-muted" aria-hidden="true">
                 <span
                   className="block h-full rounded-full"
