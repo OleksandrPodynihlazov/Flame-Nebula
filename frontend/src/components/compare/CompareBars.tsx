@@ -9,7 +9,6 @@ export interface BarSeries {
 
 interface Props {
   title: string
-  subtitle?: string
   categories: readonly string[]
   series: [BarSeries, BarSeries]
   loading?: boolean
@@ -27,7 +26,7 @@ function niceMax(n: number): number {
 }
 
 /** Grouped bars: one group per category, one bar per series. Plain DOM, scales to its container. */
-export function CompareBars({ title, subtitle, categories, series, loading = false, footer, format = (v) => v.toLocaleString() }: Props) {
+export function CompareBars({ title, categories, series, loading = false, footer, format = (v) => v.toLocaleString() }: Props) {
   const max = niceMax(Math.max(0, ...series.flatMap((s) => s.values)))
   const ticks = [max, max / 2, 0]
 
@@ -38,11 +37,8 @@ export function CompareBars({ title, subtitle, categories, series, loading = fal
       data-testid="compare-bars"
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h2 className="text-sm font-semibold text-foreground">{title}</h2>
-          {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
-        </div>
-        <ul className="flex items-center gap-3 font-mono text-xs text-foreground">
+        <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+        <ul className="flex items-center gap-3 text-xs text-foreground">
           {series.map((s) => (
             <li key={s.label} className="flex items-center gap-1.5">
               <span aria-hidden="true" className="size-2.5 rounded-[2px]" style={{ background: s.color }} />

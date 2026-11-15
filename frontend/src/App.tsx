@@ -118,8 +118,7 @@ export default function App() {
 
   const compareChart = compare && (
     <CompareBars
-      title={`Fire radiative power per month · ${compare.a} vs ${compare.b}`}
-      subtitle="Summed FRP (MW) per month (UTC). Same area and filters on both sides."
+      title="FRP per month, MW"
       format={formatMW}
       categories={MONTHS}
       loading={calendar.loading || second.calendar.loading}
@@ -140,8 +139,7 @@ export default function App() {
 
   const patternChart = patternCompare && (
     <CompareBars
-      title={`Recurring cells · ${MONTHS_FULL[patternCompare.a - 1]} vs ${MONTHS_FULL[patternCompare.b - 1]}`}
-      subtitle="0.1° cells by years burned that month. Same area on both sides."
+      title="Cells by years burned"
       categories={YEAR_BANDS}
       loading={cellsA.loading || cellsB.loading}
       series={[
@@ -166,10 +164,7 @@ export default function App() {
   }
   const mapProps = {
     query: selectionQuery,
-    total: stats.data?.total ?? null,
-    totalLoading: stats.loading,
     selection: { summary: summary.data, loading: summary.loading, error: summary.error, onRetry: summary.reload },
-    label: selectionLabel(filters),
     sensors,
     area: filters.area,
     onAreaChange: setArea,

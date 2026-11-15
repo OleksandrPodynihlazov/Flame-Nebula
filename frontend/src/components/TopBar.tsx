@@ -121,7 +121,7 @@ function PatternControls({ mode, month, stacked }: { mode: PatternMode; month: n
           </SelectField>
         ))}
       <span className={cn('text-xs text-muted-foreground', !stacked && 'hidden whitespace-nowrap xl:inline')}>
-        Patterns · S-NPP 2012–2025 · area filter only
+        Patterns 2012–2025
       </span>
     </div>
   )

@@ -18,13 +18,11 @@ const HIT_SLOP = 3
 /** Mirrors --background (dot and bubble outline) and the dark ink on bubble fills (--primary-foreground). */
 const STROKE = '#070a0f'
 const INK = '#0a0602'
-/** Bubbles from this share of the view's biggest cell get a soft glow. Static: nothing animates. */
-const GLOW_FROM = 0.75
 const DIM_OPACITY = '0.6'
 const BUBBLE_FONT_FAMILY = '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace'
 
 type Target =
-  | { kind: 'cell'; lat: number; lon: number; cell: number; type: FireType; fill: string; glow: boolean; label: string }
+  | { kind: 'cell'; lat: number; lon: number; cell: number; type: FireType; fill: string; label: string }
   | { kind: 'dot'; p: HotspotProperties }
 
 /** A drawn shape in container px, kept for hit testing until the next redraw. */
@@ -54,19 +52,14 @@ function drawBubble(ctx: CanvasRenderingContext2D, b: Hit, t: Extract<Target, { 
   ctx.beginPath()
   ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2)
   ctx.fillStyle = t.fill
-  if (t.glow) {
-    ctx.shadowColor = t.fill
-    ctx.shadowBlur = 14
-  }
   ctx.fill()
-  ctx.shadowBlur = 0
   ctx.lineWidth = 1
   ctx.strokeStyle = STROKE
   ctx.stroke()
   ctx.font = `600 ${labelFontSize(t.label, b.r)}px ${BUBBLE_FONT_FAMILY}`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  // Halo in the body colour: digits stay crisp where the bubble's own outline or a neighbour's glow crosses them.
+  // Halo in the body colour: digits stay crisp where the bubble's own outline crosses them.
   ctx.lineWidth = 2
   ctx.lineJoin = 'round'
   ctx.strokeStyle = t.fill
@@ -211,7 +204,6 @@ class HotspotCanvasLayer extends L.Layer {
           cell: data.cell,
           type,
           fill: type === 0 ? bubbleHeatColor(share) : FIRE_TYPES[type].color,
-          glow: share >= GLOW_FROM,
           label: abbreviateCount(c.count),
         }
         bubbles.push({ x, y, r, target })
@@ -227,7 +219,7 @@ class HotspotCanvasLayer extends L.Layer {
     dots.sort((a, b) => b.r - a.r)
     ctx.translate(pad.x, pad.y)
     for (const d of dots) if (d.target.kind === 'dot') drawDot(ctx, d, d.target.p.type, d.target.p.sensor)
-    // Biggest first: smaller bubbles and their numbers end up on top, and a glow never covers a neighbour's body.
+    // Biggest first: smaller bubbles and their numbers end up on top.
     const orderedBubbles = drawOrder(bubbles)
     for (const b of orderedBubbles) if (b.target.kind === 'cell') drawBubble(ctx, b, b.target)
     // Bubbles are drawn last, smallest last, so the smallest wins hit tests (searched from the end).

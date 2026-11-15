@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 import { USE_MOCKS, downloadBlob, fetchHotspots } from '../api/client'
-import { ALL_TYPES, FIRE_TYPES, MONTHS, MONTHS_FULL } from '../constants/fire'
+import { MONTHS } from '../constants/fire'
 import type { ApiQuery, Area, SelectionSummaryResponse } from '../types/api'
 import { selectionGeoJson } from '../utils/selectionExport'
 import { formatAreaKm2, selectionSummary } from '../utils/selectionSummary'
@@ -36,11 +36,11 @@ function shortDate(iso: string): string {
   return `${d} ${MONTHS[m - 1]} ${y}`
 }
 
-function Row({ label, children, testId }: { label: string; children: ReactNode; testId?: string }) {
+function Row({ label, children, testId, hidden = false }: { label: string; children: ReactNode; testId?: string; hidden?: boolean }) {
   return (
     <>
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="text-right font-mono text-foreground tabular-nums" data-testid={testId}>
+      <dt className={cn('whitespace-nowrap text-muted-foreground', hidden && 'sr-only')}>{label}</dt>
+      <dd className={cn('text-right font-mono whitespace-nowrap text-foreground tabular-nums', hidden && 'sr-only')} data-testid={testId}>
         {children}
       </dd>
     </>
@@ -160,7 +160,7 @@ export function SelectionPanel({ area, summary, loading, error, onRetry, query, 
       aria-busy={loading}
       className={cn(
         FLOAT_PANEL,
-        'absolute top-16 right-16 left-[68px] z-20 flex max-h-[calc(100%-5rem)] flex-col overflow-hidden lg:top-[10px] lg:right-[calc(var(--panel-inset,0px)+10px)] lg:left-auto lg:max-h-[calc(100%-6rem)] lg:w-72',
+        'absolute top-16 right-16 left-[68px] z-20 flex max-h-[calc(100%-5rem)] flex-col overflow-hidden lg:top-[10px] lg:right-[calc(var(--panel-inset,0px)+10px)] lg:left-auto lg:max-h-[calc(100%-6rem)] lg:w-80',
       )}
     >
       <div className="flex items-stretch lg:hidden">
@@ -218,17 +218,12 @@ export function SelectionPanel({ area, summary, loading, error, onRetry, query, 
           </Row>
           {s.count > 0 && (
             <>
-              <Row label="Hotspots" testId="selection-count">
+              <Row label="Hotspots" testId="selection-count" hidden>
                 {fmt(s.count)}
               </Row>
               <Row label="Density">{s.densityPer1000Km2 === null ? '—' : `${fmt(s.densityPer1000Km2, 1)} / 1,000 km²`}</Row>
-              <Row label="Day / night">
-                {fmt(s.byDaynight.D)} / {fmt(s.byDaynight.N)}
-              </Row>
               <Row label="FRP sum">{s.frp ? `${fmt(s.frp.sum)} MW` : '—'}</Row>
               <Row label="FRP mean / max">{s.frp ? `${fmt(s.frp.mean, 1)} / ${fmt(s.frp.max, 1)} MW` : '—'}</Row>
-              <Row label="Peak month">{s.peakMonth ? `${MONTHS_FULL[s.peakMonth.month]} (${fmt(s.peakMonth.count)})` : '—'}</Row>
-              <Row label="Peak day">{s.peakDay ? `${shortDate(s.peakDay.date)} (${fmt(s.peakDay.count)})` : '—'}</Row>
               <Row label="First / last">
                 {s.firstDate && s.lastDate ? `${shortDate(s.firstDate)} – ${shortDate(s.lastDate)}` : '—'}
               </Row>
@@ -257,23 +252,6 @@ export function SelectionPanel({ area, summary, loading, error, onRetry, query, 
           <p className="text-xs text-muted-foreground" data-testid="selection-empty">
             No hotspots in this area
           </p>
-        )}
-
-        {s.count > 0 && (
-          <>
-            <Separator />
-            <ul className="flex flex-col gap-1 text-xs" aria-label="Hotspots by type">
-              {ALL_TYPES.filter((t) => s.byType[t] > 0).map((t) => (
-                <li key={t} className="flex items-center justify-between gap-2">
-                  <span className="flex items-center gap-2 text-muted-foreground">
-                    <span aria-hidden="true" className="size-2 shrink-0 rounded-full" style={{ background: FIRE_TYPES[t].color }} />
-                    {FIRE_TYPES[t].label}
-                  </span>
-                  <span className="font-mono text-foreground tabular-nums">{fmt(s.byType[t])}</span>
-                </li>
-              ))}
-            </ul>
-          </>
         )}
 
         {area.kind === 'circle' && (

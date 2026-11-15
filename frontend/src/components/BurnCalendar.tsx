@@ -59,7 +59,7 @@ export function BurnCalendar({ grid, filters, sensors, loading, onSelectMonth, o
 
   return (
     <section className="flex flex-col gap-4 border-t border-border pt-4" aria-label="Burning activity calendar">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex min-h-8 items-center justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-foreground">Burning activity</h2>
           {sensors.length > 1 && (
@@ -67,7 +67,7 @@ export function BurnCalendar({ grid, filters, sensors, loading, onSelectMonth, o
           )}
         </div>
         {hasSelection && (
-          <Button type="button" variant="outline" size="sm" onClick={onClear} className="shrink-0">
+          <Button type="button" variant="outline" size="sm" onClick={onClear} className="h-8 shrink-0">
             Show full year
           </Button>
         )}
