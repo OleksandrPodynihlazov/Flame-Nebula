@@ -17,5 +17,10 @@ test("confidence_level for both sensors, confidence = raw MODIS percent", () => 
 });
 
 test("CSV export carries confidence_level next to confidence", () => {
-  assert.deepEqual(CSV_COLUMNS.slice(-3), ["confidence", "confidence_level", "type"]);
+  const i = CSV_COLUMNS.indexOf("confidence");
+  assert.deepEqual(CSV_COLUMNS.slice(i, i + 3), ["confidence", "confidence_level", "type"]);
+});
+
+test("CSV export ends with the [1b] fire confidence: score, class, reasons", () => {
+  assert.deepEqual(CSV_COLUMNS.slice(-3), ["score", "class", "reasons"]);
 });

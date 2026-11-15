@@ -119,14 +119,24 @@ export function parseCell(query) {
   return parseNumber(raw, "cell", MIN_CELL, MAX_CELL);
 }
 
-// Returns { from, to, circle, polygon, region, bbox, daynight, types, sensors, includeNonFire }. Missing params are
-// undefined / null / false. A polygon overrides a circle (the frontend never sends both). A region (id from
+// Returns { from, to, circle, polygon, region, bbox, daynight, types, sensors, includeNonFire, minConfidence }.
+// Missing params are undefined / null / false. A polygon overrides a circle (the frontend never sends both). A region (id from
 // /api/regions) cannot be combined with a polygon or a circle: that is a 400.
 export function parseFilters(query) {
   const f = {
     from: undefined, to: undefined, circle: null, polygon: null, region: null, bbox: null, daynight: null, types: null,
-    sensors: null, includeNonFire: false,
+    sensors: null, includeNonFire: false, minConfidence: null,
   };
+
+  // Keep only points whose [1b] confidence_score is at least this. Off when absent. Unscored points have no score,
+  // so they are left out while it is set.
+  const minConfidence = single(query, "min_confidence");
+  if (minConfidence !== undefined) {
+    if (!/^\d{1,3}$/.test(minConfidence) || Number(minConfidence) > 100) {
+      throw httpError("min_confidence must be a whole number between 0 and 100");
+    }
+    f.minConfidence = Number(minConfidence);
+  }
 
   // Points classed non_fire:* (volcano, static source, offshore, urban; contract [1b]) are hidden unless asked for.
   const includeNonFire = single(query, "include_non_fire");
@@ -205,6 +215,8 @@ export function parseFilters(query) {
 // Builds `WHERE ...` (or '') and its params for the hotspots table. Column names are fixed here.
 // `confidence`: the query reads hotspots_with_confidence (lib/confidence.js), so non_fire points can be hidden.
 // `hideNonFire: false` keeps them even then (/api/stats counts them in by_class and drops them itself).
+// min_confidence is a plain filter, applied whatever hideNonFire says (by_class then counts only what passes it).
+// Without the confidence source every point is unscored, so min_confidence matches nothing (not "ignored").
 export function buildWhere(f, { confidence = false, hideNonFire = true } = {}) {
   const conds = [];
   if (confidence && hideNonFire && !f.includeNonFire) conds.push(NOT_NON_FIRE);
@@ -213,6 +225,9 @@ export function buildWhere(f, { confidence = false, hideNonFire = true } = {}) {
     params.push(value);
     return `$${params.length}`;
   };
+  if (f.minConfidence !== null && f.minConfidence !== undefined) {
+    conds.push(confidence ? `confidence_score >= ${add(f.minConfidence)}` : "false");
+  }
 
   if (f.from) conds.push(`acq_date >= ${add(f.from)}`);
   if (f.to) conds.push(`acq_date <= ${add(f.to)}`);
