@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 import { USE_MOCKS, downloadBlob, fetchHotspots } from '../api/client'
+import { downloadToast } from '../utils/downloadToast'
 import { MONTHS } from '../constants/fire'
 import type { ApiQuery, Area, SelectionSummaryResponse } from '../types/api'
 import { selectionGeoJson } from '../utils/selectionExport'
@@ -141,11 +142,17 @@ export function SelectionPanel({ area, summary, loading, error, onRetry, query, 
   const downloadGeoJson = async () => {
     setExporting(true)
     setExportError(null)
-    try {
+    let rows: number | null = null
+    const run = (async () => {
       const { features } = await fetchHotspots(query)
+      rows = features.length
       const json = JSON.stringify(selectionGeoJson(area, features))
       const name = `firms_italy_${fileTag}_area${USE_MOCKS ? '_DEMO' : ''}.geojson`
       downloadBlob(new Blob([json], { type: 'application/geo+json' }), name)
+    })()
+    downloadToast('GeoJSON', run, () => rows)
+    try {
+      await run
     } catch (err: unknown) {
       setExportError({ queryKey, message: err instanceof Error ? err.message : String(err) })
     } finally {

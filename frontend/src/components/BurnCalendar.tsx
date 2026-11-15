@@ -128,7 +128,7 @@ export function BurnCalendar({ grid, filters, sensors, loading, onSelectMonth, o
                       onFocus={() => setActive({ month: m, day: di + 1, year: filters.year })}
                       onClick={() => onSelectDate(date)}
                       className={cn(
-                        'rounded-[2px] hover:ring-1 hover:ring-foreground/70',
+                        'rounded-[2px] hover:ring-1 hover:ring-foreground/70 motion-safe:transition-[background-color] duration-200',
                         selected && 'z-10 ring-2 ring-flare ring-offset-2 ring-offset-background',
                         !selected && monthSelected && 'ring-1 ring-flare/40',
                         FOCUS_RING,
@@ -202,7 +202,7 @@ function BusiestDays({ grid, filters, onSelectDate }: { grid: CalendarGrid; filt
               <span className="text-xs text-foreground">{dayLabel(date, MONTHS)}</span>
               <span className="h-1.5 rounded-full bg-muted" aria-hidden="true">
                 <span
-                  className="block h-full rounded-full"
+                  className="block h-full rounded-full motion-safe:transition-[width] duration-300 ease-out"
                   style={{ width: `${Math.max(4, (count / top) * 100)}%`, background: heatVar(rampIndex(count, grid.maxDay)) }}
                 />
               </span>

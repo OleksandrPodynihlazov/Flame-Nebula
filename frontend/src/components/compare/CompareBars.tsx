@@ -68,7 +68,7 @@ export function CompareBars({ title, categories, series, loading = false, footer
                   return (
                     <div
                       key={s.label}
-                      className="w-full max-w-4 rounded-t-sm transition-[height] duration-300"
+                      className="w-full max-w-4 rounded-t-sm motion-safe:transition-[height] duration-300 ease-out"
                       style={{ height: `${(v / max) * 100}%`, background: s.color, minHeight: v > 0 ? 1 : 0 }}
                       title={`${c} ${s.label}: ${format(v)}`}
                       data-testid="compare-bar"
