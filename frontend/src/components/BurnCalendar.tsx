@@ -1,9 +1,11 @@
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { MONTHS, MONTHS_FULL } from '../constants/fire'
 import type { Filters, Month, Sensor } from '../types/api'
 import { RAMP, heatVar, rampBounds, rampIndex, topDays, type CalendarGrid } from '../utils/calendar'
-import { isoDate } from '../utils/filters'
+import { daysInMonth, isoDate } from '../utils/filters'
+import { DIM, SrLoading } from './StatCards'
 
 interface Props {
   grid: CalendarGrid | null
@@ -21,6 +23,9 @@ const TOP_DAYS = 5
 
 export function BurnCalendar({ grid, filters, sensors, loading, onSelectMonth, onSelectDate, onClear }: Props) {
   const hasSelection = filters.month !== null || filters.date !== null
+  const first = loading && grid === null
+  // Reloading keeps the old grid dimmed; a year without hotspots or a failed load keeps the year's shape, dimmed.
+  const dimmed = loading ? !first : grid === null || grid.total === 0
 
   return (
     <section className="flex flex-col gap-4 border-t border-border pt-4" aria-label="Burning activity calendar">
@@ -41,7 +46,8 @@ export function BurnCalendar({ grid, filters, sensors, loading, onSelectMonth, o
         )}
       </div>
 
-      <div className={cn('flex flex-col', loading && 'opacity-60')} aria-busy={loading}>
+      <div className={cn('flex flex-col', dimmed && DIM)} aria-busy={loading}>
+        {first && <SrLoading />}
         <div className="flex flex-col gap-px" role="grid" aria-label={`Hotspots per day, ${filters.year}`}>
           <div className={`grid ${COLS} gap-px pb-1 font-mono text-[10px] text-muted-foreground`} role="row">
             <span role="columnheader" />
@@ -74,7 +80,8 @@ export function BurnCalendar({ grid, filters, sensors, loading, onSelectMonth, o
                 </button>
 
                 {row.map((count, di) => {
-                  if (count === null) return <span key={di} role="gridcell" aria-hidden="true" />
+                  if (count === null || (first && di >= daysInMonth(filters.year, m))) return <span key={di} role="gridcell" aria-hidden="true" />
+                  if (first) return <Skeleton key={di} role="gridcell" aria-hidden="true" className="rounded-[2px]" />
                   const date = isoDate(filters.year, m, di + 1)
                   const selected = filters.date === date
                   const label = `${di + 1} ${MONTHS_FULL[m]}: ${count} hotspot${count === 1 ? '' : 's'}`
@@ -105,7 +112,7 @@ export function BurnCalendar({ grid, filters, sensors, loading, onSelectMonth, o
                     monthSelected ? 'text-foreground ring-1 ring-flare' : 'text-muted-foreground hover:text-foreground',
                   )}
                 >
-                  {(grid?.monthTotals[m] ?? 0).toLocaleString('en-US')}
+                  {first ? <Skeleton className="ml-auto h-3 w-8" /> : (grid?.monthTotals[m] ?? 0).toLocaleString('en-US')}
                 </button>
               </div>
             )
@@ -113,13 +120,13 @@ export function BurnCalendar({ grid, filters, sensors, loading, onSelectMonth, o
         </div>
       </div>
 
-      <RampLegend max={grid?.maxDay ?? 0} total={grid?.total ?? 0} />
-      {grid && <BusiestDays grid={grid} filters={filters} onSelectDate={onSelectDate} />}
+      <RampLegend max={grid?.maxDay ?? 0} total={grid?.total ?? 0} loading={first} />
+      {first ? <BusiestDaysSkeleton /> : grid && grid.total > 0 && <BusiestDays grid={grid} filters={filters} onSelectDate={onSelectDate} />}
     </section>
   )
 }
 
-function RampLegend({ max, total }: { max: number; total: number }) {
+function RampLegend({ max, total, loading }: { max: number; total: number; loading: boolean }) {
   const bounds = rampBounds(max)
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-xs text-muted-foreground">
@@ -130,15 +137,28 @@ function RampLegend({ max, total }: { max: number; total: number }) {
             <span key={i} className="h-2.5 w-5 rounded-[2px]" style={{ background: heatVar(i) }} title={i === 0 ? 'No detections' : `≤ ${bounds[i - 1]} per day`} />
           ))}
         </div>
-        <span className="font-mono tabular-nums">{max.toLocaleString('en-US')} / day</span>
+        {loading ? <Skeleton className="h-3 w-14" /> : <span className="font-mono tabular-nums">{max.toLocaleString('en-US')} / day</span>}
         <span>log scale</span>
       </div>
-      <span className="font-mono tabular-nums">Year total {total.toLocaleString('en-US')}</span>
+      {loading ? <Skeleton className="h-3 w-24" /> : <span className="font-mono tabular-nums">Year total {total.toLocaleString('en-US')}</span>}
     </div>
   )
 }
 
 const dayLabel = (date: string, names: readonly string[]) => `${Number(date.slice(8))} ${names[Number(date.slice(5, 7)) - 1]}`
+
+function BusiestDaysSkeleton() {
+  return (
+    <div className="flex flex-col gap-1 border-t border-border pt-3" aria-hidden="true">
+      <Skeleton className="mb-1 h-3 w-28" />
+      {Array.from({ length: TOP_DAYS }, (_, i) => (
+        <div key={i} className="flex h-8 items-center px-2">
+          <Skeleton className="h-3 w-full" />
+        </div>
+      ))}
+    </div>
+  )
+}
 
 function BusiestDays({ grid, filters, onSelectDate }: { grid: CalendarGrid; filters: Filters; onSelectDate: (date: string) => void }) {
   const month = filters.date ? ((Number(filters.date.slice(5, 7)) - 1) as Month) : filters.month

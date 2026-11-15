@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Region } from '../types/api'
 import { inGeometry } from '../utils/area'
-import { matchRegions, mockHotspots, mockRegion, mockSearchRegions, mockStats } from './mocks'
+import { matchRegions, mockHotspots, mockRegion, mockSearchRegions, mockStats, parseMockFail } from './mocks'
 
 const region = (id: number, name: string): Region => ({ id, name, level: 2, country: 'ITA', parent_id: null, path: '' })
 const REGIONS = [region(1, 'Toscana'), region(2, 'Sicilia'), region(3, 'Basilicata'), region(4, 'Sardegna'), region(5, 'Trentino-Alto Adige')]
@@ -69,5 +69,17 @@ describe('mock regions', () => {
       const { features } = await mockHotspots({ from: '2008-01-01', to: '2008-12-31', sensor: 'MODIS', region: r.id })
       expect(features.length, r.name).toBeGreaterThan(0)
     }
+  })
+})
+
+describe('parseMockFail', () => {
+  it('splits a comma list, trims and lower-cases', () => {
+    expect([...parseMockFail(' Stats, calendar ,')]).toEqual(['stats', 'calendar'])
+  })
+
+  it('is empty for unset or blank values', () => {
+    expect(parseMockFail(undefined).size).toBe(0)
+    expect(parseMockFail('').size).toBe(0)
+    expect(parseMockFail(' , ').size).toBe(0)
   })
 })

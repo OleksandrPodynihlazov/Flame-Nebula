@@ -19,6 +19,8 @@ interface Props {
   loading: boolean
   /** Failed summary request: shown instead of the numbers. */
   error: string | null
+  /** Asks for the summary again after an error. */
+  onRetry: () => void
   /** Filters + area; the GeoJSON export loads the area's dots with it on click. */
   query: ApiQuery
   fileTag: string
@@ -123,7 +125,7 @@ function CircleInputs({ area, onAreaChange }: { area: CircleArea; onAreaChange: 
   )
 }
 
-export function SelectionPanel({ area, summary, loading, error, query, fileTag, downloading, onDownloadCsv, onAreaChange }: Props) {
+export function SelectionPanel({ area, summary, loading, error, onRetry, query, fileTag, downloading, onDownloadCsv, onAreaChange }: Props) {
   const [expanded, setExpanded] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState<{ queryKey: string; message: string } | null>(null)
@@ -235,9 +237,14 @@ export function SelectionPanel({ area, summary, loading, error, query, fileTag, 
         </dl>
 
         {error && !loading && (
-          <p role="alert" className="text-xs text-destructive" data-testid="selection-error">
-            {error}
-          </p>
+          <div className="flex flex-col items-start gap-2">
+            <p role="alert" className="text-xs text-destructive" data-testid="selection-error">
+              {error}
+            </p>
+            <Button type="button" variant="outline" size="sm" onClick={onRetry} className="shrink-0 max-lg:h-9">
+              Try again
+            </Button>
+          </div>
         )}
 
         {geoJsonError && (

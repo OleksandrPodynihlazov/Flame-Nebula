@@ -1,9 +1,10 @@
 import { useCallback, useMemo, useState } from 'react'
-import { ChevronRight, CircleAlert, SlidersHorizontal } from 'lucide-react'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { ChevronRight, SlidersHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { downloadCsv } from './api/client'
 import { BurnCalendar } from './components/BurnCalendar'
+import { EmptyState } from './components/EmptyState'
+import { ErrorAlert } from './components/ErrorAlert'
 import { CompareBars } from './components/compare/CompareBars'
 import { CompareMiniStats, CompareStats, type CompareSideData } from './components/compare/CompareStats'
 import { HotspotMap } from './components/HotspotMap'
@@ -19,9 +20,9 @@ import { useDashboardData } from './hooks/useDashboardData'
 import { useIsDesktop } from './hooks/useMediaQuery'
 import { usePatternCells, usePatternSummary } from './hooks/usePatternData'
 import type { Area, Filters, MapView } from './types/api'
-import { buildGrid } from './utils/calendar'
+import { gridForYear } from './utils/calendar'
 import { filtersForYear, formatMW } from './utils/compare'
-import { activeSensors, selectionLabel, toggleDatePatch, toggleMonthPatch, yearPatch } from './utils/filters'
+import { activeSensors, clearedFilters, selectionLabel, toggleDatePatch, toggleMonthPatch, yearPatch } from './utils/filters'
 import { PATTERN_DEFAULT_MONTH, YEAR_BANDS, patternStats, yearBands } from './utils/patterns'
 
 const PANEL_WIDTH = 600
@@ -52,9 +53,9 @@ export default function App() {
   const { calendar, stats, summary, isDemo, selectionQuery } = useDashboardData(filtersA, !isPatterns, compare === null && !isPatterns)
   const second = useDashboardData(filtersB, compare !== null && !isPatterns)
 
-  const grid = useMemo(() => (calendar.data ? buildGrid(filtersA.year, calendar.data) : null), [calendar.data, filtersA.year])
+  const grid = useMemo(() => gridForYear(filtersA.year, calendar.data), [calendar.data, filtersA.year])
   const gridB = useMemo(
-    () => (compare && second.calendar.data ? buildGrid(filtersB.year, second.calendar.data) : null),
+    () => (compare ? gridForYear(filtersB.year, second.calendar.data) : null),
     [compare, second.calendar.data, filtersB.year],
   )
   const update = (patch: Partial<Filters>) => setFilters((f) => ({ ...f, ...patch }))
@@ -73,15 +74,19 @@ export default function App() {
   }
 
   // Map and selection card show their own request errors.
-  const error = isPatterns
-    ? (patternSummary.error ?? cellsA.error ?? cellsB.error)
-    : (calendar.error ?? stats.error ?? (compare ? (second.calendar.error ?? second.stats.error) : null))
+  const endpoints = isPatterns
+    ? [patternSummary, cellsA, cellsB]
+    : [calendar, stats, ...(compare ? [second.calendar, second.stats] : [])]
+  const error = endpoints.find((e) => e.error !== null)?.error ?? null
+  // Only the failed requests run again; the ones that worked keep their data.
+  const retry = () => endpoints.forEach((e) => e.error !== null && e.reload())
 
-  const errorBanner = error && (
-    <Alert variant="destructive" className="border-destructive/40">
-      <CircleAlert aria-hidden="true" />
-      <AlertDescription>Could not load data: {error}</AlertDescription>
-    </Alert>
+  const errorBanner = error && <ErrorAlert message={error} onRetry={retry} />
+
+  // Zero is only "empty" once the answer is in: a failed or pending request is not.
+  const isEmpty = !isPatterns && !compare && stats.data?.total === 0 && !stats.loading
+  const emptyState = isEmpty && (
+    <EmptyState filters={filters} onClearFilters={() => setFilters(clearedFilters)} onClearArea={() => setArea(null)} />
   )
 
   const calendarView = (
@@ -163,7 +168,7 @@ export default function App() {
     query: selectionQuery,
     total: stats.data?.total ?? null,
     totalLoading: stats.loading,
-    selection: { summary: summary.data, loading: summary.loading, error: summary.error },
+    selection: { summary: summary.data, loading: summary.loading, error: summary.error, onRetry: summary.reload },
     label: selectionLabel(filters),
     sensors,
     area: filters.area,
@@ -229,15 +234,20 @@ export default function App() {
             >
               {isPatterns ? (
                 patternChart || patternMonths(true)
-              ) : compareChart || (
-                <MobileCalendar
-                  grid={grid}
-                  filters={filters}
-                  loading={calendar.loading}
-                  onYear={(year) => update(yearPatch(filters, year))}
-                  onMonth={(month) => update(month === null ? { month: null, date: null } : toggleMonthPatch(filters, month))}
-                  onDate={(date) => update(toggleDatePatch(filters, date))}
-                />
+              ) : (
+                compareChart || (
+                  <div className="flex flex-col gap-3">
+                    {emptyState}
+                    <MobileCalendar
+                      grid={grid}
+                      filters={filters}
+                      loading={calendar.loading}
+                      onYear={(year) => update(yearPatch(filters, year))}
+                      onMonth={(month) => update(month === null ? { month: null, date: null } : toggleMonthPatch(filters, month))}
+                      onDate={(date) => update(toggleDatePatch(filters, date))}
+                    />
+                  </div>
+                )
               )}
             </MobileSheet>
           </HotspotMap>
@@ -284,6 +294,7 @@ export default function App() {
                 ) : (
                   <StatCards stats={stats.data} grid={grid} scope={selectionLabel(filters)} loading={stats.loading} sensors={sensors} />
                 )}
+                {emptyState}
                 {compareChart || calendarView}
               </>
             )}

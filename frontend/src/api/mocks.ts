@@ -32,6 +32,14 @@ const DEFAULT_MOCK_SIZE = 6689
 // VITE_MOCK_SIZE only on the dev server, so a production build always ships the same demo set.
 const MOCK_SIZE = (import.meta.env.DEV ? envCount(import.meta.env.VITE_MOCK_SIZE) : null) ?? DEFAULT_MOCK_SIZE
 const MOCK_DELAY_MS = envCount(import.meta.env.VITE_MOCK_DELAY_MS)
+
+/** Endpoint names from a comma list (`stats, calendar`): lower-cased, trimmed, empties dropped. */
+export function parseMockFail(raw: string | undefined): Set<string> {
+  return new Set((raw ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean))
+}
+
+// VITE_MOCK_FAIL only on the dev server, so a production build never fails on purpose.
+const MOCK_FAIL = import.meta.env.DEV ? parseMockFail(import.meta.env.VITE_MOCK_FAIL) : new Set<string>()
 const MONTH_WEIGHTS = [3, 3, 4, 5, 5, 8, 16, 22, 12, 9, 7, 6]
 const TYPE_WEIGHTS: [FireType, number][] = [[0, 967], [1, 1], [2, 30], [3, 2]]
 const CLUSTERS: { lat: number; lon: number; spread: number; weight: number }[] = [
@@ -157,9 +165,15 @@ function filter(q: ApiQuery) {
   })
 }
 
-function delay<T>(value: T): Promise<T> {
-  if (MOCK_DELAY_MS === null) return Promise.resolve(value)
-  return new Promise((resolve) => setTimeout(() => resolve(value), MOCK_DELAY_MS))
+/** Answers after the fake latency; rejects like a failing API when `endpoint` is listed in VITE_MOCK_FAIL. */
+function delay<T>(value: T, endpoint?: string): Promise<T> {
+  const answer = (): Promise<T> => {
+    if (endpoint === undefined || !MOCK_FAIL.has(endpoint)) return Promise.resolve(value)
+    console.warn(`[mock] forced failure: ${endpoint}`)
+    return Promise.reject(new Error(`HTTP 503: /api/${endpoint} is unavailable (forced by VITE_MOCK_FAIL)`))
+  }
+  if (MOCK_DELAY_MS === null) return answer()
+  return new Promise((resolve, reject) => setTimeout(() => answer().then(resolve, reject), MOCK_DELAY_MS))
 }
 
 const ITALY = 'Italy'
@@ -221,7 +235,7 @@ export function mockRegion(id: number): Promise<RegionFeature> {
 }
 
 export function mockHotspots(q: ApiQuery): Promise<HotspotCollection> {
-  return delay({ type: 'FeatureCollection', features: filter(q) })
+  return delay({ type: 'FeatureCollection', features: filter(q) }, 'hotspots')
 }
 
 /** Same grouping as the API: floor(lat / cell), floor(lon / cell); type = most common, lowest on a tie. */
@@ -242,7 +256,7 @@ export function mockGrid(q: ApiQuery): Promise<GridResponse> {
     for (const t of [1, 2, 3] as const) if (g.types[t] > g.types[type]) type = t
     return { lat: +(g.lat / g.count).toFixed(4), lon: +(g.lon / g.count).toFixed(4), count: g.count, type }
   })
-  return delay({ cell, cells })
+  return delay({ cell, cells }, 'grid')
 }
 
 export function mockStats(q: ApiQuery): Promise<StatsResponse> {
@@ -254,7 +268,7 @@ export function mockStats(q: ApiQuery): Promise<StatsResponse> {
     res.by_daynight[p.daynight] = (res.by_daynight[p.daynight] ?? 0) + 1
   }
   res.frp_sum = Math.round(res.frp_sum * 10) / 10
-  return delay(res)
+  return delay(res, 'stats')
 }
 
 export function mockCalendar(q: ApiQuery): Promise<CalendarResponse> {
@@ -268,7 +282,7 @@ export function mockCalendar(q: ApiQuery): Promise<CalendarResponse> {
   const days = [...byDay]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, d]) => ({ date, count: d.count, frp: Math.round(d.frp * 10) / 10 }))
-  return delay({ days })
+  return delay({ days }, 'calendar')
 }
 
 const PATTERN_YEARS = 14
@@ -319,7 +333,7 @@ function patternCells(month: number): PatternCell[] {
 
 export function mockPatterns(q: PatternQuery): Promise<PatternsResponse> {
   const month = q.month ?? 8
-  return delay({ month, cells: patternCells(month).filter((c) => patternInArea(c, q)) })
+  return delay({ month, cells: patternCells(month).filter((c) => patternInArea(c, q)) }, 'patterns')
 }
 
 export function mockPatternSummary(q: PatternQuery): Promise<PatternSummaryResponse> {
@@ -332,10 +346,10 @@ export function mockPatternSummary(q: PatternQuery): Promise<PatternSummaryRespo
       max_probability: cells.reduce((m, c) => Math.max(m, c.probability), 0),
     }
   })
-  return delay({ months })
+  return delay({ months }, 'pattern-summary')
 }
 
 /** Same numbers as the API, computed from the filtered dots (the browser summary the endpoint replaced). */
 export function mockSelectionSummary(q: ApiQuery): Promise<SelectionSummaryResponse> {
-  return delay(summarizeFeatures(filter(q)))
+  return delay(summarizeFeatures(filter(q)), 'selection-summary')
 }

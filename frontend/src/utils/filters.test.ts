@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_FILTERS } from '../constants/fire'
-import { countChangedFilters, toggleDatePatch, toggleMonthPatch, yearPatch } from './filters'
+import { clearedFilters, countChangedFilters, filterSummary, toggleDatePatch, toggleMonthPatch, yearPatch } from './filters'
 
 describe('toggleMonthPatch', () => {
   it('selects a month and clears the day', () => {
@@ -52,5 +52,33 @@ describe('countChangedFilters', () => {
 
   it('treats reordered types and sensors as unchanged', () => {
     expect(countChangedFilters({ ...DEFAULT_FILTERS, types: [3, 2, 1, 0] })).toBe(0)
+  })
+})
+
+describe('clearedFilters', () => {
+  it('resets type, pass, noise and sensors and keeps year, period and area', () => {
+    const area = { kind: 'circle', lat: 41, lon: 12, radiusKm: 20 } as const
+    const f = { ...DEFAULT_FILTERS, year: 2012, month: 7 as const, area, types: [1] as typeof DEFAULT_FILTERS.types, daynight: 'N' as const, hideNoise: true, sensors: ['VIIRS' as const] }
+    expect(clearedFilters(f)).toEqual({ ...DEFAULT_FILTERS, year: 2012, month: 7, area })
+  })
+
+  it('leaves nothing for the badge to count', () => {
+    expect(countChangedFilters(clearedFilters({ ...DEFAULT_FILTERS, daynight: 'D', hideNoise: true }))).toBe(0)
+  })
+})
+
+describe('filterSummary', () => {
+  it('names only the period for default filters', () => {
+    expect(filterSummary(DEFAULT_FILTERS)).toBe('Full year 2008')
+  })
+
+  it('lists period, pass, type and area in that order', () => {
+    const f = { ...DEFAULT_FILTERS, month: 7 as const, daynight: 'N' as const, types: [1 as const], area: { kind: 'polygon' as const, points: [] } }
+    expect(filterSummary(f)).toBe('Aug 2008 · Night only · Active volcano · Selected area')
+  })
+
+  it('names a region and non-default sensors', () => {
+    const area = { kind: 'region' as const, id: 9, name: 'Sardegna', path: '', geometry: { type: 'Polygon' as const, coordinates: [] } }
+    expect(filterSummary({ ...DEFAULT_FILTERS, year: 2020, sensors: ['VIIRS'], hideNoise: true, area })).toBe('Full year 2020 · Noise hidden · VIIRS · Sardegna')
   })
 })

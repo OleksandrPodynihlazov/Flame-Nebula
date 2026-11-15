@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { USE_MOCKS, fetchCalendar, fetchSelectionSummary, fetchStats } from '../api/client'
 import type { ApiQuery, CalendarResponse, Filters, SelectionSummaryResponse, StatsResponse } from '../types/api'
 import { selectionQuery, yearQuery } from '../utils/filters'
@@ -8,10 +8,13 @@ export interface State<T> {
   data: T | null
   loading: boolean
   error: string | null
+  /** Asks again for the same query, e.g. after an error. No-op while nothing is loaded. */
+  reload: () => void
 }
 
 interface Settled<T> {
   key: string | null
+  nonce: number
   data: T | null
   error: string | null
 }
@@ -19,9 +22,12 @@ interface Settled<T> {
 /**
  * `query` null = nothing to load: no request, no data. A changed query is asked for only after it has
  * stayed the same for FILTER_DEBOUNCE_MS; meanwhile `loading` is true and the previous data stays.
+ * `reload` repeats the request at once; the error is hidden until the new answer arrives.
  */
 export function useEndpoint<T, Q = ApiQuery>(fetcher: (q: Q, s: AbortSignal) => Promise<T>, query: Q | null): State<T> {
-  const [settled, setSettled] = useState<Settled<T>>({ key: null, data: null, error: null })
+  const [settled, setSettled] = useState<Settled<T>>({ key: null, nonce: 0, data: null, error: null })
+  const [nonce, setNonce] = useState(0)
+  const reload = useCallback(() => setNonce((n) => n + 1), [])
   const key = query === null ? null : JSON.stringify(query)
   const requestKey = useDebouncedValue(key, FILTER_DEBOUNCE_MS)
 
@@ -31,17 +37,18 @@ export function useEndpoint<T, Q = ApiQuery>(fetcher: (q: Q, s: AbortSignal) => 
     fetcher(JSON.parse(requestKey) as Q, ctrl.signal)
       .then((data) => {
         // Mocks ignore the signal: a superseded response must never overwrite a newer query.
-        if (!ctrl.signal.aborted) setSettled({ key: requestKey, data, error: null })
+        if (!ctrl.signal.aborted) setSettled({ key: requestKey, nonce, data, error: null })
       })
       .catch((err: unknown) => {
         if (!ctrl.signal.aborted)
-          setSettled((s) => ({ ...s, key: requestKey, error: err instanceof Error ? err.message : String(err) }))
+          setSettled((s) => ({ ...s, key: requestKey, nonce, error: err instanceof Error ? err.message : String(err) }))
       })
     return () => ctrl.abort()
-  }, [fetcher, requestKey])
+  }, [fetcher, requestKey, nonce])
 
-  if (key === null) return { data: null, loading: false, error: null }
-  return { data: settled.data, error: settled.error, loading: settled.key !== key }
+  if (key === null) return { data: null, loading: false, error: null, reload }
+  const loading = settled.key !== key || settled.nonce !== nonce
+  return { data: settled.data, error: loading ? null : settled.error, loading, reload }
 }
 
 /**

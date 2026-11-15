@@ -50,6 +50,16 @@
 
 /* Not `inline`: the Leaflet override below reads var(--font-sans), so it must exist as a CSS variable. */
 @theme {
+  --animate-map-progress: map-progress 1.2s ease-in-out infinite;
+  @keyframes map-progress {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(300%);
+    }
+  }
+
   --font-sans: 'Space Grotesk Variable', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 }

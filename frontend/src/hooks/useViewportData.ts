@@ -1,5 +1,5 @@
 import type L from 'leaflet'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useMap } from 'react-leaflet'
 import { fetchGrid, fetchHotspots } from '../api/client'
 import type { ApiQuery, GridCell, HotspotFeature } from '../types/api'
@@ -16,6 +16,8 @@ export interface ViewportData {
   data: MapData | null
   loading: boolean
   error: string | null
+  /** Asks again for the same view and query, e.g. after an error. */
+  reload: () => void
 }
 
 interface Settled {
@@ -49,6 +51,8 @@ export function useViewportData(query: ApiQuery): ViewportData {
   const map = useMap()
   const [view, setView] = useState<View | null>(() => currentView(map))
   const [settled, setSettled] = useState<Settled | null>(null)
+  const [nonce, setNonce] = useState(0)
+  const reload = useCallback(() => setNonce((n) => n + 1), [])
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined
@@ -68,13 +72,13 @@ export function useViewportData(query: ApiQuery): ViewportData {
   }, [map])
 
   const queryKey = JSON.stringify(query)
-  const key = JSON.stringify([queryKey, view])
+  const key = JSON.stringify([queryKey, view, nonce])
   // Filter changes wait like map moves do, so quick clicks (e.g. sensor on/off/on) load once.
   const requestQueryKey = useDebouncedValue(queryKey, VIEW_DEBOUNCE_MS)
 
   useEffect(() => {
     if (view === null) return
-    const requestKey = JSON.stringify([requestQueryKey, view])
+    const requestKey = JSON.stringify([requestQueryKey, view, nonce])
     const ctrl = new AbortController()
     load(JSON.parse(requestQueryKey) as ApiQuery, view, ctrl.signal)
       .then((data) => {
@@ -92,11 +96,11 @@ export function useViewportData(query: ApiQuery): ViewportData {
         }
       })
     return () => ctrl.abort()
-  }, [requestQueryKey, view])
+  }, [requestQueryKey, view, nonce])
 
-  if (view === null) return { data: null, loading: false, error: null }
+  if (view === null) return { data: null, loading: false, error: null, reload }
   const loading = settled?.key !== key
   // Old data stays only while the same query loads a new view (pan / zoom); never across filters.
   const data = settled?.queryKey === queryKey ? settled.data : null
-  return { data, loading, error: loading ? null : (settled?.error ?? null) }
+  return { data, loading, error: loading ? null : (settled?.error ?? null), reload }
 }

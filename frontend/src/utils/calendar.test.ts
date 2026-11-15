@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { RAMP, buildGrid, heatInk, topDays } from './calendar'
+import { RAMP, buildGrid, gridForYear, heatInk, topDays } from './calendar'
 
 const luminance = (hex: string) => {
   const [r, g, b] = [1, 3, 5].map((i) => {
@@ -49,5 +49,25 @@ describe('topDays', () => {
 
   it('returns nothing for an empty year', () => {
     expect(topDays(buildGrid(2008, { days: [] }), 2008, null, 3)).toEqual([])
+  })
+})
+
+describe('gridForYear', () => {
+  const days = { days: [{ date: '2008-03-02', count: 4, frp: 10 }] }
+
+  it('builds the grid when the days belong to the year', () => {
+    expect(gridForYear(2008, days)?.total).toBe(4)
+  })
+
+  it('is null without an answer', () => {
+    expect(gridForYear(2008, null)).toBeNull()
+  })
+
+  it('is null for another year instead of a grid of zeros', () => {
+    expect(gridForYear(2010, days)).toBeNull()
+  })
+
+  it('builds an empty grid for a year without days', () => {
+    expect(gridForYear(2010, { days: [] })?.total).toBe(0)
   })
 })

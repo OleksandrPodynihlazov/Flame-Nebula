@@ -1,5 +1,6 @@
 import type { ComponentProps } from 'react'
 import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { MONTHS_FULL } from '../constants/fire'
 import type { Sensor, StatsResponse } from '../types/api'
@@ -28,6 +29,14 @@ export function Metric({ label, children, footer, className }: { label: string; 
       {footer && <dd className="min-w-0 text-xs text-muted-foreground">{footer}</dd>}
     </div>
   )
+}
+
+/** Old numbers stay on screen, dimmed, while the same readout reloads; the first load shows skeletons instead. */
+export const DIM = 'opacity-60 motion-safe:transition-opacity'
+
+/** Read by screen readers once per loading region; the region itself carries `aria-busy`. */
+export function SrLoading() {
+  return <span className="sr-only">Loading…</span>
 }
 
 export const FIGURE = 'font-mono font-semibold text-foreground tabular-nums'
@@ -95,9 +104,13 @@ export function StatCards({ stats, grid, scope, loading, sensors }: Props) {
   const day = stats?.by_daynight.D ?? 0
   const night = stats?.by_daynight.N ?? 0
   const peak = grid?.peakMonth
+  const first = loading && stats === null
+  const peakFirst = loading && grid === null
+  const none = '—'
 
   return (
-    <div className={cn('flex shrink-0 flex-col gap-3', loading && 'opacity-60')} aria-busy={loading}>
+    <div className={cn('flex shrink-0 flex-col gap-3', loading && !first && DIM)} aria-busy={loading}>
+      {first && <SrLoading />}
       <p className="flex items-center gap-2 text-xs text-muted-foreground">
         <Badge variant="outline" className="font-mono text-foreground">
           {scope}
@@ -106,17 +119,25 @@ export function StatCards({ stats, grid, scope, loading, sensors }: Props) {
       </p>
       <Readout className="grid-cols-[1fr_0.9fr_1.3fr]">
         <Metric label="Hotspots" footer={<span className="block truncate">detections</span>}>
-          <span className={cn(FIGURE, 'text-3xl leading-none')} data-testid="stat-total">
-            {total.toLocaleString('en-US')}
-          </span>
+          {first ? (
+            <Skeleton className="h-[30px] w-20" />
+          ) : (
+            <span className={cn(FIGURE, 'text-3xl leading-none')} data-testid="stat-total">
+              {stats ? total.toLocaleString('en-US') : none}
+            </span>
+          )}
         </Metric>
         <Metric label="Peak month" footer={peak ? <span className="block truncate font-mono tabular-nums">{peak.count.toLocaleString('en-US')} in year</span> : <span>&nbsp;</span>}>
-          <span className="text-xl leading-none font-semibold text-foreground">{peak ? MONTHS_FULL[peak.month] : '—'}</span>
+          {peakFirst ? <Skeleton className="h-5 w-24" /> : <span className="text-xl leading-none font-semibold text-foreground">{peak ? MONTHS_FULL[peak.month] : none}</span>}
         </Metric>
         <Metric label="Day / night" footer={dayNightFooter(day, total)}>
-          <span className="flex items-baseline gap-x-1.5 text-xl leading-none">
-            <DayNight day={day} night={night} />
-          </span>
+          {first ? (
+            <Skeleton className="h-5 w-28" />
+          ) : (
+            <span className="flex items-baseline gap-x-1.5 text-xl leading-none">
+              <DayNight day={day} night={night} />
+            </span>
+          )}
         </Metric>
       </Readout>
     </div>
@@ -128,22 +149,36 @@ export function MiniStats({ stats, grid, loading }: Omit<Props, 'scope' | 'senso
   const day = stats?.by_daynight.D ?? 0
   const night = stats?.by_daynight.N ?? 0
   const peak = grid?.peakMonth
+  const first = loading && stats === null
+  const peakFirst = loading && grid === null
+  const none = '—'
 
   return (
-    <Readout className={cn('grid-cols-[1fr_1fr_1.4fr]', loading && 'opacity-60')} aria-busy={loading}>
-      <Metric label="Hotspots" className="px-3">
-        <span className={cn(FIGURE, 'text-base leading-none')} data-testid="stat-total">
-          {total.toLocaleString('en-US')}
-        </span>
-      </Metric>
-      <Metric label="Peak month" className="px-3">
-        <span className="text-base leading-none font-semibold text-foreground">{peak ? MONTHS_FULL[peak.month].slice(0, 3) : '—'}</span>
-      </Metric>
-      <Metric label="Day / night" className="px-3" footer={dayNightFooter(day, total, false)}>
-        <span className="flex items-baseline gap-x-1 text-base leading-none">
-          <DayNight day={day} night={night} />
-        </span>
-      </Metric>
-    </Readout>
+    <div className={cn(loading && !first && DIM)} aria-busy={loading}>
+      {first && <SrLoading />}
+      <Readout className="grid-cols-[1fr_1fr_1.4fr]">
+        <Metric label="Hotspots" className="px-3">
+          {first ? (
+            <Skeleton className="h-4 w-12" />
+          ) : (
+            <span className={cn(FIGURE, 'text-base leading-none')} data-testid="stat-total">
+              {stats ? total.toLocaleString('en-US') : none}
+            </span>
+          )}
+        </Metric>
+        <Metric label="Peak month" className="px-3">
+          {peakFirst ? <Skeleton className="h-4 w-10" /> : <span className="text-base leading-none font-semibold text-foreground">{peak ? MONTHS_FULL[peak.month].slice(0, 3) : none}</span>}
+        </Metric>
+        <Metric label="Day / night" className="px-3" footer={dayNightFooter(day, total, false)}>
+          {first ? (
+            <Skeleton className="h-4 w-20" />
+          ) : (
+            <span className="flex items-baseline gap-x-1 text-base leading-none">
+              <DayNight day={day} night={night} />
+            </span>
+          )}
+        </Metric>
+      </Readout>
+    </div>
   )
 }
