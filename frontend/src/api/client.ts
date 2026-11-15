@@ -13,7 +13,17 @@ import type {
   SelectionSummaryResponse,
   StatsResponse,
 } from '../types/api'
-import { mockCalendar, mockGrid, mockHotspots, mockPatternSummary, mockPatterns, mockSelectionSummary, mockStats } from './mocks'
+import {
+  mockCalendar,
+  mockGrid,
+  mockHotspots,
+  mockPatternSummary,
+  mockPatterns,
+  mockRegion,
+  mockSearchRegions,
+  mockSelectionSummary,
+  mockStats,
+} from './mocks'
 
 export const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true'
 
@@ -67,10 +77,10 @@ export const fetchSelectionSummary = (q: ApiQuery, signal?: AbortSignal) =>
 
 /**
  * `GET /api/regions?q=` — name search, 2–100 chars, prefix matches first, max 20.
- * Mock mode has no regions, so it returns none.
+ * Mock mode searches a few demo regions.
  */
 export async function searchRegions(q: string, signal?: AbortSignal): Promise<Region[]> {
-  if (USE_MOCKS) return []
+  if (USE_MOCKS) return mockSearchRegions(q)
   const res = await fetch(`/api/regions?${new URLSearchParams({ q })}`, { signal })
   if (!res.ok) throw new Error(await errorMessage(res))
   return ((await res.json()) as RegionsResponse).regions
@@ -78,6 +88,7 @@ export async function searchRegions(q: string, signal?: AbortSignal): Promise<Re
 
 /** `GET /api/regions/:id` — the region with its simplified outline. */
 export async function fetchRegion(id: number, signal?: AbortSignal): Promise<RegionFeature> {
+  if (USE_MOCKS) return mockRegion(id)
   const res = await fetch(`/api/regions/${id}`, { signal })
   if (!res.ok) throw new Error(await errorMessage(res))
   return (await res.json()) as RegionFeature

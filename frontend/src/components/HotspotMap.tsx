@@ -242,6 +242,7 @@ export function HotspotMap({
         bounds={ITALY_BOUNDS}
         boundsOptions={fitOptions}
         zoomControl={false}
+        zoomSnap={0.25}
         preferCanvas
         className="z-10 h-full w-full"
       >
