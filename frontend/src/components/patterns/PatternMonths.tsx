@@ -10,9 +10,9 @@ interface Props {
   compact?: boolean
 }
 
-/** 12 month buttons for the pattern view: colour = how many likely cells that month has. */
+/** 12 month buttons for the pattern view: colour = how many recurring cells that month has. */
 export function PatternMonths({ months, selected, loading, onSelect, compact = false }: Props) {
-  const max = Math.max(1, ...(months ?? []).map((m) => m.likely))
+  const max = Math.max(1, ...(months ?? []).map((m) => m.cells))
   return (
     <div
       className={`flex flex-col gap-3 ${compact ? '' : 'rounded-xl border border-slate-800 bg-slate-900/70 p-4'}`}
@@ -22,13 +22,13 @@ export function PatternMonths({ months, selected, loading, onSelect, compact = f
       {!compact && (
         <div>
           <h2 className="text-sm font-semibold text-white">Fire patterns by month</h2>
-          <p className="text-xs text-slate-400">Cells that burned in at least half of the years (S-NPP, 2012–2025). Pick a month.</p>
+          <p className="text-xs text-slate-400">Cells that burned in at least 12 of 14 years that month (S-NPP, 2012–2025). Pick a month.</p>
         </div>
       )}
       <div className={`grid grid-cols-4 gap-2 transition-opacity ${loading ? 'opacity-60' : ''}`} role="radiogroup" aria-label="Pattern month">
         {MONTHS.map((name, i) => {
           const m = months?.[i]
-          const likely = m?.likely ?? 0
+          const likely = m?.cells ?? 0
           const ratio = likely / max
           const active = selected === i + 1
           return (
@@ -37,7 +37,7 @@ export function PatternMonths({ months, selected, loading, onSelect, compact = f
               type="button"
               role="radio"
               aria-checked={active}
-              aria-label={`${MONTHS_FULL[i]}: ${likely} likely cells`}
+              aria-label={`${MONTHS_FULL[i]}: ${likely} recurring cells`}
               onClick={() => onSelect(i + 1)}
               className={`flex flex-col items-start rounded-lg px-2.5 py-2 text-left transition-transform active:scale-95 ${
                 active ? 'ring-2 ring-white' : 'ring-1 ring-slate-800'
@@ -50,7 +50,7 @@ export function PatternMonths({ months, selected, loading, onSelect, compact = f
           )
         })}
       </div>
-      <p className="text-[11px] text-slate-500">Number = likely cells (≥50% of years) in the area.</p>
+      <p className="text-[11px] text-slate-500">Number = recurring cells (≥12 of 14 years) in the area.</p>
     </div>
   )
 }

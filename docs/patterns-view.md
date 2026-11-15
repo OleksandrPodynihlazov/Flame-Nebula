@@ -6,18 +6,18 @@ A second map layer next to the hotspots: where fire comes back in a given month,
 ## Use
 
 - **Layers** button on the map (desktop: bottom right; phone: top left) switches Hotspots ↔ Patterns.
-- Each 0.1° cell is a square. Colour and opacity = probability: the share of observed years in which the cell burned that month.
+- Only cells that burned in **at least 12 of 14 years** that month are shown (`min_probability=0.857`, filtered in the API). Colour: 12/14 light → 14/14 dark red.
 - Hover a cell (desktop) or tap it (phone): probability, years burned out of years observed, median detections that month, cell centre.
-- Pick the month with the 12 month buttons (desktop panel; phone: pull the sheet up). The number on each = likely cells (≥ 50 %).
-- Stats: likely cells, the most regular cell, cells with any fire history that month.
+- Pick the month with the 12 month buttons (desktop panel; phone: pull the sheet up). The number on each = recurring cells (≥ 12 of 14 years).
+- Stats: recurring cells, the most regular cell, cells that burned every year (14 of 14).
 - Only the area filter applies (drawn area, circle, polygon, region search). Year, fire type, day/night and sensors are hotspot filters.
 - Days and single years are not shown on purpose: a pattern is a month across years.
 
 ## Compare
 
 Compare in pattern view puts two **months** side by side with the same divider as the hotspot compare
-(`SwipeCompare`, docs/compare-mode.md). Stats show one row per month with the change in likely cells;
-the chart shows how many cells fall into each probability band for both months.
+(`SwipeCompare`, docs/compare-mode.md). Stats show one row per month with the change in recurring cells;
+the chart shows how many cells burned 12, 13 or 14 of 14 years in each month.
 
 ## Files
 

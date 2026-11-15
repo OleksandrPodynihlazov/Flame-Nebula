@@ -29,7 +29,7 @@ test('layers switch to patterns, months change the map, compare splits two month
   await expect(page.getByTestId('compare-divider')).toBeVisible();
   await expect(page.getByTestId('compare-label-b')).toContainText('August');
   await expect(page.getByTestId('pattern-stats').getByTestId('pattern-likely')).toHaveCount(2);
-  await expect(page.getByTestId('compare-bars').getByTestId('compare-bar')).toHaveCount(10);
+  await expect(page.getByTestId('compare-bars').getByTestId('compare-bar')).toHaveCount(6);
 
   await page.getByTestId('compare-toggle').click();
   await page.getByTestId('layers-button').click();

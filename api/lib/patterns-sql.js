@@ -16,8 +16,17 @@ export function parseMonth(query) {
   return Number(raw);
 }
 
+// Optional `min_probability` (0–1): drop cells that burned in fewer years. Absent → all cells.
+export function parseMinProbability(query) {
+  const raw = query.min_probability;
+  if (raw === undefined) return null;
+  const n = typeof raw === "string" && /^(0(\.\d+)?|1(\.0+)?)$/.test(raw) ? Number(raw) : NaN;
+  if (!Number.isFinite(n)) throw httpError("min_probability must be a number from 0 to 1");
+  return n;
+}
+
 // Cell centres as `latitude` / `longitude`, so buildWhere's bbox, circle and polygon apply to them.
-function source(filters) {
+function source(filters, minProbability = null) {
   const area = buildWhere({ bbox: filters.bbox, circle: filters.circle, polygon: filters.polygon });
   const params = [...area.params];
   let regionCond = "";
@@ -29,14 +38,19 @@ function source(filters) {
       `JOIN hotspot_regions hr ON hr.hotspot_id = h.id ` +
       `WHERE hr.region_id = $${params.length} AND h.satellite = 'N')`;
   }
+  let minCond = "";
+  if (minProbability !== null) {
+    params.push(minProbability);
+    minCond = ` AND p.probability >= $${params.length}`;
+  }
   const text =
     `(SELECT p.*, (p.cell_lat + 0.5) / 10.0 AS latitude, (p.cell_lon + 0.5) / 10.0 AS longitude ` +
-    `FROM fire_patterns p WHERE true${regionCond}) c ${area.where}`;
+    `FROM fire_patterns p WHERE true${regionCond}${minCond}) c ${area.where}`;
   return { text, params, hasWhere: area.where !== "" };
 }
 
-export function patternsSql(filters, month) {
-  const src = source(filters);
+export function patternsSql(filters, month, minProbability = null) {
+  const src = source(filters, minProbability);
   const params = [...src.params, month];
   const text =
     `SELECT round(latitude::numeric, 2)::float8 AS lat, round(longitude::numeric, 2)::float8 AS lon, ` +
@@ -47,8 +61,8 @@ export function patternsSql(filters, month) {
   return { text, values: params };
 }
 
-export function summarySql(filters) {
-  const src = source(filters);
+export function summarySql(filters, minProbability = null) {
+  const src = source(filters, minProbability);
   const text =
     `SELECT month, COUNT(*)::int AS cells, ` +
     `COUNT(*) FILTER (WHERE probability >= ${LIKELY})::int AS likely, ` +

@@ -9,7 +9,6 @@ import { useHotspotLayer } from "../hooks/useHotspotLayer";
 import { usePatternLayer } from "../hooks/usePatternLayer";
 import { useViewportData } from "../hooks/useViewportData";
 import type { ApiQuery, Area, HotspotFeature, MapView, PatternCell, Sensor } from "../types/api";
-import { LIKELY } from "../utils/patterns";
 import { MapLayersButton } from "./MapLayersButton";
 import { MapLegend, SideLegend } from "./MapLegend";
 import { RegionOutline } from "./RegionOutline";
@@ -84,7 +83,6 @@ export interface PatternMapView {
   b: PatternSide | null;
 }
 
-const likelyCount = (cells: PatternCell[] | null) => cells?.filter((c) => c.probability >= LIKELY).length ?? null;
 
 function PatternLayer({ side, pane, mobile }: { side: PatternSide; pane: string; mobile: boolean }) {
   usePatternLayer(side.cells, MONTHS_FULL[side.month - 1], side.loading && side.cells !== null, mobile, pane);
@@ -92,20 +90,16 @@ function PatternLayer({ side, pane, mobile }: { side: PatternSide; pane: string;
 }
 
 function PatternLabel({ side }: { side: PatternSide }) {
-  const likely = likelyCount(side.cells);
   return (
     <span className="font-medium text-slate-100">
       <span className="font-semibold">{MONTHS_FULL[side.month - 1]}</span>
-      <span className="text-slate-400"> · {side.loading || likely === null ? "…" : `${likely.toLocaleString()} likely`}</span>
+      <span className="text-slate-400"> · {side.loading || side.cells === null ? "…" : `${side.cells.length.toLocaleString()} cells`}</span>
     </span>
   );
 }
 
 function PatternStatus({ side, mobile, fitOptions }: { side: PatternSide; mobile: boolean; fitOptions?: FitBoundsOptions }) {
-  const likely = likelyCount(side.cells);
-  const text = side.loading || side.cells === null
-    ? "loading…"
-    : `${side.cells.length.toLocaleString()} cells · ${likely?.toLocaleString()} likely`;
+  const text = side.loading || side.cells === null ? "loading…" : `${side.cells.length.toLocaleString()} cells burned ≥12 of 14 years`;
   return (
     <div
       className={`absolute top-3 z-[1000] flex items-center gap-2 rounded-lg border bg-slate-900/90 px-3 py-1.5 shadow-xl backdrop-blur-md ${

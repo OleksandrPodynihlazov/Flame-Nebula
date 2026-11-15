@@ -19,7 +19,7 @@ import type { Area, Filters, HotspotFeature, MapView } from './types/api'
 import { buildGrid } from './utils/calendar'
 import { filtersForYear, formatMW } from './utils/compare'
 import { activeSensors, selectionLabel, toggleDatePatch, toggleMonthPatch, yearPatch } from './utils/filters'
-import { PATTERN_DEFAULT_MONTH, PROBABILITY_BUCKETS, patternStats, probabilityBuckets } from './utils/patterns'
+import { PATTERN_DEFAULT_MONTH, YEAR_BANDS, patternStats, yearBands } from './utils/patterns'
 
 const NO_FEATURES: readonly HotspotFeature[] = []
 const PANEL_WIDTH = 600
@@ -131,13 +131,13 @@ export default function App() {
 
   const patternChart = patternCompare && (
     <CompareBars
-      title={`Cells by fire probability · ${MONTHS_FULL[patternCompare.a - 1]} vs ${MONTHS_FULL[patternCompare.b - 1]}`}
-      subtitle="How many 0.1° cells burn in that share of years. Same area on both sides."
-      categories={PROBABILITY_BUCKETS}
+      title={`Recurring cells · ${MONTHS_FULL[patternCompare.a - 1]} vs ${MONTHS_FULL[patternCompare.b - 1]}`}
+      subtitle="0.1° cells by years burned that month. Same area on both sides."
+      categories={YEAR_BANDS}
       loading={cellsA.loading || cellsB.loading}
       series={[
-        { label: MONTHS_FULL[patternCompare.a - 1], color: COMPARE_COLORS.a, values: probabilityBuckets(cellsA.data?.cells ?? null) },
-        { label: MONTHS_FULL[patternCompare.b - 1], color: COMPARE_COLORS.b, values: probabilityBuckets(cellsB.data?.cells ?? null) },
+        { label: MONTHS_FULL[patternCompare.a - 1], color: COMPARE_COLORS.a, values: yearBands(cellsA.data?.cells ?? null) },
+        { label: MONTHS_FULL[patternCompare.b - 1], color: COMPARE_COLORS.b, values: yearBands(cellsB.data?.cells ?? null) },
       ]}
     />
   )

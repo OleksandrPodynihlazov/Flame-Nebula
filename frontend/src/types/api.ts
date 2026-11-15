@@ -85,6 +85,8 @@ export interface PatternSummaryResponse {
 /** Query for /api/patterns(/summary): the area only, plus the month (1–12) for /api/patterns. */
 export interface PatternQuery {
   month?: number
+  /** Hide cells below this probability (0–1). */
+  min_probability?: number
   lat?: number
   lon?: number
   radius_km?: number

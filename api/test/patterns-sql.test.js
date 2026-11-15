@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { parseFilters } from "../lib/query.js";
-import { LIKELY, fillMonths, parseMonth, patternsSql, summarySql } from "../lib/patterns-sql.js";
+import { LIKELY, fillMonths, parseMinProbability, parseMonth, patternsSql, summarySql } from "../lib/patterns-sql.js";
 
 const bad = (query, re) => assert.throws(() => parseMonth(query), (e) => e.status === 400 && re.test(e.message));
 
@@ -48,4 +48,21 @@ test("fillMonths returns all 12 months, zero where there is no row", () => {
   assert.equal(months.length, 12);
   assert.deepEqual(months[0], { month: 1, cells: 0, likely: 0, max_probability: 0 });
   assert.deepEqual(months[7], { month: 8, cells: 900, likely: 300, max_probability: 1 });
+});
+
+test("min_probability: optional, 0-1", () => {
+  assert.equal(parseMinProbability({}), null);
+  assert.equal(parseMinProbability({ min_probability: "0.857" }), 0.857);
+  assert.equal(parseMinProbability({ min_probability: "1" }), 1);
+  for (const v of ["1.2", "-0.1", "abc", ""]) {
+    assert.throws(() => parseMinProbability({ min_probability: v }), (e) => e.status === 400);
+  }
+});
+
+test("min_probability filters cells before the area and keeps month last", () => {
+  const sql = patternsSql(parseFilters({ bbox: "6,36,19,48" }), 8, 0.857);
+  assert.deepEqual(sql.values.slice(-2), [0.857, 8]);
+  assert.match(sql.text, /p\.probability >= \$\d+/);
+  const sum = summarySql(parseFilters({}), 0.857);
+  assert.deepEqual(sum.values, [0.857]);
 });

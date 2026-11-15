@@ -37,12 +37,12 @@ export function PatternStats({ a, b = null }: { a: PatternSideStats; b?: Pattern
             style={b ? { borderColor: COMPARE_COLORS[d.side] } : undefined}
             aria-busy={d.loading}
           >
-            <Card title="Likely cells" badge={MONTHS_FULL[d.month - 1]}>
+            <Card title="Recurring cells" badge={MONTHS_FULL[d.month - 1]}>
               <span className="font-mono text-2xl font-bold text-white" data-testid="pattern-likely">
-                {d.stats ? d.stats.likely.toLocaleString() : '—'}
+                {d.stats ? d.stats.cells.toLocaleString() : '—'}
               </span>
-              {other && <Delta from={other.stats?.likely} to={d.stats?.likely} />}
-              {!other && <span className="text-xs text-slate-400">burned ≥50% of years</span>}
+              {other && <Delta from={other.stats?.cells} to={d.stats?.cells} />}
+              {!other && <span className="text-xs text-slate-400">burned ≥12 of 14 years</span>}
             </Card>
             <Card title="Most regular cell">
               <span className="text-base font-bold whitespace-nowrap text-white">{topLine(d.stats)}</span>
@@ -52,10 +52,10 @@ export function PatternStats({ a, b = null }: { a: PatternSideStats; b?: Pattern
                 </span>
               )}
             </Card>
-            <Card title="Cells with fire">
-              <span className="font-mono text-xl font-bold text-white">{d.stats ? d.stats.cells.toLocaleString() : '—'}</span>
-              {other && <Delta from={other.stats?.cells} to={d.stats?.cells} />}
-              {!other && <span className="text-xs text-slate-400">0.1° cells, any year</span>}
+            <Card title="Every year">
+              <span className="font-mono text-xl font-bold text-white">{d.stats ? d.stats.everyYear.toLocaleString() : '—'}</span>
+              {other && <Delta from={other.stats?.everyYear} to={d.stats?.everyYear} />}
+              {!other && <span className="text-xs text-slate-400">cells, 14 of 14 years</span>}
             </Card>
           </div>
         )
@@ -71,9 +71,9 @@ export function PatternMiniStats({ a, b = null }: { a: PatternSideStats; b?: Pat
     <div className="flex flex-col gap-1.5" data-testid="pattern-stats">
       <div className="grid grid-cols-[3.25rem_1fr_1fr_1fr] gap-x-2 text-[10px] font-medium tracking-wider text-slate-400 uppercase">
         <span />
-        <span>Likely</span>
+        <span>Cells</span>
         <span>Top cell</span>
-        <span>With fire</span>
+        <span>14/14</span>
       </div>
       {rows.map((d) => (
         <div key={d.side} className={`grid grid-cols-[3.25rem_1fr_1fr_1fr] items-baseline gap-x-2 ${d.loading ? 'opacity-60' : ''}`}>
@@ -82,10 +82,10 @@ export function PatternMiniStats({ a, b = null }: { a: PatternSideStats; b?: Pat
             {MONTHS_FULL[d.month - 1].slice(0, 3)}
           </span>
           <span className="truncate font-mono text-sm font-bold text-white" data-testid="pattern-likely">
-            {d.stats ? d.stats.likely.toLocaleString() : '—'}
+            {d.stats ? d.stats.cells.toLocaleString() : '—'}
           </span>
           <span className="truncate font-mono text-sm font-bold text-white">{d.stats?.top ? formatProbability(d.stats.top.probability) : '—'}</span>
-          <span className="truncate font-mono text-sm font-bold text-white">{d.stats ? d.stats.cells.toLocaleString() : '—'}</span>
+          <span className="truncate font-mono text-sm font-bold text-white">{d.stats ? d.stats.everyYear.toLocaleString() : '—'}</span>
         </div>
       ))}
     </div>

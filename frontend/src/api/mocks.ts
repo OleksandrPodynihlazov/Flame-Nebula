@@ -210,6 +210,7 @@ export function mockCalendar(q: ApiQuery): Promise<CalendarResponse> {
 const PATTERN_YEARS = 14
 
 function patternInArea(c: PatternCell, q: PatternQuery) {
+  if (q.min_probability !== undefined && c.probability < q.min_probability) return false
   if (q.polygon) return inPolygon([c.lon, c.lat], JSON.parse(q.polygon))
   if (q.lat !== undefined && q.lon !== undefined && q.radius_km !== undefined) return haversineKm(q.lat, q.lon, c.lat, c.lon) <= q.radius_km
   return true
@@ -230,7 +231,7 @@ function patternCells(month: number): PatternCell[] {
         const lat = Math.floor((c.lat + i / 10) * 10)
         const lon = Math.floor((c.lon + j / 10) * 10)
         const d = Math.hypot(i / 10, j / 10) / c.spread
-        const p = Math.min(1, season * Math.exp(-d * d) * (0.6 + 0.6 * rand()) * (c.weight / 16))
+        const p = Math.min(1, season * Math.exp(-d * d) * (0.9 + 0.8 * rand()) * (c.weight / 12))
         const burned = Math.round(p * PATTERN_YEARS)
         if (burned < 1 || rand() > 0.85) continue
         const key = `${lat},${lon}`

@@ -12,10 +12,10 @@ async function rowsOrEmpty(sql) {
   }
 }
 
-export async function getPatterns(filters, month) {
-  return { month, cells: await rowsOrEmpty(patternsSql(filters, month)) };
+export async function getPatterns(filters, month, minProbability = null) {
+  return { month, cells: await rowsOrEmpty(patternsSql(filters, month, minProbability)) };
 }
 
-export async function getPatternSummary(filters) {
-  return { months: fillMonths(await rowsOrEmpty(summarySql(filters))) };
+export async function getPatternSummary(filters, minProbability = null) {
+  return { months: fillMonths(await rowsOrEmpty(summarySql(filters, minProbability))) };
 }

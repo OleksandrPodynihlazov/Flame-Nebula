@@ -2,7 +2,7 @@ import L from 'leaflet'
 import { useEffect, useRef } from 'react'
 import { useMap } from 'react-leaflet'
 import type { PatternCell } from '../types/api'
-import { formatProbability, patternColor } from '../utils/patterns'
+import { formatProbability, patternShade } from '../utils/patterns'
 import { HOTSPOT_PANE } from './useGeoman'
 
 const HALF = 0.05
@@ -22,11 +22,11 @@ export function patternTooltip(c: PatternCell, monthName: string): string {
 function style(c: PatternCell): L.PathOptions {
   return {
     stroke: true,
-    color: patternColor(c.probability),
+    color: patternShade(c.probability),
     weight: 0.5,
     opacity: 0.9,
-    fillColor: patternColor(c.probability),
-    fillOpacity: 0.25 + 0.5 * c.probability,
+    fillColor: patternShade(c.probability),
+    fillOpacity: 0.7,
   }
 }
 
