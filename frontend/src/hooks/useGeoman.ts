@@ -1,7 +1,6 @@
 // leaflet must evaluate before geoman: geoman reads the global `L` that leaflet sets.
 import L from 'leaflet'
 import '@geoman-io/leaflet-geoman-free'
-import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css'
 import { useEffect, useRef } from 'react'
 import { useMap } from 'react-leaflet'
 import type { Area, LonLat } from '../types/api'
@@ -12,7 +11,8 @@ export const HOTSPOT_PANE = 'hotspots'
 export const HOTSPOT_PANE_B = 'hotspots-b'
 const HOTSPOT_PANES = [HOTSPOT_PANE, HOTSPOT_PANE_B]
 
-const SHAPE_STYLE: L.PathOptions = { color: '#fb923c', weight: 2, fillColor: '#f97316', fillOpacity: 0.08 }
+/** Mirrors --flare (outline) and --primary (fill): same ember as the region outline. */
+const SHAPE_STYLE: L.PathOptions = { color: '#ffc24b', weight: 2, fillColor: '#ff6a1a', fillOpacity: 0.1 }
 
 const round = (n: number, digits: number) => Number(n.toFixed(digits))
 

@@ -1,7 +1,10 @@
 import L from 'leaflet'
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { ChevronsLeftRight } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { useMap } from 'react-leaflet'
+import { cn } from '@/lib/utils'
+import { FLOAT_PANEL } from '../floating'
 
 const MIN = 0.02
 const MAX = 0.98
@@ -104,30 +107,30 @@ export function SwipeCompare({ leftPane, rightPane, left, right, leftColor, righ
   return createPortal(
     <>
       <div
-        className="pointer-events-none absolute top-3 z-[1000] flex justify-end"
+        className="pointer-events-none absolute top-3 z-[1000] flex justify-end lg:top-[10px]"
         style={{ right: `calc(${100 - ratio * 100}% + 12px)` }}
       >
         <div
-          className="flex items-center gap-1.5 whitespace-nowrap rounded-lg border bg-slate-900/90 px-2.5 py-1 text-xs shadow-xl backdrop-blur-md"
+          className={cn(FLOAT_PANEL, 'flex h-9 items-center gap-2 px-3 text-xs whitespace-nowrap')}
           style={{ borderColor: leftColor }}
           data-testid="compare-label-a"
         >
-          <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: leftColor }} />
+          <span aria-hidden="true" className="size-2 shrink-0 rounded-full" style={{ background: leftColor }} />
           {left}
         </div>
       </div>
-      <div className="pointer-events-none absolute top-3 z-[1000]" style={{ left: `calc(${pct} + 12px)` }}>
+      <div className="pointer-events-none absolute top-3 z-[1000] lg:top-[10px]" style={{ left: `calc(${pct} + 12px)` }}>
         <div
-          className="flex items-center gap-1.5 whitespace-nowrap rounded-lg border bg-slate-900/90 px-2.5 py-1 text-xs shadow-xl backdrop-blur-md"
+          className={cn(FLOAT_PANEL, 'flex h-9 items-center gap-2 px-3 text-xs whitespace-nowrap')}
           style={{ borderColor: rightColor }}
           data-testid="compare-label-b"
         >
-          <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: rightColor }} />
+          <span aria-hidden="true" className="size-2 shrink-0 rounded-full" style={{ background: rightColor }} />
           {right}
         </div>
       </div>
 
-      <div className="pointer-events-none absolute inset-y-0 z-[999] w-0.5 -translate-x-1/2 bg-white/90 shadow-[0_0_8px_rgba(0,0,0,0.6)]" style={{ left: pct }} />
+      <div className="pointer-events-none absolute inset-y-0 z-[999] w-0.5 -translate-x-1/2 bg-foreground/80 shadow-[0_0_8px_var(--background)]" style={{ left: pct }} />
 
       <div
         ref={handleRef}
@@ -139,12 +142,10 @@ export function SwipeCompare({ leftPane, rightPane, left, right, leftColor, righ
         aria-valuenow={Math.round(ratio * 100)}
         onKeyDown={onKeyDown}
         data-testid="compare-divider"
-        className="absolute top-1/2 z-[1000] flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize touch-none items-center justify-center rounded-full border-2 border-white bg-slate-900/90 text-white shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
+        className={cn(FLOAT_PANEL, 'absolute top-1/2 z-[1000] flex size-11 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize touch-none items-center justify-center rounded-full text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring')}
         style={{ left: pct }}
       >
-        <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" d="m9 6-6 6 6 6M15 6l6 6-6 6" />
-        </svg>
+        <ChevronsLeftRight className="size-4" aria-hidden="true" />
       </div>
     </>,
     map.getContainer(),

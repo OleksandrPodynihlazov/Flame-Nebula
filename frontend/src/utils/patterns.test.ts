@@ -53,8 +53,8 @@ describe('peakPatternMonth', () => {
 describe('formatting', () => {
   it('formats probability and colors', () => {
     expect(formatProbability(0.929)).toBe('93%')
-    expect(patternColor(0)).toBe('rgb(253, 230, 138)')
-    expect(patternColor(1)).toBe('rgb(185, 28, 28)')
+    expect(patternColor(0)).toBe('rgb(255, 231, 163)')
+    expect(patternColor(1)).toBe('rgb(142, 31, 11)')
     expect(patternShade(MIN_PROBABILITY)).toBe(patternColor(0))
     expect(patternShade(1)).toBe(patternColor(1))
   })

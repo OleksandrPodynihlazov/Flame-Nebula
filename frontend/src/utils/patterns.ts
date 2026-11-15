@@ -16,10 +16,11 @@ export function patternQuery(f: Filters, month?: number): PatternQuery {
   return q
 }
 
+/** Pale → ember → deep red: --heat-6, --heat-4, --heat-2 (see RAMP in calendar.ts). */
 const STOPS: [number, [number, number, number]][] = [
-  [0, [253, 230, 138]],
-  [0.5, [249, 115, 22]],
-  [1, [185, 28, 28]],
+  [0, [255, 231, 163]],
+  [0.5, [255, 122, 26]],
+  [1, [142, 31, 11]],
 ]
 
 export function patternRgb(p: number): [number, number, number] {

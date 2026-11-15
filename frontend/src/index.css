@@ -109,7 +109,11 @@
   }
 }
 
-/* Leaflet: dark popups and controls to match the app. */
+/*
+ * Leaflet and geoman: floating controls in the app's card idiom (card/90 + blur, 1px border, 8px radius, 36px, 44px on phone).
+ * Both stylesheets are imported in main.tsx before this file, so equal specificity here wins; !important stays only
+ * where a vendor rule is more specific (geoman's `.button-container a`).
+ */
 .leaflet-container {
   background: var(--background);
   font-family: var(--font-sans);
@@ -118,23 +122,48 @@
   /* zoomSnap 0.25 scales tiles to fractional sizes; this hides the hairline seams between them. */
   outline: 1px solid transparent;
 }
+
+/* Popups: a card; the dot popup's content styles itself. */
 .leaflet-popup-content-wrapper,
 .leaflet-popup-tip {
-  background: color-mix(in srgb, var(--card) 95%, transparent);
+  background: color-mix(in srgb, var(--card) 96%, transparent);
   color: var(--card-foreground);
   border: 1px solid var(--border);
-  border-radius: 0.65rem;
-  box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.7);
+  box-shadow: 0 8px 24px -6px rgb(0 0 0 / 0.65);
+}
+.leaflet-popup-content-wrapper {
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(4px);
 }
 .leaflet-popup-content {
-  margin: 10px 12px;
+  margin: 12px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.leaflet-popup-content p {
+  margin: 0;
 }
 .leaflet-container a.leaflet-popup-close-button {
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
   color: var(--muted-foreground);
+  font: 16px/1 var(--font-sans);
 }
 .leaflet-container a.leaflet-popup-close-button:hover {
+  background: var(--accent);
   color: var(--foreground);
 }
+.leaflet-container a.leaflet-popup-close-button:focus-visible {
+  outline: 2px solid var(--ring);
+}
+
 .leaflet-control-attribution {
   background: color-mix(in srgb, var(--background) 75%, transparent) !important;
   color: var(--muted-foreground) !important;
@@ -143,30 +172,117 @@
 .leaflet-control-attribution a {
   color: var(--muted-foreground) !important;
 }
-.leaflet-bar a {
-  background: color-mix(in srgb, var(--card) 90%, transparent) !important;
-  color: var(--foreground) !important;
-  border-color: var(--border) !important;
-}
-.leaflet-bar a:hover {
-  background: var(--accent) !important;
+
+/* Tooltips (geoman's drawing hints): same card as popups. */
+.leaflet-tooltip {
+  background: color-mix(in srgb, var(--card) 96%, transparent);
+  color: var(--card-foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px -6px rgb(0 0 0 / 0.65);
+  font-size: 12px;
 }
 
-/* Geoman draw toolbar: light icons on the dark Leaflet bar, orange for the active tool. */
+/* Zoom and geoman bars: one panel, hairline dividers between buttons. */
+.leaflet-bar,
+.leaflet-touch .leaflet-bar {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--card) 90%, transparent);
+  box-shadow: none;
+  backdrop-filter: blur(4px);
+}
+.leaflet-bar a,
+.leaflet-touch .leaflet-bar a {
+  width: 36px;
+  height: 36px;
+  line-height: 36px;
+  background-color: transparent !important;
+  color: var(--foreground) !important;
+  border-bottom: 1px solid var(--border);
+  font: 500 18px/36px var(--font-sans);
+  text-indent: 0;
+}
+.leaflet-bar a:first-child,
+.leaflet-touch .leaflet-bar a:first-child {
+  border-radius: calc(var(--radius-lg) - 1px) calc(var(--radius-lg) - 1px) 0 0;
+}
+.leaflet-bar a:last-child,
+.leaflet-touch .leaflet-bar a:last-child {
+  border-radius: 0 0 calc(var(--radius-lg) - 1px) calc(var(--radius-lg) - 1px);
+  border-bottom: none;
+}
+.leaflet-bar a:hover,
+.leaflet-bar a:focus-visible {
+  background-color: var(--accent) !important;
+}
+.leaflet-bar a:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+.leaflet-bar a.leaflet-disabled {
+  color: var(--muted-foreground) !important;
+}
+
+/* Geoman toolbar: same buttons; the active tool is ember with a dark icon. */
+.leaflet-pm-toolbar .button-container a.leaflet-buttons-control-button {
+  padding: 8px;
+  border-radius: 0;
+}
+.leaflet-pm-toolbar .button-container:first-child a.leaflet-buttons-control-button {
+  border-radius: calc(var(--radius-lg) - 1px) calc(var(--radius-lg) - 1px) 0 0;
+}
+.leaflet-pm-toolbar .button-container:last-child a.leaflet-buttons-control-button {
+  border-radius: 0 0 calc(var(--radius-lg) - 1px) calc(var(--radius-lg) - 1px);
+  border-bottom: none;
+}
 .leaflet-pm-toolbar .control-icon {
   filter: invert(0.9);
 }
 .leaflet-pm-toolbar .button-container.active > a.leaflet-buttons-control-button {
-  background: var(--primary) !important;
+  background-color: var(--primary) !important;
   box-shadow: none;
 }
+.leaflet-pm-toolbar .button-container.active > a.leaflet-buttons-control-button .control-icon {
+  filter: none;
+}
+.leaflet-pm-toolbar .button-container.active > a.leaflet-buttons-control-button:hover {
+  background-color: color-mix(in srgb, var(--primary) 85%, white) !important;
+}
+.leaflet-pm-toolbar .leaflet-buttons-control-button.pm-disabled > .control-icon {
+  filter: invert(0.9) opacity(0.4);
+}
 .leaflet-pm-toolbar .leaflet-pm-actions-container a.leaflet-pm-action {
-  background: var(--secondary) !important;
+  height: 36px;
+  line-height: 34px;
+  padding: 0 12px;
+  background-color: color-mix(in srgb, var(--card) 95%, transparent) !important;
   color: var(--foreground) !important;
-  border-color: var(--border) !important;
+  border: 1px solid var(--border);
+  border-left: 0;
+  font: 500 12px/34px var(--font-sans);
 }
 .leaflet-pm-toolbar .leaflet-pm-actions-container a.leaflet-pm-action:hover {
-  background: var(--accent) !important;
+  background-color: var(--accent) !important;
+}
+.leaflet-pm-toolbar .leaflet-pm-actions-container:not(.pos-right) a.leaflet-pm-action:last-child {
+  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+}
+.leaflet-pm-toolbar .leaflet-pm-actions-container.pos-right a.leaflet-pm-action:first-child {
+  border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+}
+
+@media (max-width: 1023px) {
+  .leaflet-bar a,
+  .leaflet-touch .leaflet-bar a {
+    width: 44px;
+    height: 44px;
+    line-height: 44px;
+  }
+  .leaflet-pm-toolbar .leaflet-pm-actions-container a.leaflet-pm-action {
+    height: 44px;
+    line-height: 42px;
+  }
 }
 
 @media (max-width: 1023px) {
@@ -200,19 +316,19 @@
   background: color-mix(in srgb, var(--card) 95%, transparent);
   border: 1px solid var(--border);
   color: var(--card-foreground);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   padding: 8px 10px;
-  box-shadow: 0 10px 25px rgb(0 0 0 / 0.4);
+  box-shadow: 0 8px 24px -6px rgb(0 0 0 / 0.65);
 }
 .pattern-tooltip.leaflet-tooltip-top::before {
   border-top-color: var(--border);
 }
 .pattern-tip-title {
-  font-weight: 700;
+  font-weight: 600;
   margin-bottom: 2px;
 }
 .pattern-tip-muted {
   margin-top: 2px;
   font-size: 11px;
-  opacity: 0.6;
+  color: var(--muted-foreground);
 }
